@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { computePlan, type AssetDef, type Row } from "@/lib/rebalance";
 import {
   DEFAULT_ASSETS,
@@ -46,7 +45,6 @@ export default function Home() {
   const [newName, setNewName] = useState("");
   const [newTarget, setNewTarget] = useState("");
   const skipOnce = useRef(true);
-  const router = useRouter();
 
   useEffect(() => {
     let cancelled = false;
@@ -157,11 +155,6 @@ export default function Home() {
     setValues({ ...DEFAULT_VALUES });
     setContribution("");
   };
-
-  const handleLogout = useCallback(async () => {
-    await fetch("/api/logout", { method: "POST" });
-    router.push("/login");
-  }, [router]);
 
   return (
     <div className={styles.page}>
@@ -479,9 +472,6 @@ export default function Home() {
                 <div className={styles.footerLeft}>
                   <button type="button" className={styles.reset} onClick={handleReset}>
                     Restablecer
-                  </button>
-                  <button type="button" className={styles.reset} onClick={handleLogout}>
-                    Salir
                   </button>
                 </div>
                 <button
