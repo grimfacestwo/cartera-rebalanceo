@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -14,7 +14,22 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Cartera Rebalanceo",
-  description: "Recalcula tu cartera MSCI / Oro / Bitcoin",
+  description:
+    "Calculadora de rebalanceo de cartera por inyección de capital, sin vender: MSCI World, Oro y Bitcoin.",
+  applicationName: "Cartera Rebalanceo",
+  openGraph: {
+    title: "Cartera Rebalanceo",
+    description:
+      "Calculadora de rebalanceo de cartera por inyección de capital, sin vender.",
+    type: "website",
+    locale: "es_ES",
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#0f172a",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

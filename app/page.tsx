@@ -291,67 +291,69 @@ export default function Home() {
               </p>
             ) : (
               <>
-                <table className={styles.table}>
-                  <thead>
-                    <tr>
-                      <th>Activo</th>
-                      <th>Actual</th>
-                      <th>% actual</th>
-                      <th>Objetivo</th>
-                      <th>Inyectar (alinear)</th>
-                      <th>Aportación</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tableRows.map((r) => {
-                      const isTotal = r.id === "total";
-                      const needAlign = r.toAlign > Math.max(0.01, total * 0.001);
-                      const hasAlloc = extra > 0 && r.allocation > 0.01;
-                      return (
-                        <tr key={r.id} className={isTotal ? styles.totalRow : ""}>
-                          <td>
-                            <span className={styles.cellName}>
-                              <span
-                                className={styles.dot}
-                                style={{ background: r.color }}
-                              />
-                              {r.name}
-                            </span>
-                          </td>
-                          <td>{currency.format(r.value)}</td>
-                          <td>{r.currentPct.toFixed(1)}%</td>
-                          <td>{isTotal ? "100%" : `${r.targetPct.toFixed(1)}%`}</td>
-                          <td>
-                            {isTotal ? (
-                              <span className={styles.plain}>
-                                {aligned ? "—" : currency.format(r.toAlign)}
+                <div className={styles.tableWrap}>
+                  <table className={styles.table}>
+                    <thead>
+                      <tr>
+                        <th>Activo</th>
+                        <th>Actual</th>
+                        <th>% actual</th>
+                        <th>Objetivo</th>
+                        <th>Inyectar (alinear)</th>
+                        <th>Aportación</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tableRows.map((r) => {
+                        const isTotal = r.id === "total";
+                        const needAlign = r.toAlign > Math.max(0.01, total * 0.001);
+                        const hasAlloc = extra > 0 && r.allocation > 0.01;
+                        return (
+                          <tr key={r.id} className={isTotal ? styles.totalRow : ""}>
+                            <td>
+                              <span className={styles.cellName}>
+                                <span
+                                  className={styles.dot}
+                                  style={{ background: r.color }}
+                                />
+                                {r.name}
                               </span>
-                            ) : needAlign ? (
-                              <span className={styles.inject}>
-                                Inyectar {currency.format(r.toAlign)}
-                              </span>
-                            ) : (
-                              <span className={styles.plain}>—</span>
-                            )}
-                          </td>
-                          <td>
-                            {isTotal ? (
-                              <span className={styles.plain}>
-                                {extra > 0 ? currency.format(r.allocation) : "—"}
-                              </span>
-                            ) : hasAlloc ? (
-                              <span className={styles.inject}>
-                                {currency.format(r.allocation)}
-                              </span>
-                            ) : (
-                              <span className={styles.plain}>—</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                            </td>
+                            <td>{currency.format(r.value)}</td>
+                            <td>{r.currentPct.toFixed(1)}%</td>
+                            <td>{isTotal ? "100%" : `${r.targetPct.toFixed(1)}%`}</td>
+                            <td>
+                              {isTotal ? (
+                                <span className={styles.plain}>
+                                  {aligned ? "—" : currency.format(r.toAlign)}
+                                </span>
+                              ) : needAlign ? (
+                                <span className={styles.inject}>
+                                  Inyectar {currency.format(r.toAlign)}
+                                </span>
+                              ) : (
+                                <span className={styles.plain}>—</span>
+                              )}
+                            </td>
+                            <td>
+                              {isTotal ? (
+                                <span className={styles.plain}>
+                                  {extra > 0 ? currency.format(r.allocation) : "—"}
+                                </span>
+                              ) : hasAlloc ? (
+                                <span className={styles.inject}>
+                                  {currency.format(r.allocation)}
+                                </span>
+                              ) : (
+                                <span className={styles.plain}>—</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
 
                 {aligned && extra === 0 && (
                   <p className={styles.balanced}>
