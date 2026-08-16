@@ -7,3 +7,40 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## Commands
+
+```bash
+npm run dev        # dev server
+npm run lint       # eslint (next/core-web-vitals + typescript)
+npm run typecheck  # tsc --noEmit
+npm test           # vitest run (no config, picks up lib/*.test.ts)
+```
+
+**Verify before committing**: `npm run lint && npm run typecheck && npm test` (matches CI order).
+
+## Repo architecture
+
+- **Next.js 16.3.1 App Router**, React 19, TypeScript strict, Vercel Postgres (`@vercel/postgres`).
+- **`proxy.ts` is the middleware** (Next 16 renamed `middleware` → `proxy`). Auth: `SITE_PASSWORD` env var → sha256 stored in cookie `site_auth`. If env var is unset, no auth. Matcher skips `/api`, static, `/login`. API routes do their own auth check via `expectedToken`/`safeEqual` from `@/lib/auth`. `.env*` is gitignored — never commit credentials.
+- **Route handlers use async params** (Next 15+/16 convention): `{ params }: { params: Promise<{ slug: string }> }` — must `await params`.
+- **Persistence**: tables are created at runtime with `CREATE TABLE IF NOT EXISTS` inside route code. `portfolio_state` (Finanzas) in `app/api/state/route.ts`; `section_state` (key-value: `id` text, `data` jsonb) in `lib/db.ts` via `ensureSectionTable()`. **`db/schema.sql` is stale** — it's missing `banks`/`expenses`/`months` columns. Trust the route code, not schema.sql.
+
+## State pattern (`lib/state.ts`)
+
+All persisted state uses **defensive parsers** (`parseState`, `parseExpenses`, `parseBanks`…) that sanitize unknown DB JSON and fall back to defaults — never trust raw DB data. New persisted data must follow this pattern. Values are stored as **strings**, not numbers. Types: `PortfolioState`, `MonthData`, `Expense`, `BankId`.
+
+## Sections
+
+Pages live under `app/(app)/`. Simple sections (`coches`, `lectura`, `planificacion`) are just `export default function X() { return <NoteSection slug="..." /> }`. `NoteSection` (`app/(app)/note-section.tsx`) is a client component that autosaves `{note: string}` JSON to `/api/section/[slug]` with 500ms debounce. Slug regex: `^[a-z0-9-]+$`.
+
+## Tests
+
+- Colocated as `lib/*.test.ts`, **use relative imports** (not `@/`), no vitest config needed.
+- Fast, pure unit tests, no DB required.
+
+## Style
+
+- Dark theme, inline styles + CSS modules.
+- UI text and commit messages **in Spanish**.
+- `@/*` path alias maps to repo root (tsconfig).
