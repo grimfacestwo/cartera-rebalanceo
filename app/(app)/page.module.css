@@ -406,6 +406,12 @@
   color: #94a3b8;
 }
 
+.pending {
+  color: #f59e0b;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .balanced {
   margin-top: 1rem;
   color: #22c55e;

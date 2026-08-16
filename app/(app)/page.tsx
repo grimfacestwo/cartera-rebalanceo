@@ -177,6 +177,9 @@ export default function Home() {
   const bankExpenses = (bankId: BankId) =>
     activeData.expenses.reduce((s, e) => e.bank === bankId ? s + (Number.parseFloat(e.amount) || 0) : s, 0);
 
+  const bankPendientes = (bankId: BankId) =>
+    activeData.expenses.filter((e) => e.bank === bankId && !e.paid).reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
+
   const bankTotal = BANK_IDS.reduce((s, id) => s + (Number.parseFloat(activeData.banks[id]) || 0), 0);
   const totalExpenses = activeData.expenses.reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
   const remaining = bankTotal - totalExpenses;
@@ -222,6 +225,7 @@ export default function Home() {
   const activeExpenses = activeData.expenses;
   const totalFijos = activeExpenses.filter((e) => e.type === "fijo").reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
   const pagados = activeExpenses.filter((e) => e.paid).length;
+  const totalPendientes = activeExpenses.filter((e) => !e.paid).reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
 
   return (
     <div className={styles.page}>
@@ -377,18 +381,20 @@ export default function Home() {
               <h2>Bancos</h2>
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
-                  <thead><tr><th>Banco</th><th>Saldo</th><th>Gastos</th><th>Restante</th></tr></thead>
+                  <thead><tr><th>Banco</th><th>Saldo</th><th>Gastos</th><th>Restante</th><th>Pendientes</th></tr></thead>
                   <tbody>
                     {BANK_IDS.map((id) => {
                       const saldo = Number.parseFloat(activeData.banks[id]) || 0;
                       const gastos = bankExpenses(id);
                       const rest = saldo - gastos;
+                      const pend = bankPendientes(id);
                       return (
                         <tr key={id}>
                           <td className={styles.cellName}>{BANK_LABELS[id]}</td>
                           <td><input type="text" inputMode="decimal" value={activeData.banks[id]} onChange={(e) => setBank(id, e.target.value)} placeholder="0" className={styles.expenseInput} aria-label={`Saldo ${BANK_LABELS[id]}`} /></td>
                           <td>{currency.format(gastos)}</td>
                           <td className={rest >= 0 ? styles.inject : ""}>{currency.format(rest)}</td>
+                          <td className={pend > 0 ? styles.pending : ""}>{currency.format(pend)}</td>
                         </tr>
                       );
                     })}
@@ -397,6 +403,7 @@ export default function Home() {
                       <td>{currency.format(bankTotal)}</td>
                       <td>{currency.format(totalExpenses)}</td>
                       <td className={remaining >= 0 ? styles.inject : ""}>{currency.format(remaining)}</td>
+                      <td className={styles.pending}>{currency.format(totalPendientes)}</td>
                     </tr>
                   </tbody>
                 </table>
