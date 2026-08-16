@@ -288,6 +288,11 @@
   margin-top: 1.5rem;
 }
 
+.footerLeft {
+  display: flex;
+  gap: 0.5rem;
+}
+
 .closeBtn {
   padding: 0.5rem 0.9rem;
   border-radius: 8px;

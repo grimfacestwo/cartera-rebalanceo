@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useRouter } from "next/navigation";
 import { computePlan, type AssetDef, type Row } from "@/lib/rebalance";
 import styles from "./page.module.css";
 
@@ -137,6 +138,7 @@ export default function Home() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [newTarget, setNewTarget] = useState("");
+  const router = useRouter();
 
   const plan = useMemo(() => {
     const parsed = Object.fromEntries(
@@ -196,6 +198,11 @@ export default function Home() {
     setAssets(DEFAULT_ASSETS);
     setValues(DEFAULT_VALUES);
     setContribution("");
+  };
+
+  const handleLogout = async () => {
+    await fetch("/api/logout", { method: "POST" });
+    router.push("/login");
   };
 
   return (
@@ -485,9 +492,14 @@ export default function Home() {
               </div>
 
               <div className={styles.modalFooter}>
-                <button type="button" className={styles.reset} onClick={handleReset}>
-                  Restablecer
-                </button>
+                <div className={styles.footerLeft}>
+                  <button type="button" className={styles.reset} onClick={handleReset}>
+                    Restablecer
+                  </button>
+                  <button type="button" className={styles.reset} onClick={handleLogout}>
+                    Salir
+                  </button>
+                </div>
                 <button
                   type="button"
                   className={styles.closeBtn}
