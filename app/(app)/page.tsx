@@ -36,7 +36,7 @@ const pct = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 });
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 type TabId = "cartera" | "hogar";
 
-const EMPTY_MONTH: MonthData = { banks: { ...DEFAULT_BANKS }, expenses: [], comidaDaily: "40" };
+const EMPTY_MONTH: MonthData = { banks: { ...DEFAULT_BANKS }, expenses: [], comidaDaily: "40", comidaBank: "ing" };
 
 function nextColor(assets: AssetDef[]): string {
   const used = new Set(assets.map((a) => a.color));
@@ -176,11 +176,15 @@ export default function Home() {
     }
   };
 
-  const bankExpenses = (bankId: BankId) =>
-    activeData.expenses.reduce((s, e) => e.bank === bankId ? s + (Number.parseFloat(e.amount) || 0) : s, 0);
+  const bankExpenses = (bankId: BankId) => {
+    const exp = activeData.expenses.reduce((s, e) => e.bank === bankId ? s + (Number.parseFloat(e.amount) || 0) : s, 0);
+    return exp + (activeData.comidaBank === bankId ? activeComida : 0);
+  };
 
-  const bankPendientes = (bankId: BankId) =>
-    activeData.expenses.filter((e) => e.bank === bankId && !e.paid).reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
+  const bankPendientes = (bankId: BankId) => {
+    const pen = activeData.expenses.filter((e) => e.bank === bankId && !e.paid).reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
+    return pen + (activeData.comidaBank === bankId ? activeComida : 0);
+  };
 
   const bankTotal = BANK_IDS.reduce((s, id) => s + (Number.parseFloat(activeData.banks[id]) || 0), 0);
   const totalExpensesBank = activeData.expenses.reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
@@ -222,7 +226,10 @@ export default function Home() {
       const r = bankRemaining(prev, id);
       banks[id] = r > 0 ? String(r) : "";
     }
-    setMonths((p) => ({ ...p, [nextKey]: { banks, expenses: [], comidaDaily: lastKey && p[lastKey] ? (p[lastKey]?.comidaDaily ?? "40") : "40" } }));
+    setMonths((p) => {
+      const prevMonth = lastKey ? p[lastKey] : undefined;
+      return { ...p, [nextKey]: { banks, expenses: [], comidaDaily: prevMonth?.comidaDaily ?? "40", comidaBank: prevMonth?.comidaBank ?? "ing" } };
+    });
     setActiveMonth(nextKey);
   };
 
@@ -230,6 +237,10 @@ export default function Home() {
     if (v === "" || /^\d*\.?\d*$/.test(v)) {
       updateMonth((m) => ({ ...m, comidaDaily: v }));
     }
+  };
+
+  const setComidaBank = (v: BankId) => {
+    updateMonth((m) => ({ ...m, comidaBank: v }));
   };
 
   const sortedMonthKeys = sortMonthKeys(Object.keys(months));
@@ -363,7 +374,7 @@ export default function Home() {
                     <tr className={styles.comidaRow}>
                       <td>Comida</td>
                       <td>Fijo</td>
-                      <td>—</td>
+                      <td><select value={activeData.comidaBank} onChange={(ev) => setComidaBank(ev.target.value as BankId)} className={styles.expenseSelect} aria-label="Banco Comida">{BANK_IDS.map((b) => <option key={b} value={b}>{BANK_LABELS[b]}</option>)}</select></td>
                       <td className={styles.comidaInputCell}>
                         <input type="text" inputMode="decimal" value={activeData.comidaDaily} onChange={(ev) => setComidaDaily(ev.target.value)} className={styles.expenseInput} aria-label="Comida por día" />
                         <span className={styles.comidaUnit}>€/día</span>
@@ -433,7 +444,7 @@ export default function Home() {
                 </table>
               </div>
               {activeComida > 0 && (
-                <p className={styles.bankNote}>Total incluye Comida ({activeData.comidaDaily} €/día × {activeDaysRemaining} días = {currency.format(activeComida)})</p>
+                <p className={styles.bankNote}>Comida: {activeData.comidaDaily} €/día × {activeDaysRemaining} días = {currency.format(activeComida)} ({BANK_LABELS[activeData.comidaBank]})</p>
               )}
             </section>
           </>

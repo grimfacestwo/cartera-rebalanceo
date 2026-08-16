@@ -175,6 +175,7 @@ describe("month helpers", () => {
         { id: "e3", name: "C", amount: "50", type: "variable" as const, bank: "santander" as const, paid: true },
       ],
       comidaDaily: "40",
+      comidaBank: "ing" as const,
     };
     expect(bankRemaining(month, "ing")).toBe(700);
     expect(bankRemaining(month, "santander")).toBe(450);
@@ -220,6 +221,7 @@ describe("comidaAmount", () => {
     banks: { ing: "500", santander: "200", trade: "100" },
     expenses: [],
     comidaDaily: "40",
+    comidaBank: "ing" as const,
   };
 
   it("mes futuro = 40 × díasDelMes", () => {

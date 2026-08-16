@@ -30,6 +30,7 @@ export type MonthData = {
   banks: Record<BankId, string>;
   expenses: Expense[];
   comidaDaily: string;
+  comidaBank: BankId;
 };
 
 export type PortfolioState = {
@@ -203,6 +204,9 @@ function parseMonthData(raw: unknown): MonthData | null {
       : typeof o.comidaDaily === "number"
         ? String(o.comidaDaily)
         : "40",
+    comidaBank: typeof o.comidaBank === "string" && ["ing", "santander", "trade"].includes(o.comidaBank)
+      ? (o.comidaBank as BankId)
+      : "ing",
   };
 }
 
@@ -241,6 +245,7 @@ export function parseState(raw: unknown): PortfolioState {
           banks: legacyBanks,
           expenses: legacyExpenses,
           comidaDaily: "40",
+          comidaBank: "ing",
         },
       };
     }
