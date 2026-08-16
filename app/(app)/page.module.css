@@ -440,3 +440,84 @@
   align-items: center;
   gap: 0.4rem;
 }
+
+.expenseInput {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.4rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid #334155;
+  background: #0f172a;
+  color: #f1f5f9;
+  font-size: 0.85rem;
+  font-family: inherit;
+}
+
+.expenseInput:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 1px;
+}
+
+.expenseSelect {
+  padding: 0.4rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid #334155;
+  background: #0f172a;
+  color: #f1f5f9;
+  font-size: 0.85rem;
+  font-family: inherit;
+}
+
+.expenseSelect:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 1px;
+}
+
+.expenseAddRow td {
+  padding-top: 0.6rem;
+}
+
+.expenseActions {
+  margin-top: 0.75rem;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.newMonthBtn {
+  padding: 0.45rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid #f59e0b;
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.newMonthBtn:hover {
+  background: rgba(245, 158, 11, 0.25);
+}
+
+.expenseSummary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #334155;
+  font-size: 0.85rem;
+  color: #94a3b8;
+}
+
+.card h3 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #94a3b8;
+  margin: 1.25rem 0 0.6rem;
+}
+
+.card h3:first-of-type {
+  margin-top: 0;
+}

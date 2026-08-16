@@ -2,10 +2,35 @@ import type { AssetDef } from "@/lib/rebalance";
 
 export type PortfolioValues = Record<string, string>;
 
+export type Expense = {
+  id: string;
+  name: string;
+  amount: string;
+  type: "fijo" | "variable";
+  paid: boolean;
+};
+
+export const BANK_IDS = ["ing", "santander", "trade"] as const;
+export type BankId = (typeof BANK_IDS)[number];
+
+export const BANK_LABELS: Record<BankId, string> = {
+  ing: "ING",
+  santander: "Santander",
+  trade: "Trade Republic",
+};
+
+export const DEFAULT_BANKS: Record<BankId, string> = {
+  ing: "",
+  santander: "",
+  trade: "",
+};
+
 export type PortfolioState = {
   assets: AssetDef[];
   values: PortfolioValues;
   contribution: string;
+  banks: Record<BankId, string>;
+  expenses: Expense[];
 };
 
 export const DEFAULT_ASSETS: AssetDef[] = [
@@ -24,6 +49,8 @@ export const DEFAULT_STATE: PortfolioState = {
   assets: DEFAULT_ASSETS,
   values: DEFAULT_VALUES,
   contribution: "",
+  banks: { ...DEFAULT_BANKS },
+  expenses: [],
 };
 
 export const PALETTE = [
@@ -68,6 +95,39 @@ function parseValues(raw: unknown): PortfolioValues {
   return out;
 }
 
+function parseBanks(raw: unknown): Record<BankId, string> {
+  const banks = { ...DEFAULT_BANKS };
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return banks;
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (BANK_IDS.includes(k as BankId)) {
+      if (typeof v === "number") banks[k as BankId] = String(v);
+      else if (typeof v === "string") banks[k as BankId] = v;
+    }
+  }
+  return banks;
+}
+
+export function parseExpenses(raw: unknown): Expense[] {
+  if (!Array.isArray(raw)) return [];
+  const out: Expense[] = [];
+  for (const item of raw) {
+    if (item && typeof item === "object") {
+      const o = item as Record<string, unknown>;
+      if (typeof o.id === "string" && typeof o.name === "string") {
+        const t = o.type;
+        out.push({
+          id: o.id,
+          name: o.name,
+          amount: typeof o.amount === "string" ? o.amount : "",
+          type: t === "fijo" || t === "variable" ? t : "variable",
+          paid: o.paid === true,
+        });
+      }
+    }
+  }
+  return out;
+}
+
 export function parseState(raw: unknown): PortfolioState {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     return { ...DEFAULT_STATE, values: { ...DEFAULT_VALUES } };
@@ -83,5 +143,7 @@ export function parseState(raw: unknown): PortfolioState {
     assets,
     values,
     contribution: typeof o.contribution === "string" ? o.contribution : "",
+    banks: parseBanks(o.banks),
+    expenses: parseExpenses(o.expenses),
   };
 }

@@ -3,10 +3,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { computePlan, type AssetDef, type Row } from "@/lib/rebalance";
 import {
+  BANK_IDS,
+  BANK_LABELS,
   DEFAULT_ASSETS,
   DEFAULT_VALUES,
   PALETTE,
   parseState,
+  type BankId,
+  type Expense,
   type PortfolioValues,
 } from "@/lib/state";
 import styles from "./page.module.css";
@@ -33,10 +37,23 @@ function newAssetId(): string {
     : `a${Date.now()}`;
 }
 
+function newExpId(): string {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `e${Date.now()}`;
+}
+
+const ZERO_BANKS: Record<BankId, string> = { ing: "", santander: "", trade: "" };
+
 export default function Home() {
   const [assets, setAssets] = useState<AssetDef[]>(DEFAULT_ASSETS);
   const [values, setValues] = useState<PortfolioValues>(DEFAULT_VALUES);
   const [contribution, setContribution] = useState("");
+  const [banks, setBanks] = useState<Record<BankId, string>>(ZERO_BANKS);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [newExpName, setNewExpName] = useState("");
+  const [newExpAmount, setNewExpAmount] = useState("");
+  const [newExpType, setNewExpType] = useState<"fijo" | "variable">("variable");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -58,6 +75,8 @@ export default function Home() {
           setAssets(state.assets);
           setValues(state.values);
           setContribution(state.contribution);
+          setBanks(state.banks);
+          setExpenses(state.expenses);
           setLoadError(false);
         }
       } catch {
@@ -82,13 +101,13 @@ export default function Home() {
       fetch("/api/state", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assets, values, contribution }),
+        body: JSON.stringify({ assets, values, contribution, banks, expenses }),
       })
         .then((res) => setSaveStatus(res.ok ? "saved" : "error"))
         .catch(() => setSaveStatus("error"));
     }, 500);
     return () => clearTimeout(timer);
-  }, [assets, values, contribution, loading, loadError]);
+  }, [assets, values, contribution, banks, expenses, loading, loadError]);
 
   const retryLoad = () => {
     setLoadError(false);
@@ -155,6 +174,53 @@ export default function Home() {
     setValues({ ...DEFAULT_VALUES });
     setContribution("");
   };
+
+  // Banks
+  const setBank = (id: BankId, v: string) => {
+    if (v === "" || /^\d*\.?\d*$/.test(v)) setBanks({ ...banks, [id]: v });
+  };
+
+  const bankTotal = BANK_IDS.reduce(
+    (sum, id) => sum + (Number.parseFloat(banks[id]) || 0),
+    0
+  );
+
+  // Expenses
+  const setExpField = (id: string, field: keyof Expense, val: unknown) => {
+    setExpenses(expenses.map((e) => (e.id === id ? { ...e, [field]: val } : e)));
+  };
+
+  const addExpense = () => {
+    const name = newExpName.trim();
+    if (!name || newExpAmount === "") return;
+    setExpenses([
+      ...expenses,
+      { id: newExpId(), name, amount: newExpAmount, type: newExpType, paid: false },
+    ]);
+    setNewExpName("");
+    setNewExpAmount("");
+  };
+
+  const removeExpense = (id: string) => {
+    setExpenses(expenses.filter((e) => e.id !== id));
+  };
+
+  const newMonth = () => {
+    if (!window.confirm("¿Empezar nuevo mes? Se desmarcarán todos los gastos pagados."))
+      return;
+    setExpenses(expenses.map((e) => ({ ...e, paid: false })));
+  };
+
+  const totalExpenses = expenses.reduce(
+    (s, e) => s + (Number.parseFloat(e.amount) || 0),
+    0
+  );
+  const totalFijos = expenses
+    .filter((e) => e.type === "fijo")
+    .reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
+  const totalVariables = totalExpenses - totalFijos;
+  const pagados = expenses.filter((e) => e.paid).length;
+  const pendientes = expenses.length - pagados;
 
   return (
     <div className={styles.page}>
@@ -392,6 +458,191 @@ export default function Home() {
                 </div>
               </section>
             )}
+
+            <section className={styles.card}>
+              <h2>Finanzas del hogar</h2>
+
+              <h3>Bancos</h3>
+              <div className={styles.tableWrap}>
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th>Banco</th>
+                      <th>Saldo (EUR)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {BANK_IDS.map((id) => (
+                      <tr key={id}>
+                        <td>{BANK_LABELS[id]}</td>
+                        <td>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={banks[id]}
+                            onChange={(e) => setBank(id, e.target.value)}
+                            placeholder="0"
+                            className={styles.expenseInput}
+                            aria-label={`Saldo ${BANK_LABELS[id]}`}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                    <tr className={styles.totalRow}>
+                      <td>Total</td>
+                      <td>{currency.format(bankTotal)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <h3>Gastos</h3>
+              <div className={styles.tableWrap}>
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th>Gasto</th>
+                      <th>Tipo</th>
+                      <th>Importe</th>
+                      <th>Pagado</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {expenses.map((e) => (
+                      <tr key={e.id}>
+                        <td>
+                          <input
+                            type="text"
+                            value={e.name}
+                            onChange={(ev) => setExpField(e.id, "name", ev.target.value)}
+                            className={styles.expenseInput}
+                            aria-label="Nombre del gasto"
+                          />
+                        </td>
+                        <td>
+                          <select
+                            value={e.type}
+                            onChange={(ev) =>
+                              setExpField(
+                                e.id,
+                                "type",
+                                ev.target.value as "fijo" | "variable"
+                              )
+                            }
+                            className={styles.expenseSelect}
+                            aria-label="Tipo de gasto"
+                          >
+                            <option value="fijo">Fijo</option>
+                            <option value="variable">Variable</option>
+                          </select>
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={e.amount}
+                            onChange={(ev) => {
+                              const v = ev.target.value;
+                              if (v === "" || /^\d*\.?\d*$/.test(v))
+                                setExpField(e.id, "amount", v);
+                            }}
+                            className={styles.expenseInput}
+                            aria-label="Importe"
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={e.paid}
+                            onChange={(ev) => setExpField(e.id, "paid", ev.target.checked)}
+                            aria-label="Pagado"
+                          />
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className={styles.removeBtn}
+                            onClick={() => removeExpense(e.id)}
+                            aria-label={`Eliminar gasto ${e.name}`}
+                          >
+                            ×
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+
+                    <tr className={styles.expenseAddRow}>
+                      <td>
+                        <input
+                          type="text"
+                          value={newExpName}
+                          onChange={(ev) => setNewExpName(ev.target.value)}
+                          placeholder="Nuevo gasto"
+                          className={styles.expenseInput}
+                          aria-label="Nombre del gasto"
+                        />
+                      </td>
+                      <td>
+                        <select
+                          value={newExpType}
+                          onChange={(ev) =>
+                            setNewExpType(ev.target.value as "fijo" | "variable")
+                          }
+                          className={styles.expenseSelect}
+                          aria-label="Tipo de gasto"
+                        >
+                          <option value="fijo">Fijo</option>
+                          <option value="variable">Variable</option>
+                        </select>
+                      </td>
+                      <td>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={newExpAmount}
+                          onChange={(ev) => {
+                            const v = ev.target.value;
+                            if (v === "" || /^\d*\.?\d*$/.test(v)) setNewExpAmount(v);
+                          }}
+                          placeholder="0"
+                          className={styles.expenseInput}
+                          aria-label="Importe"
+                        />
+                      </td>
+                      <td />
+                      <td>
+                        <button
+                          type="button"
+                          className={styles.addBtn}
+                          onClick={addExpense}
+                        >
+                          Añadir
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div className={styles.expenseActions}>
+                <button type="button" className={styles.newMonthBtn} onClick={newMonth}>
+                  Nuevo mes
+                </button>
+              </div>
+
+              {expenses.length > 0 && (
+                <div className={styles.expenseSummary}>
+                  <span>Total: {currency.format(totalExpenses)}</span>
+                  <span>Fijos: {currency.format(totalFijos)}</span>
+                  <span>Variables: {currency.format(totalVariables)}</span>
+                  <span>
+                    Pagados: {pagados}/{expenses.length}
+                  </span>
+                  <span>Pendientes: {pendientes}</span>
+                </div>
+              )}
+            </section>
           </>
         )}
 
