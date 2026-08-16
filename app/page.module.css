@@ -50,6 +50,12 @@
   margin: 0;
 }
 
+.saveStatus {
+  color: #22c55e;
+  margin: 0.5rem 0 0;
+  font-size: 0.8rem;
+}
+
 .grid {
   display: grid;
   grid-template-columns: 1fr 1.2fr;

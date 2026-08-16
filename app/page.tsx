@@ -1,40 +1,16 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { computePlan, type AssetDef, type Row } from "@/lib/rebalance";
+import {
+  DEFAULT_ASSETS,
+  DEFAULT_VALUES,
+  PALETTE,
+  parseState,
+  type PortfolioValues,
+} from "@/lib/state";
 import styles from "./page.module.css";
-
-const DEFAULT_ASSETS: AssetDef[] = [
-  { id: "msci", name: "MSCI World", targetPct: 68, color: "#3b82f6" },
-  { id: "oro", name: "Oro", targetPct: 25, color: "#f59e0b" },
-  { id: "btc", name: "Bitcoin", targetPct: 6, color: "#f97316" },
-];
-
-const DEFAULT_VALUES: Record<string, string> = {
-  msci: "10000",
-  oro: "2500",
-  btc: "500",
-};
-
-const STORAGE = {
-  assets: "cartera:assets",
-  values: "cartera:values",
-  contribution: "cartera:contribution",
-};
-
-const PALETTE = [
-  "#8b5cf6",
-  "#ec4899",
-  "#14b8a6",
-  "#84cc16",
-  "#f43f5e",
-  "#06b6d4",
-  "#eab308",
-  "#6366f1",
-  "#d946ef",
-  "#22c55e",
-];
 
 const currency = new Intl.NumberFormat("es-ES", {
   style: "currency",
@@ -45,80 +21,7 @@ const currency = new Intl.NumberFormat("es-ES", {
 
 const pct = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 });
 
-const rawCache = new Map<string, string>();
-const parsedCache = new Map<string, unknown>();
-
-function defaultMerge<T>(fallback: T, parsed: unknown): T {
-  if (typeof fallback === "object" && fallback !== null && !Array.isArray(fallback)) {
-    return parsed !== null && typeof parsed === "object"
-      ? { ...fallback, ...(parsed as Record<string, unknown>) }
-      : fallback;
-  }
-  return parsed as T;
-}
-
-function mergeAssets(_fallback: AssetDef[], parsed: unknown): AssetDef[] {
-  if (!Array.isArray(parsed)) return DEFAULT_ASSETS;
-  const out: AssetDef[] = [];
-  for (const item of parsed) {
-    if (item && typeof item === "object") {
-      const o = item as Record<string, unknown>;
-      if (typeof o.id === "string" && typeof o.name === "string") {
-        out.push({
-          id: o.id,
-          name: o.name,
-          targetPct: Number(o.targetPct) || 0,
-          color: typeof o.color === "string" ? o.color : "#94a3b8",
-        });
-      }
-    }
-  }
-  return out.length > 0 ? out : DEFAULT_ASSETS;
-}
-
-function readStored<T>(
-  key: string,
-  fallback: T,
-  merge: (fb: T, parsed: unknown) => T
-): T {
-  if (typeof window === "undefined") return fallback;
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (raw === null) return fallback;
-    if (rawCache.get(key) !== raw) {
-      rawCache.set(key, raw);
-      parsedCache.set(key, merge(fallback, JSON.parse(raw)));
-    }
-    return parsedCache.get(key) as T;
-  } catch {
-    return fallback;
-  }
-}
-
-function useStored<T>(
-  key: string,
-  fallback: T,
-  merge: (fb: T, parsed: unknown) => T = defaultMerge
-): [T, (next: T) => void] {
-  const listeners = useRef(new Set<() => void>());
-  const subscribe = useCallback((cb: () => void) => {
-    listeners.current.add(cb);
-    return () => listeners.current.delete(cb);
-  }, []);
-  const value = useSyncExternalStore(
-    subscribe,
-    () => readStored(key, fallback, merge),
-    () => fallback
-  );
-  const set = useCallback(
-    (next: T) => {
-      window.localStorage.setItem(key, JSON.stringify(next));
-      listeners.current.forEach((l) => l());
-    },
-    [key]
-  );
-  return [value, set];
-}
+type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 function nextColor(assets: AssetDef[]): string {
   const used = new Set(assets.map((a) => a.color));
@@ -132,13 +35,68 @@ function newAssetId(): string {
 }
 
 export default function Home() {
-  const [assets, setAssets] = useStored(STORAGE.assets, DEFAULT_ASSETS, mergeAssets);
-  const [values, setValues] = useStored(STORAGE.values, DEFAULT_VALUES);
-  const [contribution, setContribution] = useStored(STORAGE.contribution, "");
+  const [assets, setAssets] = useState<AssetDef[]>(DEFAULT_ASSETS);
+  const [values, setValues] = useState<PortfolioValues>(DEFAULT_VALUES);
+  const [contribution, setContribution] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [newTarget, setNewTarget] = useState("");
+  const skipOnce = useRef(true);
   const router = useRouter();
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/state");
+        if (!res.ok) throw new Error("estado no disponible");
+        const data = (await res.json()) as { state?: unknown };
+        const state = parseState(data.state);
+        if (!cancelled) {
+          setAssets(state.assets);
+          setValues(state.values);
+          setContribution(state.contribution);
+          setLoadError(false);
+        }
+      } catch {
+        if (!cancelled) setLoadError(true);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
+
+  useEffect(() => {
+    if (loading || loadError) return;
+    if (skipOnce.current) {
+      skipOnce.current = false;
+      return;
+    }
+    const timer = setTimeout(() => {
+      setSaveStatus("saving");
+      fetch("/api/state", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assets, values, contribution }),
+      })
+        .then((res) => setSaveStatus(res.ok ? "saved" : "error"))
+        .catch(() => setSaveStatus("error"));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [assets, values, contribution, loading, loadError]);
+
+  const retryLoad = () => {
+    setLoadError(false);
+    setLoading(true);
+    setReloadKey((k) => k + 1);
+  };
 
   const plan = useMemo(() => {
     const parsed = Object.fromEntries(
@@ -196,14 +154,14 @@ export default function Home() {
   const handleReset = () => {
     if (!window.confirm("¿Restablecer todos los valores guardados?")) return;
     setAssets(DEFAULT_ASSETS);
-    setValues(DEFAULT_VALUES);
+    setValues({ ...DEFAULT_VALUES });
     setContribution("");
   };
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     await fetch("/api/logout", { method: "POST" });
     router.push("/login");
-  };
+  }, [router]);
 
   return (
     <div className={styles.page}>
@@ -239,185 +197,209 @@ export default function Home() {
           <p className={styles.subtitle}>
             Estrategia: nunca vendas; inyecta nuevo capital en los activos desfasados.
           </p>
+          {saveStatus !== "idle" && (
+            <p className={styles.saveStatus} role="status">
+              {saveStatus === "saving"
+                ? "Guardando…"
+                : saveStatus === "saved"
+                  ? "Guardado"
+                  : "Error al guardar"}
+            </p>
+          )}
         </header>
 
-        <section className={styles.grid}>
-          <div className={styles.card}>
-            <h2>Valores actuales (EUR)</h2>
-            {assets.map((a) => (
-              <label key={a.id} className={styles.field}>
-                <span className={styles.fieldName}>
-                  <span
-                    className={styles.dot}
-                    style={{ background: a.color }}
-                  />
-                  {a.name}
-                  <em>{pct.format(a.targetPct)}%</em>
-                </span>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={values[a.id] ?? ""}
-                  onChange={(e) => setValue(a.id, e.target.value)}
-                  aria-label={`Valor actual de ${a.name}`}
-                />
-              </label>
-            ))}
-
-            <label className={styles.field}>
-              <span className={styles.fieldName}>
-                <span className={styles.dot} style={{ background: "#22c55e" }} />
-                Aportación extra (opcional)
-              </span>
-              <input
-                type="text"
-                inputMode="decimal"
-                value={contribution}
-                onChange={(e) => {
-                  if (e.target.value === "" || /^\d*\.?\d*$/.test(e.target.value))
-                    setContribution(e.target.value);
-                }}
-                placeholder="0"
-                aria-label="Aportación extra"
-              />
-            </label>
-          </div>
-
-          <div className={styles.card}>
-            <h2>Resultado</h2>
-            {!hasValues ? (
-              <p className={styles.empty}>
-                Introduce el valor de cada posición para ver cuánto inyectar.
-              </p>
-            ) : (
-              <>
-                <div className={styles.tableWrap}>
-                  <table className={styles.table}>
-                    <thead>
-                      <tr>
-                        <th>Activo</th>
-                        <th>Actual</th>
-                        <th>% actual</th>
-                        <th>Objetivo</th>
-                        <th>Inyectar (alinear)</th>
-                        <th>Aportación</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {tableRows.map((r) => {
-                        const isTotal = r.id === "total";
-                        const needAlign = r.toAlign > Math.max(0.01, total * 0.001);
-                        const hasAlloc = extra > 0 && r.allocation > 0.01;
-                        return (
-                          <tr key={r.id} className={isTotal ? styles.totalRow : ""}>
-                            <td>
-                              <span className={styles.cellName}>
-                                <span
-                                  className={styles.dot}
-                                  style={{ background: r.color }}
-                                />
-                                {r.name}
-                              </span>
-                            </td>
-                            <td>{currency.format(r.value)}</td>
-                            <td>{r.currentPct.toFixed(1)}%</td>
-                            <td>{isTotal ? "100%" : `${r.targetPct.toFixed(1)}%`}</td>
-                            <td>
-                              {isTotal ? (
-                                <span className={styles.plain}>
-                                  {aligned ? "—" : currency.format(r.toAlign)}
-                                </span>
-                              ) : needAlign ? (
-                                <span className={styles.inject}>
-                                  Inyectar {currency.format(r.toAlign)}
-                                </span>
-                              ) : (
-                                <span className={styles.plain}>—</span>
-                              )}
-                            </td>
-                            <td>
-                              {isTotal ? (
-                                <span className={styles.plain}>
-                                  {extra > 0 ? currency.format(r.allocation) : "—"}
-                                </span>
-                              ) : hasAlloc ? (
-                                <span className={styles.inject}>
-                                  {currency.format(r.allocation)}
-                                </span>
-                              ) : (
-                                <span className={styles.plain}>—</span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                {aligned && extra === 0 && (
-                  <p className={styles.balanced}>
-                    Tu cartera ya está alineada con la asignación objetivo.
-                  </p>
-                )}
-                {aligned && extra > 0 && (
-                  <p className={styles.balanced}>
-                    Cartera alineada; la aportación se reparte según el objetivo.
-                  </p>
-                )}
-                {!aligned && extra === 0 && (
-                  <p className={styles.balanced}>
-                    Necesitas inyectar {currency.format(fullNeed)} para alinear la cartera.
-                  </p>
-                )}
-                {!aligned && extra > 0 && extra >= fullNeed && (
-                  <p className={styles.balanced}>
-                    Con tu aportación alineas la cartera
-                    {extra - fullNeed > 0.5
-                      ? ` y sobran ${currency.format(extra - fullNeed)}`
-                      : ""}
-                    .
-                  </p>
-                )}
-                {!aligned && extra > 0 && extra < fullNeed && (
-                  <p className={styles.balanced}>
-                    Tu aportación cubre el {covered}% de lo necesario; faltan{" "}
-                    {currency.format(fullNeed - extra)}.
-                  </p>
-                )}
-              </>
-            )}
-          </div>
-        </section>
-
-        {hasValues && (
+        {loading ? (
           <section className={styles.card}>
-            <h2>Distribución</h2>
-            <div className={styles.bar}>
-              {rows.map((row) =>
-                row.value > 0 ? (
-                  <div
-                    key={row.id}
-                    className={styles.barSeg}
-                    style={{
-                      width: `${row.currentPct}%`,
-                      background: row.color,
-                    }}
-                    title={`${row.name}: ${row.currentPct.toFixed(1)}%`}
-                  />
-                ) : null
-              )}
-            </div>
-            <div className={styles.legend}>
-              {rows.map((row) => (
-                <span key={row.id} className={styles.legendItem}>
-                  <span className={styles.dot} style={{ background: row.color }} />
-                  {row.name} · {row.currentPct.toFixed(1)}% (objetivo{" "}
-                  {row.targetPct.toFixed(1)}%)
-                </span>
-              ))}
-            </div>
+            <p className={styles.empty}>Cargando…</p>
           </section>
+        ) : loadError ? (
+          <section className={styles.card}>
+            <p className={styles.empty}>No se pudo cargar el estado guardado.</p>
+            <button type="button" className={styles.addBtn} onClick={retryLoad}>
+              Reintentar
+            </button>
+          </section>
+        ) : (
+          <>
+            <section className={styles.grid}>
+              <div className={styles.card}>
+                <h2>Valores actuales (EUR)</h2>
+                {assets.map((a) => (
+                  <label key={a.id} className={styles.field}>
+                    <span className={styles.fieldName}>
+                      <span
+                        className={styles.dot}
+                        style={{ background: a.color }}
+                      />
+                      {a.name}
+                      <em>{pct.format(a.targetPct)}%</em>
+                    </span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={values[a.id] ?? ""}
+                      onChange={(e) => setValue(a.id, e.target.value)}
+                      aria-label={`Valor actual de ${a.name}`}
+                    />
+                  </label>
+                ))}
+
+                <label className={styles.field}>
+                  <span className={styles.fieldName}>
+                    <span className={styles.dot} style={{ background: "#22c55e" }} />
+                    Aportación extra (opcional)
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={contribution}
+                    onChange={(e) => {
+                      if (e.target.value === "" || /^\d*\.?\d*$/.test(e.target.value))
+                        setContribution(e.target.value);
+                    }}
+                    placeholder="0"
+                    aria-label="Aportación extra"
+                  />
+                </label>
+              </div>
+
+              <div className={styles.card}>
+                <h2>Resultado</h2>
+                {!hasValues ? (
+                  <p className={styles.empty}>
+                    Introduce el valor de cada posición para ver cuánto inyectar.
+                  </p>
+                ) : (
+                  <>
+                    <div className={styles.tableWrap}>
+                      <table className={styles.table}>
+                        <thead>
+                          <tr>
+                            <th>Activo</th>
+                            <th>Actual</th>
+                            <th>% actual</th>
+                            <th>Objetivo</th>
+                            <th>Inyectar (alinear)</th>
+                            <th>Aportación</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {tableRows.map((r) => {
+                            const isTotal = r.id === "total";
+                            const needAlign = r.toAlign > Math.max(0.01, total * 0.001);
+                            const hasAlloc = extra > 0 && r.allocation > 0.01;
+                            return (
+                              <tr key={r.id} className={isTotal ? styles.totalRow : ""}>
+                                <td>
+                                  <span className={styles.cellName}>
+                                    <span
+                                      className={styles.dot}
+                                      style={{ background: r.color }}
+                                    />
+                                    {r.name}
+                                  </span>
+                                </td>
+                                <td>{currency.format(r.value)}</td>
+                                <td>{r.currentPct.toFixed(1)}%</td>
+                                <td>{isTotal ? "100%" : `${r.targetPct.toFixed(1)}%`}</td>
+                                <td>
+                                  {isTotal ? (
+                                    <span className={styles.plain}>
+                                      {aligned ? "—" : currency.format(r.toAlign)}
+                                    </span>
+                                  ) : needAlign ? (
+                                    <span className={styles.inject}>
+                                      Inyectar {currency.format(r.toAlign)}
+                                    </span>
+                                  ) : (
+                                    <span className={styles.plain}>—</span>
+                                  )}
+                                </td>
+                                <td>
+                                  {isTotal ? (
+                                    <span className={styles.plain}>
+                                      {extra > 0 ? currency.format(r.allocation) : "—"}
+                                    </span>
+                                  ) : hasAlloc ? (
+                                    <span className={styles.inject}>
+                                      {currency.format(r.allocation)}
+                                    </span>
+                                  ) : (
+                                    <span className={styles.plain}>—</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {aligned && extra === 0 && (
+                      <p className={styles.balanced}>
+                        Tu cartera ya está alineada con la asignación objetivo.
+                      </p>
+                    )}
+                    {aligned && extra > 0 && (
+                      <p className={styles.balanced}>
+                        Cartera alineada; la aportación se reparte según el objetivo.
+                      </p>
+                    )}
+                    {!aligned && extra === 0 && (
+                      <p className={styles.balanced}>
+                        Necesitas inyectar {currency.format(fullNeed)} para alinear la cartera.
+                      </p>
+                    )}
+                    {!aligned && extra > 0 && extra >= fullNeed && (
+                      <p className={styles.balanced}>
+                        Con tu aportación alineas la cartera
+                        {extra - fullNeed > 0.5
+                          ? ` y sobran ${currency.format(extra - fullNeed)}`
+                          : ""}
+                        .
+                      </p>
+                    )}
+                    {!aligned && extra > 0 && extra < fullNeed && (
+                      <p className={styles.balanced}>
+                        Tu aportación cubre el {covered}% de lo necesario; faltan{" "}
+                        {currency.format(fullNeed - extra)}.
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
+            </section>
+
+            {hasValues && (
+              <section className={styles.card}>
+                <h2>Distribución</h2>
+                <div className={styles.bar}>
+                  {rows.map((row) =>
+                    row.value > 0 ? (
+                      <div
+                        key={row.id}
+                        className={styles.barSeg}
+                        style={{
+                          width: `${row.currentPct}%`,
+                          background: row.color,
+                        }}
+                        title={`${row.name}: ${row.currentPct.toFixed(1)}%`}
+                      />
+                    ) : null
+                  )}
+                </div>
+                <div className={styles.legend}>
+                  {rows.map((row) => (
+                    <span key={row.id} className={styles.legendItem}>
+                      <span className={styles.dot} style={{ background: row.color }} />
+                      {row.name} · {row.currentPct.toFixed(1)}% (objetivo{" "}
+                      {row.targetPct.toFixed(1)}%)
+                    </span>
+                  ))}
+                </div>
+              </section>
+            )}
+          </>
         )}
 
         {settingsOpen && (
