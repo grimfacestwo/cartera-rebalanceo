@@ -7,6 +7,7 @@ export type Expense = {
   name: string;
   amount: string;
   type: "fijo" | "variable";
+  bank: BankId;
   paid: boolean;
 };
 
@@ -25,12 +26,16 @@ export const DEFAULT_BANKS: Record<BankId, string> = {
   trade: "",
 };
 
+export type MonthData = {
+  banks: Record<BankId, string>;
+  expenses: Expense[];
+};
+
 export type PortfolioState = {
   assets: AssetDef[];
   values: PortfolioValues;
   contribution: string;
-  banks: Record<BankId, string>;
-  expenses: Expense[];
+  months: Record<string, MonthData>;
 };
 
 export const DEFAULT_ASSETS: AssetDef[] = [
@@ -49,8 +54,7 @@ export const DEFAULT_STATE: PortfolioState = {
   assets: DEFAULT_ASSETS,
   values: DEFAULT_VALUES,
   contribution: "",
-  banks: { ...DEFAULT_BANKS },
-  expenses: [],
+  months: {},
 };
 
 export const PALETTE = [
@@ -65,6 +69,42 @@ export const PALETTE = [
   "#d946ef",
   "#22c55e",
 ];
+
+// --- Month helpers ---
+
+export function currentMonthKey(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+export function addMonth(key: string): string {
+  const [y, m] = key.split("-").map(Number);
+  if (!y || !m) return currentMonthKey();
+  if (m === 12) return `${y + 1}-01`;
+  return `${y}-${String(m + 1).padStart(2, "0")}`;
+}
+
+export function monthLabel(key: string): string {
+  const [y, m] = key.split("-").map(Number);
+  if (!y || !m) return key;
+  const d = new Date(y, m - 1, 1);
+  const label = new Intl.DateTimeFormat("es-ES", { month: "long", year: "numeric" }).format(d);
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+export function sortMonthKeys(keys: string[]): string[] {
+  return [...keys].sort();
+}
+
+export function bankRemaining(month: MonthData, bankId: BankId): number {
+  const saldo = Number.parseFloat(month.banks[bankId]) || 0;
+  const gastos = month.expenses
+    .filter((e) => e.bank === bankId)
+    .reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
+  return saldo - gastos;
+}
+
+// --- Parsers ---
 
 function parseAssets(raw: unknown): AssetDef[] {
   if (!Array.isArray(raw)) return DEFAULT_ASSETS;
@@ -115,15 +155,38 @@ export function parseExpenses(raw: unknown): Expense[] {
       const o = item as Record<string, unknown>;
       if (typeof o.id === "string" && typeof o.name === "string") {
         const t = o.type;
+        const b = typeof o.bank === "string" && BANK_IDS.includes(o.bank as BankId)
+          ? (o.bank as BankId)
+          : "ing";
         out.push({
           id: o.id,
           name: o.name,
           amount: typeof o.amount === "string" ? o.amount : "",
           type: t === "fijo" || t === "variable" ? t : "variable",
+          bank: b,
           paid: o.paid === true,
         });
       }
     }
+  }
+  return out;
+}
+
+function parseMonthData(raw: unknown): MonthData | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const o = raw as Record<string, unknown>;
+  return {
+    banks: parseBanks(o.banks),
+    expenses: parseExpenses(o.expenses),
+  };
+}
+
+function parseMonths(raw: unknown): Record<string, MonthData> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const out: Record<string, MonthData> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    const parsed = parseMonthData(v);
+    if (parsed) out[k] = parsed;
   }
   return out;
 }
@@ -139,11 +202,28 @@ export function parseState(raw: unknown): PortfolioState {
   for (const a of assets) {
     values[a.id] = parsedValues[a.id] ?? DEFAULT_VALUES[a.id] ?? "";
   }
+
+  let months = parseMonths(o.months);
+
+  if (Object.keys(months).length === 0) {
+    const legacyBanks = parseBanks(o.banks);
+    const legacyExpenses = parseExpenses(o.expenses);
+    const hasLegacy =
+      Object.values(legacyBanks).some((v) => v !== "") || legacyExpenses.length > 0;
+    if (hasLegacy) {
+      months = {
+        [currentMonthKey()]: {
+          banks: legacyBanks,
+          expenses: legacyExpenses,
+        },
+      };
+    }
+  }
+
   return {
     assets,
     values,
     contribution: typeof o.contribution === "string" ? o.contribution : "",
-    banks: parseBanks(o.banks),
-    expenses: parseExpenses(o.expenses),
+    months,
   };
 }

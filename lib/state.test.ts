@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_ASSETS, DEFAULT_VALUES, parseExpenses, parseState } from "./state";
+import {
+  addMonth,
+  bankRemaining,
+  currentMonthKey,
+  DEFAULT_ASSETS,
+  DEFAULT_VALUES,
+  monthLabel,
+  parseExpenses,
+  parseState,
+  sortMonthKeys,
+} from "./state";
 
 describe("parseState", () => {
   it("devuelve el estado si es válido", () => {
@@ -35,6 +45,7 @@ describe("parseState", () => {
     expect(state.assets).toEqual(DEFAULT_ASSETS);
     expect(state.values.msci).toBe(DEFAULT_VALUES.msci);
     expect(state.contribution).toBe("");
+    expect(state.months).toEqual({});
   });
 
   it("no incluye claves de activos desconocidos si ya hay datos", () => {
@@ -47,45 +58,60 @@ describe("parseState", () => {
     expect(state.values.msci).toBeUndefined();
   });
 
-  it("parsea banks con saldos válidos", () => {
+  it("parsea months con banks y expenses", () => {
     const state = parseState({
       assets: DEFAULT_ASSETS,
       values: DEFAULT_VALUES,
       contribution: "",
-      banks: { ing: "5000", santander: 3000, trade: "" },
+      months: {
+        "2026-08": {
+          banks: { ing: "5000", santander: 3000, trade: "1000" },
+          expenses: [
+            { id: "e1", name: "Alquiler", amount: "800", type: "fijo", bank: "ing", paid: true },
+          ],
+        },
+      },
     });
-    expect(state.banks.ing).toBe("5000");
-    expect(state.banks.santander).toBe("3000");
-    expect(state.banks.trade).toBe("");
+    expect(state.months["2026-08"]!.banks.ing).toBe("5000");
+    expect(state.months["2026-08"]!.banks.santander).toBe("3000");
+    expect(state.months["2026-08"]!.expenses).toHaveLength(1);
+    expect(state.months["2026-08"]!.expenses[0].bank).toBe("ing");
   });
 
-  it("devuelve banks vacíos por defecto si no hay datos", () => {
+  it("devuelve months vacío si no hay datos", () => {
     const state = parseState(null);
-    expect(state.banks).toEqual({ ing: "", santander: "", trade: "" });
+    expect(state.months).toEqual({});
   });
 
-  it("ignora bancos desconocidos en banks", () => {
-    const state = parseState({
+  it("migra banks/expenses legacy al mes actual", () => {
+    const legacy = {
       assets: DEFAULT_ASSETS,
       values: DEFAULT_VALUES,
       contribution: "",
-      banks: { ing: "100", bbva: "200" },
-    });
-    expect(state.banks.ing).toBe("100");
-    expect(state.banks).not.toHaveProperty("bbva");
+      banks: { ing: "5000", santander: "3000", trade: "1000" },
+      expenses: [
+        { id: "e1", name: "Alquiler", amount: "800", type: "fijo", paid: false },
+      ],
+    };
+    const state = parseState(legacy);
+    const key = currentMonthKey();
+    expect(state.months[key]).toBeDefined();
+    expect(state.months[key]!.banks.ing).toBe("5000");
+    expect(state.months[key]!.expenses).toHaveLength(1);
+    expect(state.months[key]!.expenses[0].bank).toBe("ing");
   });
 });
 
 describe("parseExpenses", () => {
-  it("parsea gastos válidos", () => {
+  it("parsea gastos válidos con bank", () => {
     const data = [
-      { id: "e1", name: "Alquiler", amount: "800", type: "fijo", paid: true },
-      { id: "e2", name: "Gasolina", amount: "50", type: "variable", paid: false },
+      { id: "e1", name: "Alquiler", amount: "800", type: "fijo", bank: "santander", paid: true },
+      { id: "e2", name: "Gasolina", amount: "50", type: "variable", bank: "trade", paid: false },
     ];
     const result = parseExpenses(data);
     expect(result).toHaveLength(2);
-    expect(result[0]).toEqual({ id: "e1", name: "Alquiler", amount: "800", type: "fijo", paid: true });
-    expect(result[1]).toEqual({ id: "e2", name: "Gasolina", amount: "50", type: "variable", paid: false });
+    expect(result[0]).toEqual({ id: "e1", name: "Alquiler", amount: "800", type: "fijo", bank: "santander", paid: true });
+    expect(result[1]).toEqual({ id: "e2", name: "Gasolina", amount: "50", type: "variable", bank: "trade", paid: false });
   });
 
   it("devuelve [] para datos inválidos", () => {
@@ -96,26 +122,58 @@ describe("parseExpenses", () => {
 
   it("filtra gastos con campos faltantes", () => {
     const data = [
-      { id: "e1", name: "OK", amount: "10", type: "fijo", paid: false },
-      { name: "sin id", amount: "10", type: "fijo", paid: false },
-      { id: "e3", amount: "10", type: "fijo", paid: false },
+      { id: "e1", name: "OK", amount: "10", type: "fijo", bank: "ing", paid: false },
+      { name: "sin id", amount: "10", type: "fijo", bank: "ing", paid: false },
+      { id: "e3", amount: "10", type: "fijo", bank: "ing", paid: false },
     ];
     const result = parseExpenses(data);
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe("e1");
   });
 
-  it("defaulta tipo inválido a variable", () => {
-    const result = parseExpenses([{ id: "e1", name: "Test", amount: "10", type: "raro", paid: false }]);
+  it("defaulta tipo y bank inválidos", () => {
+    const result = parseExpenses([{ id: "e1", name: "Test", amount: "10", type: "raro", bank: "bbva", paid: false }]);
     expect(result[0].type).toBe("variable");
+    expect(result[0].bank).toBe("ing");
   });
 
   it("parsea paid=true y defaults a false si falta", () => {
     const result = parseExpenses([
-      { id: "e1", name: "A", amount: "10", type: "fijo", paid: true },
-      { id: "e2", name: "B", amount: "10", type: "fijo" },
+      { id: "e1", name: "A", amount: "10", type: "fijo", bank: "ing", paid: true },
+      { id: "e2", name: "B", amount: "10", type: "fijo", bank: "ing" },
     ]);
     expect(result[0].paid).toBe(true);
     expect(result[1].paid).toBe(false);
+  });
+});
+
+describe("month helpers", () => {
+  it("addMonth avanza de mes", () => {
+    expect(addMonth("2026-08")).toBe("2026-09");
+    expect(addMonth("2026-12")).toBe("2027-01");
+  });
+
+  it("monthLabel muestra nombre legible", () => {
+    expect(monthLabel("2026-08")).toContain("Agosto");
+    expect(monthLabel("2026-08")).toContain("2026");
+    expect(monthLabel("2026-01")).toContain("Enero");
+  });
+
+  it("sortMonthKeys ordena ascendente", () => {
+    expect(sortMonthKeys(["2026-09", "2026-08", "2026-10"])).toEqual(["2026-08", "2026-09", "2026-10"]);
+  });
+
+  it("bankRemaining calcula saldo − gastos", () => {
+    const month = {
+      banks: { ing: "1000", santander: "500", trade: "300" },
+      expenses: [
+        { id: "e1", name: "A", amount: "200", type: "fijo" as const, bank: "ing" as const, paid: false },
+        { id: "e2", name: "B", amount: "100", type: "variable" as const, bank: "ing" as const, paid: false },
+        { id: "e3", name: "C", amount: "50", type: "variable" as const, bank: "santander" as const, paid: true },
+      ],
+    };
+    expect(bankRemaining(month, "ing")).toBe(700);
+    expect(bankRemaining(month, "santander")).toBe(450);
+    expect(bankRemaining(month, "trade")).toBe(300);
   });
 });

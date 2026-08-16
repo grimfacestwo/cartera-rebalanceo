@@ -23,10 +23,12 @@ async function ensureTable() {
     contribution text NOT NULL DEFAULT '',
     banks jsonb NOT NULL DEFAULT '{}'::jsonb,
     expenses jsonb NOT NULL DEFAULT '[]'::jsonb,
+    months jsonb NOT NULL DEFAULT '{}'::jsonb,
     updated_at timestamptz NOT NULL DEFAULT now()
   )`;
   await sql`ALTER TABLE portfolio_state ADD COLUMN IF NOT EXISTS banks jsonb NOT NULL DEFAULT '{}'::jsonb`;
   await sql`ALTER TABLE portfolio_state ADD COLUMN IF NOT EXISTS expenses jsonb NOT NULL DEFAULT '[]'::jsonb`;
+  await sql`ALTER TABLE portfolio_state ADD COLUMN IF NOT EXISTS months jsonb NOT NULL DEFAULT '{}'::jsonb`;
   ensured = true;
 }
 
@@ -42,7 +44,8 @@ export async function GET() {
       contribution: string;
       banks: unknown;
       expenses: unknown;
-    }>`SELECT assets, values, contribution, banks, expenses FROM portfolio_state WHERE id = 1`;
+      months: unknown;
+    }>`SELECT assets, values, contribution, banks, expenses, months FROM portfolio_state WHERE id = 1`;
     if (rows.length === 0) {
       return NextResponse.json({ state: DEFAULT_STATE });
     }
@@ -71,22 +74,20 @@ export async function PUT(request: Request) {
   try {
     await ensureTable();
     await sql`
-      INSERT INTO portfolio_state (id, assets, values, contribution, banks, expenses, updated_at)
+      INSERT INTO portfolio_state (id, assets, values, contribution, months, updated_at)
       VALUES (
         1,
         ${JSON.stringify(state.assets)}::jsonb,
         ${JSON.stringify(state.values)}::jsonb,
         ${state.contribution},
-        ${JSON.stringify(state.banks)}::jsonb,
-        ${JSON.stringify(state.expenses)}::jsonb,
+        ${JSON.stringify(state.months)}::jsonb,
         now()
       )
       ON CONFLICT (id) DO UPDATE SET
         assets = EXCLUDED.assets,
         values = EXCLUDED.values,
         contribution = EXCLUDED.contribution,
-        banks = EXCLUDED.banks,
-        expenses = EXCLUDED.expenses,
+        months = EXCLUDED.months,
         updated_at = now()
     `;
     return NextResponse.json({ ok: true });
