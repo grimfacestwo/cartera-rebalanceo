@@ -29,6 +29,7 @@ export const DEFAULT_BANKS: Record<BankId, string> = {
 export type MonthData = {
   banks: Record<BankId, string>;
   expenses: Expense[];
+  comidaDaily: string;
 };
 
 export type PortfolioState = {
@@ -102,6 +103,25 @@ export function bankRemaining(month: MonthData, bankId: BankId): number {
     .filter((e) => e.bank === bankId)
     .reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
   return saldo - gastos;
+}
+
+export function daysInMonth(key: string): number {
+  const [y, m] = key.split("-").map(Number);
+  if (!y || !m) return 30;
+  return new Date(y, m, 0).getDate();
+}
+
+export function daysRemaining(key: string): number {
+  const cur = currentMonthKey();
+  const total = daysInMonth(key);
+  if (key < cur) return 0;
+  if (key === cur) return total - new Date().getDate() + 1;
+  return total;
+}
+
+export function comidaAmount(month: MonthData, key: string): number {
+  const rate = Number.parseFloat(month.comidaDaily) || 0;
+  return rate * daysRemaining(key);
 }
 
 // --- Parsers ---
@@ -178,6 +198,11 @@ function parseMonthData(raw: unknown): MonthData | null {
   return {
     banks: parseBanks(o.banks),
     expenses: parseExpenses(o.expenses),
+    comidaDaily: typeof o.comidaDaily === "string"
+      ? o.comidaDaily
+      : typeof o.comidaDaily === "number"
+        ? String(o.comidaDaily)
+        : "40",
   };
 }
 
@@ -215,6 +240,7 @@ export function parseState(raw: unknown): PortfolioState {
         [currentMonthKey()]: {
           banks: legacyBanks,
           expenses: legacyExpenses,
+          comidaDaily: "40",
         },
       };
     }

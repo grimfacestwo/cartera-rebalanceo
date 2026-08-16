@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   addMonth,
   bankRemaining,
+  comidaAmount,
   currentMonthKey,
+  daysInMonth,
+  daysRemaining,
   DEFAULT_ASSETS,
   DEFAULT_VALUES,
   monthLabel,
@@ -171,9 +174,70 @@ describe("month helpers", () => {
         { id: "e2", name: "B", amount: "100", type: "variable" as const, bank: "ing" as const, paid: false },
         { id: "e3", name: "C", amount: "50", type: "variable" as const, bank: "santander" as const, paid: true },
       ],
+      comidaDaily: "40",
     };
     expect(bankRemaining(month, "ing")).toBe(700);
     expect(bankRemaining(month, "santander")).toBe(450);
     expect(bankRemaining(month, "trade")).toBe(300);
+  });
+});
+
+describe("daysInMonth", () => {
+  it("agosto 2026 tiene 31 días", () => {
+    expect(daysInMonth("2026-08")).toBe(31);
+  });
+
+  it("febrero 2026 tiene 28 días (no bisiesto)", () => {
+    expect(daysInMonth("2026-02")).toBe(28);
+  });
+
+  it("febrero 2028 tiene 29 días (bisiesto)", () => {
+    expect(daysInMonth("2028-02")).toBe(29);
+  });
+});
+
+describe("daysRemaining", () => {
+  it("mes pasado devuelve 0", () => {
+    expect(daysRemaining("2020-01")).toBe(0);
+  });
+
+  it("mes futuro devuelve días completos", () => {
+    expect(daysRemaining("2999-01")).toBe(31);
+    expect(daysRemaining("2999-02")).toBe(28);
+  });
+
+  it("mes actual devuelve entre 1 y díasDelMes (incluye hoy)", () => {
+    const cur = currentMonthKey();
+    const total = daysInMonth(cur);
+    const r = daysRemaining(cur);
+    expect(r).toBeGreaterThanOrEqual(1);
+    expect(r).toBeLessThanOrEqual(total);
+  });
+});
+
+describe("comidaAmount", () => {
+  const month = {
+    banks: { ing: "500", santander: "200", trade: "100" },
+    expenses: [],
+    comidaDaily: "40",
+  };
+
+  it("mes futuro = 40 × díasDelMes", () => {
+    const total = daysInMonth("2999-01");
+    expect(comidaAmount(month, "2999-01")).toBe(40 * total);
+  });
+
+  it("mes pasado = 0", () => {
+    expect(comidaAmount(month, "2020-01")).toBe(0);
+  });
+
+  it("mes actual = 40 × daysRemaining", () => {
+    const cur = currentMonthKey();
+    expect(comidaAmount(month, cur)).toBe(40 * daysRemaining(cur));
+  });
+
+  it("comidaDaily vacío = 0", () => {
+    const empty = { ...month, comidaDaily: "" };
+    expect(comidaAmount(empty, "2999-01")).toBe(0);
   });
 });

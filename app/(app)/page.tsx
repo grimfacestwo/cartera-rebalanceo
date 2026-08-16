@@ -11,7 +11,9 @@ import {
   PALETTE,
   addMonth,
   bankRemaining,
+  comidaAmount,
   currentMonthKey,
+  daysRemaining,
   monthLabel,
   parseState,
   sortMonthKeys,
@@ -34,7 +36,7 @@ const pct = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 });
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 type TabId = "cartera" | "hogar";
 
-const EMPTY_MONTH: MonthData = { banks: { ...DEFAULT_BANKS }, expenses: [] };
+const EMPTY_MONTH: MonthData = { banks: { ...DEFAULT_BANKS }, expenses: [], comidaDaily: "40" };
 
 function nextColor(assets: AssetDef[]): string {
   const used = new Set(assets.map((a) => a.color));
@@ -181,7 +183,10 @@ export default function Home() {
     activeData.expenses.filter((e) => e.bank === bankId && !e.paid).reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
 
   const bankTotal = BANK_IDS.reduce((s, id) => s + (Number.parseFloat(activeData.banks[id]) || 0), 0);
-  const totalExpenses = activeData.expenses.reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
+  const totalExpensesBank = activeData.expenses.reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
+  const activeDaysRemaining = daysRemaining(activeMonth);
+  const activeComida = comidaAmount(activeData, activeMonth);
+  const totalExpenses = totalExpensesBank + activeComida;
   const remaining = bankTotal - totalExpenses;
 
   // Expenses
@@ -217,15 +222,21 @@ export default function Home() {
       const r = bankRemaining(prev, id);
       banks[id] = r > 0 ? String(r) : "";
     }
-    setMonths((prev) => ({ ...prev, [nextKey]: { banks, expenses: [] } }));
+    setMonths((p) => ({ ...p, [nextKey]: { banks, expenses: [], comidaDaily: lastKey && p[lastKey] ? (p[lastKey]?.comidaDaily ?? "40") : "40" } }));
     setActiveMonth(nextKey);
+  };
+
+  const setComidaDaily = (v: string) => {
+    if (v === "" || /^\d*\.?\d*$/.test(v)) {
+      updateMonth((m) => ({ ...m, comidaDaily: v }));
+    }
   };
 
   const sortedMonthKeys = sortMonthKeys(Object.keys(months));
   const activeExpenses = activeData.expenses;
   const totalFijos = activeExpenses.filter((e) => e.type === "fijo").reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
   const pagados = activeExpenses.filter((e) => e.paid).length;
-  const totalPendientes = activeExpenses.filter((e) => !e.paid).reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
+  const totalPendientes = activeExpenses.filter((e) => !e.paid).reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0) + activeComida;
 
   return (
     <div className={styles.page}>
@@ -334,7 +345,10 @@ export default function Home() {
             {/* Month selector */}
             <div className={styles.monthTabs}>
               {sortedMonthKeys.map((key) => (
-                <button key={key} type="button" className={`${styles.monthTab} ${key === activeMonth ? styles.monthTabActive : ""}`} onClick={() => setActiveMonth(key)}>{monthLabel(key)}</button>
+                <button key={key} type="button" className={`${styles.monthTab} ${key === activeMonth ? styles.monthTabActive : ""}`} onClick={() => setActiveMonth(key)}>
+                  {monthLabel(key)}
+                  {key === activeMonth && <span className={styles.daysLeft}> · {activeDaysRemaining} días restantes</span>}
+                </button>
               ))}
               <button type="button" className={styles.newMonthBtn} onClick={newMonth}>+ Nuevo mes</button>
             </div>
@@ -346,6 +360,18 @@ export default function Home() {
                 <table className={styles.table}>
                   <thead><tr><th>Gasto</th><th>Tipo</th><th>Banco</th><th>Importe</th><th>Pagado</th><th></th></tr></thead>
                   <tbody>
+                    <tr className={styles.comidaRow}>
+                      <td>Comida</td>
+                      <td>Fijo</td>
+                      <td>—</td>
+                      <td className={styles.comidaInputCell}>
+                        <input type="text" inputMode="decimal" value={activeData.comidaDaily} onChange={(ev) => setComidaDaily(ev.target.value)} className={styles.expenseInput} aria-label="Comida por día" />
+                        <span className={styles.comidaUnit}>€/día</span>
+                        <span className={styles.comidaCalc}>= {activeDaysRemaining} días × {currency.format(Number.parseFloat(activeData.comidaDaily) || 0)} = {currency.format(activeComida)}</span>
+                      </td>
+                      <td>—</td>
+                      <td />
+                    </tr>
                     {activeExpenses.map((e) => (
                       <tr key={e.id}>
                         <td><input type="text" value={e.name} onChange={(ev) => setExpField(e.id, "name", ev.target.value)} className={styles.expenseInput} aria-label="Nombre del gasto" /></td>
@@ -367,13 +393,11 @@ export default function Home() {
                   </tbody>
                 </table>
               </div>
-              {activeExpenses.length > 0 && (
-                <div className={styles.expenseSummary}>
-                  <span>Total: {currency.format(totalExpenses)}</span>
-                  <span>Fijos: {currency.format(totalFijos)}</span>
-                  <span>Pagados: {pagados}/{activeExpenses.length}</span>
-                </div>
-              )}
+              <div className={styles.expenseSummary}>
+                <span>Total: {currency.format(totalExpenses)}</span>
+                {activeExpenses.length > 0 && <span>Fijos: {currency.format(totalFijos)}</span>}
+                {activeExpenses.length > 0 && <span>Pagados: {pagados}/{activeExpenses.length}</span>}
+              </div>
             </section>
 
             {/* Banks */}
@@ -408,6 +432,9 @@ export default function Home() {
                   </tbody>
                 </table>
               </div>
+              {activeComida > 0 && (
+                <p className={styles.bankNote}>Total incluye Comida ({activeData.comidaDaily} €/día × {activeDaysRemaining} días = {currency.format(activeComida)})</p>
+              )}
             </section>
           </>
         )}
