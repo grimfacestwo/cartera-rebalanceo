@@ -521,3 +521,56 @@
 .card h3:first-of-type {
   margin-top: 0;
 }
+
+.tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid #334155;
+  margin-bottom: 1.5rem;
+}
+
+.tab {
+  flex: 1;
+  padding: 0.65rem 1rem;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #94a3b8;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.tab:hover {
+  color: #e2e8f0;
+}
+
+.tabActive {
+  color: #fff;
+  border-bottom-color: #3b82f6;
+}
+
+.monthSummary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.monthRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.95rem;
+  color: #cbd5e1;
+  padding: 0.3rem 0;
+}
+
+.monthRowTotal {
+  border-top: 2px solid #334155;
+  margin-top: 0.3rem;
+  padding-top: 0.6rem;
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: #f1f5f9;
+}

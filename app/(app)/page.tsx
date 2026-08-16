@@ -25,6 +25,7 @@ const currency = new Intl.NumberFormat("es-ES", {
 const pct = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 });
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
+type TabId = "cartera" | "hogar";
 
 function nextColor(assets: AssetDef[]): string {
   const used = new Set(assets.map((a) => a.color));
@@ -61,6 +62,7 @@ export default function Home() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [newTarget, setNewTarget] = useState("");
+  const [tab, setTab] = useState<TabId>("cartera");
   const skipOnce = useRef(true);
 
   useEffect(() => {
@@ -221,6 +223,7 @@ export default function Home() {
   const totalVariables = totalExpenses - totalFijos;
   const pagados = expenses.filter((e) => e.paid).length;
   const pendientes = expenses.length - pagados;
+  const remaining = bankTotal - totalExpenses;
 
   return (
     <div className={styles.page}>
@@ -249,13 +252,6 @@ export default function Home() {
             </svg>
           </button>
           <h1>Cartera Rebalanceo</h1>
-          <p className={styles.subtitle}>
-            Asignación objetivo:{" "}
-            {assets.map((a) => `${a.name} ${pct.format(a.targetPct)}%`).join(" · ")}
-          </p>
-          <p className={styles.subtitle}>
-            Estrategia: nunca vendas; inyecta nuevo capital en los activos desfasados.
-          </p>
           {saveStatus !== "idle" && (
             <p className={styles.saveStatus} role="status">
               {saveStatus === "saving"
@@ -266,6 +262,27 @@ export default function Home() {
             </p>
           )}
         </header>
+
+        <nav className={styles.tabs} role="tablist">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "cartera"}
+            className={`${styles.tab} ${tab === "cartera" ? styles.tabActive : ""}`}
+            onClick={() => setTab("cartera")}
+          >
+            Cartera
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "hogar"}
+            className={`${styles.tab} ${tab === "hogar" ? styles.tabActive : ""}`}
+            onClick={() => setTab("hogar")}
+          >
+            Hogar
+          </button>
+        </nav>
 
         {loading ? (
           <section className={styles.card}>
@@ -278,8 +295,16 @@ export default function Home() {
               Reintentar
             </button>
           </section>
-        ) : (
+        ) : tab === "cartera" ? (
           <>
+            <p className={styles.subtitle}>
+              Asignación objetivo:{" "}
+              {assets.map((a) => `${a.name} ${pct.format(a.targetPct)}%`).join(" · ")}
+            </p>
+            <p className={styles.subtitle}>
+              Estrategia: nunca vendas; inyecta nuevo capital en los activos desfasados.
+            </p>
+
             <section className={styles.grid}>
               <div className={styles.card}>
                 <h2>Valores actuales (EUR)</h2>
@@ -458,45 +483,11 @@ export default function Home() {
                 </div>
               </section>
             )}
-
+          </>
+        ) : (
+          <>
             <section className={styles.card}>
-              <h2>Finanzas del hogar</h2>
-
-              <h3>Bancos</h3>
-              <div className={styles.tableWrap}>
-                <table className={styles.table}>
-                  <thead>
-                    <tr>
-                      <th>Banco</th>
-                      <th>Saldo (EUR)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {BANK_IDS.map((id) => (
-                      <tr key={id}>
-                        <td>{BANK_LABELS[id]}</td>
-                        <td>
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            value={banks[id]}
-                            onChange={(e) => setBank(id, e.target.value)}
-                            placeholder="0"
-                            className={styles.expenseInput}
-                            aria-label={`Saldo ${BANK_LABELS[id]}`}
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                    <tr className={styles.totalRow}>
-                      <td>Total</td>
-                      <td>{currency.format(bankTotal)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              <h3>Gastos</h3>
+              <h2>Gastos</h2>
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
                   <thead>
@@ -642,6 +633,62 @@ export default function Home() {
                   <span>Pendientes: {pendientes}</span>
                 </div>
               )}
+            </section>
+
+            <section className={styles.card}>
+              <h2>Bancos</h2>
+              <div className={styles.tableWrap}>
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th>Banco</th>
+                      <th>Saldo (EUR)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {BANK_IDS.map((id) => (
+                      <tr key={id}>
+                        <td>{BANK_LABELS[id]}</td>
+                        <td>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={banks[id]}
+                            onChange={(e) => setBank(id, e.target.value)}
+                            placeholder="0"
+                            className={styles.expenseInput}
+                            aria-label={`Saldo ${BANK_LABELS[id]}`}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                    <tr className={styles.totalRow}>
+                      <td>Total bancos</td>
+                      <td>{currency.format(bankTotal)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section className={styles.card}>
+              <h2>Resumen del mes</h2>
+              <div className={styles.monthSummary}>
+                <div className={styles.monthRow}>
+                  <span>Total bancos</span>
+                  <span>{currency.format(bankTotal)}</span>
+                </div>
+                <div className={styles.monthRow}>
+                  <span>Total gastos</span>
+                  <span>-{currency.format(totalExpenses)}</span>
+                </div>
+                <div className={`${styles.monthRow} ${styles.monthRowTotal}`}>
+                  <span>Disponible</span>
+                  <span className={remaining >= 0 ? styles.inject : ""}>
+                    {currency.format(remaining)}
+                  </span>
+                </div>
+              </div>
             </section>
           </>
         )}
