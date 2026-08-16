@@ -4,6 +4,7 @@ export type Vehicle = {
   plate: string;
   year: string;
   currentKm: string;
+  maintenance: MaintenanceItem[];
 };
 
 export type Repair = {
@@ -25,15 +26,77 @@ export type Revision = {
   done: boolean;
 };
 
+export type MaintenanceItem = {
+  id: string;
+  name: string;
+  intervalKm: string;
+  intervalMonths: string;
+  lastKm: string;
+  lastDate: string;
+};
+
 export type CochesState = {
   vehicles: Vehicle[];
   repairs: Repair[];
   revisions: Revision[];
 };
 
+export const CORSAS_MAINTENANCE: MaintenanceItem[] = [
+  { id: "preset-aceite", name: "Aceite", intervalKm: "30000", intervalMonths: "12", lastKm: "", lastDate: "" },
+  { id: "preset-filtro-aceite", name: "Filtro de aceite", intervalKm: "30000", intervalMonths: "12", lastKm: "", lastDate: "" },
+  { id: "preset-filtro-aire", name: "Filtro de aire", intervalKm: "30000", intervalMonths: "24", lastKm: "", lastDate: "" },
+  { id: "preset-filtro-combustible", name: "Filtro de combustible", intervalKm: "30000", intervalMonths: "24", lastKm: "", lastDate: "" },
+  { id: "preset-filtro-habitaculo", name: "Filtro de habitáculo", intervalKm: "30000", intervalMonths: "24", lastKm: "", lastDate: "" },
+  { id: "preset-liquido-frenos", name: "Líquido de frenos", intervalKm: "", intervalMonths: "24", lastKm: "", lastDate: "" },
+  { id: "preset-refrigerante", name: "Líquido refrigerante", intervalKm: "", intervalMonths: "60", lastKm: "", lastDate: "" },
+  { id: "preset-correa-alternador", name: "Correa de alternador", intervalKm: "90000", intervalMonths: "60", lastKm: "", lastDate: "" },
+  { id: "preset-pastillas", name: "Pastillas de freno", intervalKm: "45000", intervalMonths: "", lastKm: "", lastDate: "" },
+];
+
+export const CARENS_MAINTENANCE: MaintenanceItem[] = [
+  { id: "preset-aceite", name: "Aceite", intervalKm: "15000", intervalMonths: "12", lastKm: "", lastDate: "" },
+  { id: "preset-filtro-aceite", name: "Filtro de aceite", intervalKm: "15000", intervalMonths: "12", lastKm: "", lastDate: "" },
+  { id: "preset-filtro-combustible", name: "Filtro de combustible", intervalKm: "60000", intervalMonths: "48", lastKm: "", lastDate: "" },
+  { id: "preset-filtro-aire", name: "Filtro de aire", intervalKm: "30000", intervalMonths: "24", lastKm: "", lastDate: "" },
+  { id: "preset-filtro-habitaculo", name: "Filtro de habitáculo", intervalKm: "15000", intervalMonths: "12", lastKm: "", lastDate: "" },
+  { id: "preset-liquido-frenos", name: "Líquido de frenos", intervalKm: "", intervalMonths: "24", lastKm: "", lastDate: "" },
+  { id: "preset-refrigerante", name: "Líquido refrigerante", intervalKm: "", intervalMonths: "60", lastKm: "", lastDate: "" },
+  { id: "preset-correa-alternador", name: "Correa de alternador", intervalKm: "90000", intervalMonths: "60", lastKm: "", lastDate: "" },
+  { id: "preset-aceite-transmision", name: "Aceite de transmisión", intervalKm: "60000", intervalMonths: "60", lastKm: "", lastDate: "" },
+  { id: "preset-pastillas", name: "Pastillas de freno", intervalKm: "45000", intervalMonths: "", lastKm: "", lastDate: "" },
+];
+
+export const GENERIC_MAINTENANCE: MaintenanceItem[] = [
+  { id: "preset-aceite", name: "Aceite", intervalKm: "15000", intervalMonths: "12", lastKm: "", lastDate: "" },
+  { id: "preset-filtro-aceite", name: "Filtro de aceite", intervalKm: "15000", intervalMonths: "12", lastKm: "", lastDate: "" },
+  { id: "preset-filtro-aire", name: "Filtro de aire", intervalKm: "30000", intervalMonths: "24", lastKm: "", lastDate: "" },
+  { id: "preset-liquido-frenos", name: "Líquido de frenos", intervalKm: "", intervalMonths: "24", lastKm: "", lastDate: "" },
+];
+
+export function maintenanceForName(name: string): MaintenanceItem[] {
+  const n = name.toLowerCase();
+  if (n.includes("corsa")) return CORSAS_MAINTENANCE.map((i) => ({ ...i }));
+  if (n.includes("carens")) return CARENS_MAINTENANCE.map((i) => ({ ...i }));
+  return GENERIC_MAINTENANCE.map((i) => ({ ...i }));
+}
+
 export const DEFAULT_VEHICLES: Vehicle[] = [
-  { id: "opel-corsa", name: "Opel Corsa", plate: "", year: "", currentKm: "" },
-  { id: "kia-carens", name: "Kia Carens", plate: "", year: "", currentKm: "" },
+  {
+    id: "opel-corsa",
+    name: "Opel Corsa",
+    plate: "",
+    year: "",
+    currentKm: "",
+    maintenance: CORSAS_MAINTENANCE.map((i) => ({ ...i })),
+  },
+  {
+    id: "kia-carens",
+    name: "Kia Carens",
+    plate: "",
+    year: "",
+    currentKm: "",
+    maintenance: CARENS_MAINTENANCE.map((i) => ({ ...i })),
+  },
 ];
 
 export const DEFAULT_STATE: CochesState = {
@@ -44,6 +107,27 @@ export const DEFAULT_STATE: CochesState = {
 
 function str(v: unknown): string {
   return typeof v === "string" ? v : "";
+}
+
+export function parseMaintenanceItems(raw: unknown): MaintenanceItem[] {
+  if (!Array.isArray(raw)) return [];
+  const out: MaintenanceItem[] = [];
+  for (const item of raw) {
+    if (item && typeof item === "object") {
+      const o = item as Record<string, unknown>;
+      if (typeof o.id === "string" && typeof o.name === "string") {
+        out.push({
+          id: o.id,
+          name: o.name,
+          intervalKm: str(o.intervalKm),
+          intervalMonths: str(o.intervalMonths),
+          lastKm: str(o.lastKm),
+          lastDate: str(o.lastDate),
+        });
+      }
+    }
+  }
+  return out;
 }
 
 export function parseVehicles(raw: unknown): Vehicle[] {
@@ -59,6 +143,7 @@ export function parseVehicles(raw: unknown): Vehicle[] {
           plate: str(o.plate),
           year: str(o.year),
           currentKm: str(o.currentKm),
+          maintenance: "maintenance" in o ? parseMaintenanceItems(o.maintenance) : maintenanceForName(o.name),
         });
       }
     }
@@ -113,12 +198,16 @@ export function parseRevisions(raw: unknown): Revision[] {
   return out;
 }
 
+function cloneVehicles(vs: Vehicle[]): Vehicle[] {
+  return vs.map((v) => ({ ...v, maintenance: v.maintenance.map((i) => ({ ...i })) }));
+}
+
 export function parseCochesState(raw: unknown): CochesState {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
-    return { vehicles: [...DEFAULT_VEHICLES], repairs: [], revisions: [] };
+    return { vehicles: cloneVehicles(DEFAULT_VEHICLES), repairs: [], revisions: [] };
   }
   const o = raw as Record<string, unknown>;
-  const vehicles = "vehicles" in o ? parseVehicles(o.vehicles) : [...DEFAULT_VEHICLES];
+  const vehicles = "vehicles" in o ? parseVehicles(o.vehicles) : cloneVehicles(DEFAULT_VEHICLES);
   return {
     vehicles,
     repairs: parseRepairs(o.repairs),
@@ -152,4 +241,83 @@ export function revisionStatusLabel(s: RevisionStatus): string {
     case "future":
       return "Futura";
   }
+}
+
+// --- Mantenimiento ---
+
+export function maintenanceKmRemaining(item: MaintenanceItem, currentKm: string): number | null {
+  const interval = Number.parseFloat(item.intervalKm);
+  const cur = Number.parseFloat(currentKm);
+  const last = Number.parseFloat(item.lastKm);
+  if (!Number.isFinite(interval) || interval <= 0) return null;
+  if (!Number.isFinite(cur)) return null;
+  if (!Number.isFinite(last)) return null;
+  return interval - (cur - last);
+}
+
+export function maintenanceMonthsRemaining(item: MaintenanceItem, today: Date = new Date()): number | null {
+  const interval = Number.parseFloat(item.intervalMonths);
+  if (!Number.isFinite(interval) || interval <= 0) return null;
+  if (!item.lastDate) return null;
+  const last = new Date(item.lastDate + "T00:00:00");
+  if (Number.isNaN(last.getTime())) return null;
+  const months =
+    (today.getFullYear() - last.getFullYear()) * 12 + (today.getMonth() - last.getMonth());
+  return interval - months;
+}
+
+export type MaintenanceStatus = "unknown" | "ok" | "soon" | "overdue";
+
+function perStatus(value: number | null, threshold: number): MaintenanceStatus {
+  if (value === null) return "unknown";
+  if (value < 0) return "overdue";
+  if (value <= threshold) return "soon";
+  return "ok";
+}
+
+export function maintenanceStatus(
+  item: MaintenanceItem,
+  currentKm: string,
+  today: Date = new Date()
+): MaintenanceStatus {
+  const km = perStatus(maintenanceKmRemaining(item, currentKm), 2000);
+  const months = perStatus(maintenanceMonthsRemaining(item, today), 2);
+  const rank: Record<MaintenanceStatus, number> = { unknown: 0, ok: 1, soon: 2, overdue: 3 };
+  return rank[months] > rank[km] ? months : km;
+}
+
+function fmtKm(n: number): string {
+  return Math.abs(Math.round(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+
+function fmtMonth(n: number): string {
+  const a = Math.abs(Math.round(n));
+  return `${a} mes${a === 1 ? "" : "es"}`;
+}
+
+export function maintenanceMessage(
+  item: MaintenanceItem,
+  currentKm: string,
+  today: Date = new Date()
+): string {
+  const km = maintenanceKmRemaining(item, currentKm);
+  const months = maintenanceMonthsRemaining(item, today);
+  const name = item.name.toLowerCase();
+
+  if (km !== null && months !== null) {
+    const k = km >= 0 ? `Te faltan ${fmtKm(km)} km` : `Te has pasado ${fmtKm(km)} km`;
+    const mo = months >= 0 ? `y te quedan ${fmtMonth(months)}` : `y llevas ${fmtMonth(months)} de más`;
+    return `${k} ${mo} para cambiar ${name}`;
+  }
+  if (km !== null) {
+    return km >= 0
+      ? `Te faltan ${fmtKm(km)} km para cambiar ${name}`
+      : `Te has pasado ${fmtKm(km)} km: toca cambiar ${name}`;
+  }
+  if (months !== null) {
+    if (months < 0) return `Te has pasado ${fmtMonth(months)}: toca cambiar ${name}`;
+    if (months === 0) return `Toca cambiar ${name} este mes`;
+    return `Te faltan ${fmtMonth(months)} para cambiar ${name}`;
+  }
+  return `Fija el km o la fecha del último cambio de ${name}`;
 }

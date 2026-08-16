@@ -4,10 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import {
   type CochesState,
+  type MaintenanceItem,
+  type MaintenanceStatus,
   type Repair,
   type Revision,
   type RevisionStatus,
   type Vehicle,
+  maintenanceForName,
+  maintenanceMessage,
+  maintenanceStatus,
   parseCochesState,
   revisionStatus,
   revisionStatusLabel,
@@ -20,6 +25,13 @@ const STATUS_COLORS: Record<RevisionStatus, string> = {
   overdue: "#ef4444",
   soon: "#f59e0b",
   future: "#94a3b8",
+};
+
+const MNT_STATUS_COLORS: Record<MaintenanceStatus, string> = {
+  ok: "#22c55e",
+  overdue: "#ef4444",
+  soon: "#f59e0b",
+  unknown: "#94a3b8",
 };
 
 const inputStyle: CSSProperties = {
@@ -224,9 +236,68 @@ export default function CochesManager() {
       plate: "",
       year: "",
       currentKm: "",
+      maintenance: maintenanceForName(""),
     };
     setState((s) => (s ? { ...s, vehicles: [...s.vehicles, vehicle] } : s));
     setActiveId(vehicle.id);
+  };
+
+  const updateMaintenance = (id: string, patch: Partial<MaintenanceItem>) =>
+    setState((s) =>
+      s
+        ? {
+            ...s,
+            vehicles: s.vehicles.map((v) =>
+              v.id === activeId
+                ? { ...v, maintenance: v.maintenance.map((i) => (i.id === id ? { ...i, ...patch } : i)) }
+                : v
+            ),
+          }
+        : s
+    );
+
+  const addMaintenance = () => {
+    if (!active) return;
+    const item: MaintenanceItem = {
+      id: uid(),
+      name: "",
+      intervalKm: "",
+      intervalMonths: "",
+      lastKm: "",
+      lastDate: "",
+    };
+    setState((s) =>
+      s
+        ? {
+            ...s,
+            vehicles: s.vehicles.map((v) =>
+              v.id === active.id ? { ...v, maintenance: [...v.maintenance, item] } : v
+            ),
+          }
+        : s
+    );
+  };
+
+  const deleteMaintenance = (id: string) =>
+    setState((s) =>
+      s
+        ? {
+            ...s,
+            vehicles: s.vehicles.map((v) =>
+              v.id === activeId
+                ? { ...v, maintenance: v.maintenance.filter((i) => i.id !== id) }
+                : v
+            ),
+          }
+        : s
+    );
+
+  const markMaintenanceDone = (id: string) => {
+    if (!active) return;
+    updateMaintenance(id, {
+      lastKm: active.currentKm,
+      lastDate: new Date().toISOString().slice(0, 10),
+    });
   };
 
   const deleteVehicle = (id: string) => {
@@ -326,6 +397,94 @@ export default function CochesManager() {
                 aria-label="Km actuales"
               />
             </div>
+          </div>
+
+          <div style={{ ...cardStyle, marginBottom: "1.25rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
+              <h2 style={{ fontSize: "0.95rem", margin: 0, color: "#e2e8f0", flex: 1 }}>
+                Mantenimiento
+              </h2>
+              <button type="button" onClick={addMaintenance} style={btnStyle}>
+                + Mantenimiento
+              </button>
+            </div>
+            {active.maintenance.length === 0 && (
+              <p style={{ color: "#94a3b8", fontSize: "0.85rem", margin: 0 }}>
+                Sin elementos de mantenimiento. Añade aceite, filtros, líquido de frenos…
+              </p>
+            )}
+            {active.maintenance.map((m) => {
+              const status = maintenanceStatus(m, active.currentKm);
+              return (
+                <div
+                  key={m.id}
+                  style={{
+                    border: "1px solid #1e293b",
+                    borderRadius: 8,
+                    padding: "0.5rem",
+                    marginBottom: "0.5rem",
+                  }}
+                >
+                  <div style={{ ...fieldGrid, marginBottom: "0.4rem" }}>
+                    <input
+                      value={m.name}
+                      onChange={(e) => updateMaintenance(m.id, { name: e.target.value })}
+                      placeholder="Elemento (aceite, filtros…)"
+                      style={inputStyle}
+                      aria-label="Nombre del mantenimiento"
+                    />
+                    <input
+                      value={m.intervalKm}
+                      onChange={(e) => updateMaintenance(m.id, { intervalKm: e.target.value })}
+                      placeholder="Cada X km"
+                      style={inputStyle}
+                      aria-label="Intervalo en kilómetros"
+                    />
+                    <input
+                      value={m.intervalMonths}
+                      onChange={(e) => updateMaintenance(m.id, { intervalMonths: e.target.value })}
+                      placeholder="Cada X meses"
+                      style={inputStyle}
+                      aria-label="Intervalo en meses"
+                    />
+                    <input
+                      value={m.lastKm}
+                      onChange={(e) => updateMaintenance(m.id, { lastKm: e.target.value })}
+                      placeholder="Últ. cambio km"
+                      style={inputStyle}
+                      aria-label="Kilómetros del último cambio"
+                    />
+                    <input
+                      type="date"
+                      value={m.lastDate}
+                      onChange={(e) => updateMaintenance(m.id, { lastDate: e.target.value })}
+                      style={inputStyle}
+                      aria-label="Fecha del último cambio"
+                    />
+                    <button type="button" onClick={() => markMaintenanceDone(m.id)} style={btnStyle}>
+                      Hecho
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteMaintenance(m.id)}
+                      style={btnDanger}
+                      aria-label="Eliminar mantenimiento"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <p
+                    style={{
+                      color: MNT_STATUS_COLORS[status],
+                      fontSize: "0.8rem",
+                      margin: 0,
+                    }}
+                  >
+                    {maintenanceMessage(m, active.currentKm)}
+                  </p>
+                </div>
+              );
+            })}
           </div>
 
           <div style={{ ...cardStyle, marginBottom: "1.25rem" }}>

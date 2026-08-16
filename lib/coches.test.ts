@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
+  CARENS_MAINTENANCE,
+  CORSAS_MAINTENANCE,
   DEFAULT_VEHICLES,
+  GENERIC_MAINTENANCE,
+  maintenanceForName,
+  maintenanceKmRemaining,
+  maintenanceMessage,
+  maintenanceMonthsRemaining,
+  maintenanceStatus,
   parseCochesState,
+  parseMaintenanceItems,
   parseRepairs,
   parseRevisions,
   parseVehicles,
@@ -56,9 +65,21 @@ describe("parseVehicles", () => {
     expect(result[0].id).toBe("v1");
   });
 
-  it("rellena campos opcionales con cadena vacía", () => {
+  it("aplica el preset de mantenimiento del modelo si falta maintenance", () => {
     const result = parseVehicles([{ id: "v1", name: "Kia Carens" }]);
-    expect(result[0]).toEqual({ id: "v1", name: "Kia Carens", plate: "", year: "", currentKm: "" });
+    expect(result[0].plate).toBe("");
+    expect(result[0].maintenance).toEqual(CARENS_MAINTENANCE);
+  });
+
+  it("respeta maintenance si viene en los datos", () => {
+    const result = parseVehicles([
+      { id: "v1", name: "Kia Carens", maintenance: [{ id: "m1", name: "Aceite", intervalKm: "99999" }] },
+    ]);
+    expect(result[0].maintenance).toHaveLength(1);
+    expect(result[0].maintenance[0].intervalKm).toBe("99999");
+    expect(result[0].maintenance[0].intervalMonths).toBe("");
+    expect(result[0].maintenance[0].lastKm).toBe("");
+    expect(result[0].maintenance[0].lastDate).toBe("");
   });
 });
 
@@ -120,5 +141,159 @@ describe("revisionStatus", () => {
 
   it("sin fecha es 'future'", () => {
     expect(revisionStatus(rev(""), today)).toBe("future");
+  });
+});
+
+describe("maintenanceForName", () => {
+  it("Corsa → preset diésel con aceite a 30000 km", () => {
+    const items = maintenanceForName("Opel Corsa");
+    expect(items).toEqual(CORSAS_MAINTENANCE);
+    expect(items.find((i) => i.name === "Aceite")?.intervalKm).toBe("30000");
+  });
+
+  it("Carens → preset diésel con aceite a 15000 km", () => {
+    const items = maintenanceForName("Kia Carens");
+    expect(items).toEqual(CARENS_MAINTENANCE);
+    expect(items.find((i) => i.name === "Aceite")?.intervalKm).toBe("15000");
+    expect(items.find((i) => i.name === "Filtro de combustible")?.intervalKm).toBe("60000");
+  });
+
+  it("nombre desconocido → lista genérica", () => {
+    expect(maintenanceForName("Seat León")).toEqual(GENERIC_MAINTENANCE);
+  });
+});
+
+describe("parseMaintenanceItems", () => {
+  it("devuelve [] para datos inválidos", () => {
+    expect(parseMaintenanceItems(null)).toEqual([]);
+    expect(parseMaintenanceItems("mal")).toEqual([]);
+  });
+
+  it("requiere id y name", () => {
+    const result = parseMaintenanceItems([
+      { id: "m1", name: "Aceite", intervalKm: "15000" },
+      { name: "sin id" },
+      { id: "m3" },
+    ]);
+    expect(result).toHaveLength(1);
+    expect(result[0].intervalMonths).toBe("");
+  });
+});
+
+describe("maintenanceKmRemaining", () => {
+  const item = (intervalKm: string, lastKm: string): Parameters<typeof maintenanceKmRemaining>[0] => ({
+    id: "m1",
+    name: "Aceite",
+    intervalKm,
+    intervalMonths: "12",
+    lastKm,
+    lastDate: "",
+  });
+
+  it("calcula km restantes", () => {
+    expect(maintenanceKmRemaining(item("30000", "30000"), "50000")).toBe(10000);
+  });
+
+  it("negativo si ya ha pasado el intervalo", () => {
+    expect(maintenanceKmRemaining(item("30000", "10000"), "50000")).toBe(-10000);
+  });
+
+  it("null si falta el km del último cambio", () => {
+    expect(maintenanceKmRemaining(item("30000", ""), "50000")).toBeNull();
+  });
+
+  it("null si falta el km actual", () => {
+    expect(maintenanceKmRemaining(item("30000", "30000"), "")).toBeNull();
+  });
+
+  it("null si no hay intervalo de km", () => {
+    expect(maintenanceKmRemaining(item("", "30000"), "50000")).toBeNull();
+  });
+});
+
+describe("maintenanceMonthsRemaining", () => {
+  const today = new Date("2026-08-16T12:00:00");
+  const item = (intervalMonths: string, lastDate: string): Parameters<typeof maintenanceMonthsRemaining>[0] => ({
+    id: "m1",
+    name: "Líquido de frenos",
+    intervalKm: "",
+    intervalMonths,
+    lastKm: "",
+    lastDate,
+  });
+
+  it("calcula meses restantes", () => {
+    expect(maintenanceMonthsRemaining(item("24", "2024-08-10"), today)).toBe(0);
+    expect(maintenanceMonthsRemaining(item("24", "2024-09-10"), today)).toBe(1);
+  });
+
+  it("negativo si ya ha pasado el intervalo", () => {
+    expect(maintenanceMonthsRemaining(item("24", "2023-01-10"), today)).toBe(-19);
+  });
+
+  it("null si falta la fecha del último cambio", () => {
+    expect(maintenanceMonthsRemaining(item("24", ""), today)).toBeNull();
+  });
+
+  it("null si no hay intervalo de meses", () => {
+    expect(maintenanceMonthsRemaining(item("", "2024-08-10"), today)).toBeNull();
+  });
+});
+
+describe("maintenanceStatus", () => {
+  const today = new Date("2026-08-16T12:00:00");
+  const item = (intervalKm: string, lastKm: string): Parameters<typeof maintenanceStatus>[0] => ({
+    id: "m1",
+    name: "Aceite",
+    intervalKm,
+    intervalMonths: "",
+    lastKm,
+    lastDate: "",
+  });
+
+  it("unknown si faltan datos", () => {
+    expect(maintenanceStatus(item("30000", ""), "50000", today)).toBe("unknown");
+  });
+
+  it("ok si queda margen", () => {
+    expect(maintenanceStatus(item("30000", "30000"), "50000", today)).toBe("ok");
+  });
+
+  it("soon si quedan 2000 km o menos", () => {
+    expect(maintenanceStatus(item("30000", "21000"), "50000", today)).toBe("soon");
+    expect(maintenanceStatus(item("30000", "22000"), "50000", today)).toBe("soon");
+  });
+
+  it("overdue si ya pasó", () => {
+    expect(maintenanceStatus(item("30000", "15000"), "50000", today)).toBe("overdue");
+  });
+});
+
+describe("maintenanceMessage", () => {
+  const item = (name: string, intervalKm: string, lastKm: string): Parameters<typeof maintenanceMessage>[0] => ({
+    id: "m1",
+    name,
+    intervalKm,
+    intervalMonths: "",
+    lastKm,
+    lastDate: "",
+  });
+
+  it("mensaje de km restantes", () => {
+    expect(maintenanceMessage(item("Aceite", "30000", "25000"), "50000")).toBe(
+      "Te faltan 5.000 km para cambiar aceite"
+    );
+  });
+
+  it("mensaje de km superado", () => {
+    expect(maintenanceMessage(item("Aceite", "30000", "10000"), "50000")).toBe(
+      "Te has pasado 10.000 km: toca cambiar aceite"
+    );
+  });
+
+  it("mensaje cuando faltan datos", () => {
+    expect(maintenanceMessage(item("Aceite", "30000", ""), "50000")).toBe(
+      "Fija el km o la fecha del último cambio de aceite"
+    );
   });
 });
