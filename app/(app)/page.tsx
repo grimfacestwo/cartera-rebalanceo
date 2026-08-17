@@ -375,7 +375,7 @@ export default function Home() {
               </section>
             )}
           </>
-        ) : (
+        ) : tab === "hogar" ? (
           <>
             {/* Month selector */}
             <div className={styles.monthTabs}>
@@ -501,12 +501,12 @@ export default function Home() {
               <p className={`${styles.disponibleTotal} ${remaining >= 0 ? styles.inject : styles.negative}`}>Disponible total: {currency.format(remaining)} €</p>
             </section>
           </>
-        )}
+        ) : null}
 
         {tab === "objetivos" && !loading && !loadError && (
           <>
             <section className={styles.card}>
-              <h2>Objetivos de ahorro</h2>
+              <h2>Objetivos del ahorro</h2>
               {goals.length === 0 ? (
                 <p className={styles.empty}>Sin objetivos. Crea el primero abajo.</p>
               ) : (
