@@ -47,6 +47,7 @@ const SECTIONS = [
 ];
 
 const SIDEBAR_KEY = "cartera:sidebar";
+const DARK_KEY = "cartera:dark";
 
 const currencySidebar = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
@@ -57,9 +58,17 @@ function readCollapsed(): boolean {
   } catch { return false; }
 }
 
+function readDark(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem(DARK_KEY) === "1";
+  } catch { return false; }
+}
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [darkMode, setDarkMode] = useState(readDark);
   const [alerts, setAlerts] = useState<Alerts | null>(null);
   const [disponible, setDisponible] = useState<number | null>(null);
   const pathname = usePathname();
@@ -107,6 +116,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setCollapsed((c) => {
       const next = !c;
       try { localStorage.setItem(SIDEBAR_KEY, next ? "1" : "0"); } catch { /* */ }
+      return next;
+    });
+  };
+
+  const toggleDark = () => {
+    setDarkMode((d) => {
+      const next = !d;
+      try { localStorage.setItem(DARK_KEY, next ? "1" : "0"); } catch { /* */ }
       return next;
     });
   };
@@ -164,7 +181,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className={styles.shell}>
+    <div className={styles.shell} data-theme={darkMode ? "dark" : undefined}>
       {drawerOpen && (
         <div className={styles.backdrop} onClick={() => setDrawerOpen(false)} />
       )}
@@ -193,6 +210,23 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </button>
         {nav}
         <div className={styles.sidebarFooter}>
+          <button
+            type="button"
+            className={styles.navLink}
+            onClick={toggleDark}
+            title={darkMode ? "Modo claro" : "Modo oscuro"}
+          >
+            {darkMode ? (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+              </svg>
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+              </svg>
+            )}
+            {!collapsed && <span className={styles.navLabel}>{darkMode ? "Claro" : "Oscuro"}</span>}
+          </button>
           <button
             type="button"
             className={styles.navLink}

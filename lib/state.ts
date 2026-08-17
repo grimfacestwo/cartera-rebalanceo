@@ -2,6 +2,42 @@ import type { AssetDef } from "@/lib/rebalance";
 
 export type PortfolioValues = Record<string, string>;
 
+export const CATEGORIES = [
+  "alimentacion",
+  "transporte",
+  "vivienda",
+  "ocio",
+  "salud",
+  "educacion",
+  "suscripciones",
+  "otros",
+] as const;
+export type CategoryId = (typeof CATEGORIES)[number];
+export type CategoryLabel = Record<CategoryId, string>;
+export type CategoryColor = Record<CategoryId, string>;
+
+export const CATEGORY_LABELS: CategoryLabel = {
+  alimentacion: "Alimentación",
+  transporte: "Transporte",
+  vivienda: "Vivienda",
+  ocio: "Ocio",
+  salud: "Salud",
+  educacion: "Educación",
+  suscripciones: "Suscripciones",
+  otros: "Otros",
+};
+
+export const CATEGORY_COLORS: CategoryColor = {
+  alimentacion: "#f97316",
+  transporte: "#3b82f6",
+  vivienda: "#8b5cf6",
+  ocio: "#ec4899",
+  salud: "#22c55e",
+  educacion: "#06b6d4",
+  suscripciones: "#eab308",
+  otros: "#94a3b8",
+};
+
 export type Expense = {
   id: string;
   name: string;
@@ -9,6 +45,7 @@ export type Expense = {
   type: "fijo" | "variable";
   bank: BankId | "";
   paid: boolean;
+  category: CategoryId;
 };
 
 export type Goal = {
@@ -202,6 +239,9 @@ export function parseExpenses(raw: unknown): Expense[] {
           type: t === "fijo" || t === "variable" ? t : "variable",
           bank: b,
           paid: o.paid === true,
+          category: CATEGORIES.includes(o.category as CategoryId)
+            ? (o.category as CategoryId)
+            : "otros",
         });
       }
     }

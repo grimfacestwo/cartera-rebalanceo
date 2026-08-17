@@ -6,6 +6,9 @@ import {
   BANK_IDS,
   BANK_LABELS,
   BANK_COLORS,
+  CATEGORY_LABELS,
+  CATEGORY_COLORS,
+  CATEGORIES,
   DEFAULT_ASSETS,
   DEFAULT_VALUES,
   DEFAULT_BANKS,
@@ -19,6 +22,7 @@ import {
   parseState,
   sortMonthKeys,
   type BankId,
+  type CategoryId,
   type Expense,
   type Goal,
   type MonthData,
@@ -68,7 +72,11 @@ export default function Home() {
   const [newExpName, setNewExpName] = useState("");
   const [newExpAmount, setNewExpAmount] = useState("");
   const [newExpType, setNewExpType] = useState<"fijo" | "variable">("variable");
+  const [newExpCategory, setNewExpCategory] = useState<CategoryId>("otros");
   const [goals, setGoals] = useState<Goal[]>([]);
+  const [expSearch, setExpSearch] = useState("");
+  const [expSort, setExpSort] = useState<"paid" | "amount" | "name" | "category">("paid");
+  const [expCategoryFilter, setExpCategoryFilter] = useState<CategoryId | "all">("all");
   const [goalName, setGoalName] = useState("");
   const [goalTarget, setGoalTarget] = useState("");
   const [goalCurrent, setGoalCurrent] = useState("");
@@ -210,9 +218,9 @@ export default function Home() {
     if (!name || newExpAmount === "") return;
     updateMonth((m) => ({
       ...m,
-      expenses: [...m.expenses, { id: newId(), name, amount: newExpAmount, type: newExpType, bank: "ing", paid: false }],
+      expenses: [...m.expenses, { id: newId(), name, amount: newExpAmount, type: newExpType, bank: "ing", paid: false, category: newExpCategory }],
     }));
-    setNewExpName(""); setNewExpAmount(""); setNewExpType("variable");
+    setNewExpName(""); setNewExpAmount(""); setNewExpType("variable"); setNewExpCategory("otros");
   };
 
   const removeExpense = (id: string) => {
@@ -251,7 +259,23 @@ export default function Home() {
   const activeExpenses = activeData.expenses;
   const totalFijos = activeExpenses.filter((e) => e.type === "fijo").reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
   const pagados = activeExpenses.filter((e) => e.paid).length;
-  const sortedExpenses = useMemo(() => [...activeExpenses].sort((a, b) => Number(a.paid) - Number(b.paid)), [activeExpenses]);
+  const sortedExpenses = useMemo(() => {
+    let list = [...activeExpenses];
+    if (expSearch) {
+      const q = expSearch.toLowerCase();
+      list = list.filter((e) => e.name.toLowerCase().includes(q));
+    }
+    if (expCategoryFilter !== "all") {
+      list = list.filter((e) => e.category === expCategoryFilter);
+    }
+    switch (expSort) {
+      case "amount": list.sort((a, b) => (Number.parseFloat(a.amount) || 0) - (Number.parseFloat(b.amount) || 0)); break;
+      case "name": list.sort((a, b) => a.name.localeCompare(b.name, "es")); break;
+      case "category": list.sort((a, b) => a.category.localeCompare(b.category)); break;
+      default: list.sort((a, b) => Number(a.paid) - Number(b.paid)); break;
+    }
+    return list;
+  }, [activeExpenses, expSearch, expSort, expCategoryFilter]);
 
   // Goals helpers
   const setGoalField = (id: string, field: keyof Goal, val: string) => {
@@ -271,6 +295,58 @@ export default function Home() {
 
   const goalTargetTotal = goals.reduce((s, g) => s + (Number.parseFloat(g.target) || 0), 0);
   const goalCurrentTotal = goals.reduce((s, g) => s + (Number.parseFloat(g.current) || 0), 0);
+
+  // Category stats
+  const categoryStats = useMemo(() => {
+    const stats: Record<string, number> = {};
+    for (const e of activeExpenses) {
+      stats[e.category] = (stats[e.category] || 0) + (Number.parseFloat(e.amount) || 0);
+    }
+    return Object.entries(stats)
+      .sort((a, b) => b[1] - a[1])
+      .map(([cat, total]) => ({ cat: cat as CategoryId, total }));
+  }, [activeExpenses]);
+
+  // Export/Import
+  const handleExport = () => {
+    const payload = { assets, values, contribution, months, goals };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `cartera-backup-${currentMonthKey()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json";
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const data = JSON.parse(reader.result as string);
+          const state = parseState(data);
+          setAssets(state.assets);
+          setValues(state.values);
+          setContribution(state.contribution);
+          setMonths(state.months);
+          setGoals(state.goals);
+          const keys = sortMonthKeys(Object.keys(state.months));
+          if (keys.length > 0) setActiveMonth(keys[keys.length - 1]);
+          else setActiveMonth(currentMonthKey());
+        } catch {
+          alert("Error al importar: archivo no válido.");
+        }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  };
 
   return (
     <div className={styles.page}>
@@ -370,8 +446,42 @@ export default function Home() {
             {hasValues && (
               <section className={styles.card}>
                 <h2>Distribución</h2>
-                <div className={styles.bar}>{rows.map((row) => row.value > 0 ? <div key={row.id} className={styles.barSeg} style={{ width: `${row.currentPct}%`, background: row.color }} title={`${row.name}: ${row.currentPct.toFixed(1)}%`} /> : null)}</div>
-                <div className={styles.legend}>{rows.map((row) => <span key={row.id} className={styles.legendItem}><span className={styles.dot} style={{ background: row.color }} />{row.name} · {row.currentPct.toFixed(1)}% (objetivo {row.targetPct.toFixed(1)}%)</span>)}</div>
+                {(() => {
+                  const r = 40;
+                  const circ = 2 * Math.PI * r;
+                  let cumOffset = 0;
+                  const segments = rows.filter((row) => row.value > 0).map((row) => {
+                    const len = (row.currentPct / 100) * circ;
+                    const seg = { color: row.color, name: row.name, pct: row.currentPct, targetPct: row.targetPct, offset: cumOffset, len };
+                    cumOffset += len;
+                    return seg;
+                  });
+                  return (
+                    <div className={styles.pieWrap}>
+                      <div className={styles.pieContainer}>
+                        <svg viewBox="0 0 100 100" className={styles.pie}>
+                          {segments.map((s, i) => (
+                            <circle key={i} cx="50" cy="50" r={r} fill="none" stroke={s.color}
+                              strokeWidth="28" strokeDasharray={`${s.len} ${circ - s.len}`}
+                              strokeDashoffset={-s.offset} strokeLinecap="butt" />
+                          ))}
+                        </svg>
+                        <div className={styles.pieCenter}>
+                          <span className={styles.pieTotalLabel}>Total</span>
+                          <span className={styles.pieTotalValue}>{currency.format(total)}</span>
+                        </div>
+                      </div>
+                      <div className={styles.legend}>
+                        {segments.map((s) => (
+                          <span key={s.name} className={styles.legendItem}>
+                            <span className={styles.dot} style={{ background: s.color }} />
+                            {s.name} · {s.pct.toFixed(1)}% (objetivo {s.targetPct.toFixed(1)}%)
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
               </section>
             )}
           </>
@@ -400,9 +510,24 @@ export default function Home() {
                   return lines.length ? `Gastos pendientes del mes:\n${lines.join("\n")}` : "Sin gastos pendientes este mes";
                 })()
               }>Gastos</h2>
+              {activeExpenses.length > 0 && (
+                <div className={styles.filterBar}>
+                  <input type="text" value={expSearch} onChange={(ev) => setExpSearch(ev.target.value)} placeholder="Buscar gasto…" className={styles.expenseInput} aria-label="Buscar gasto" style={{ maxWidth: 200 }} />
+                  <select value={expCategoryFilter} onChange={(ev) => setExpCategoryFilter(ev.target.value as CategoryId | "all")} className={styles.expenseSelect} aria-label="Filtrar por categoría">
+                    <option value="all">Todas las categorías</option>
+                    {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
+                  </select>
+                  <select value={expSort} onChange={(ev) => setExpSort(ev.target.value as "paid" | "amount" | "name" | "category")} className={styles.expenseSelect} aria-label="Ordenar por">
+                    <option value="paid">Por estado</option>
+                    <option value="amount">Por importe</option>
+                    <option value="name">Por nombre</option>
+                    <option value="category">Por categoría</option>
+                  </select>
+                </div>
+              )}
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
-                  <thead><tr><th>Concepto</th><th>Importe</th><th>ING</th><th>Santander</th><th>Trade</th><th>Tipo</th><th>Hecho</th><th></th></tr></thead>
+                  <thead><tr><th>Concepto</th><th>Importe</th><th>Categoría</th><th>ING</th><th>Santander</th><th>Trade</th><th>Tipo</th><th>Hecho</th><th></th></tr></thead>
                   <tbody>
                     <tr className={styles.comidaRow}>
                       <td>
@@ -431,6 +556,11 @@ export default function Home() {
                             <span className={styles.amountUnit}>€</span>
                           </div>
                         </td>
+                        <td>
+                          <select value={e.category} onChange={(ev) => setExpField(e.id, "category", ev.target.value as CategoryId)} className={styles.expenseSelect} aria-label="Categoría" style={{ fontSize: "0.8rem" }}>
+                            {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
+                          </select>
+                        </td>
                         {BANK_IDS.map((b) => (
                           <td key={b} className={styles.bankCell} onClick={() => setExpField(e.id, "bank", e.bank === b ? "" : b)}>
                             {e.bank === b && <span className={styles.bankDot} style={{ background: BANK_COLORS[b] }} />}
@@ -449,6 +579,11 @@ export default function Home() {
                           <span className={styles.amountUnit}>€</span>
                         </div>
                       </td>
+                      <td>
+                        <select value={newExpCategory} onChange={(ev) => setNewExpCategory(ev.target.value as CategoryId)} className={styles.expenseSelect} aria-label="Categoría" style={{ fontSize: "0.8rem" }}>
+                          {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
+                        </select>
+                      </td>
                       <td colSpan={3} />
                       <td><select value={newExpType} onChange={(ev) => setNewExpType(ev.target.value as "fijo" | "variable")} className={styles.expenseSelect} aria-label="Tipo de gasto"><option value="fijo">Fijo</option><option value="variable">Variable</option></select></td>
                       <td colSpan={2}><button type="button" className={styles.addBtn} onClick={addExpense}>Añadir</button></td>
@@ -461,6 +596,16 @@ export default function Home() {
                 {activeExpenses.length > 0 && <span>Fijos: {currency.format(totalFijos)}</span>}
                 {activeExpenses.length > 0 && <span>Pagados: {pagados}/{activeExpenses.length}</span>}
               </div>
+              {categoryStats.length > 0 && (
+                <div className={styles.categoryStats}>
+                  {categoryStats.map(({ cat, total }) => (
+                    <span key={cat} className={styles.categoryBadge}>
+                      <span className={styles.dot} style={{ background: CATEGORY_COLORS[cat] }} />
+                      {CATEGORY_LABELS[cat]}: {currency.format(total)}
+                    </span>
+                  ))}
+                </div>
+              )}
             </section>
 
             {/* Banks */}
@@ -585,7 +730,11 @@ export default function Home() {
                 <button type="button" className={styles.addBtn} onClick={handleAddAsset}>Añadir</button>
               </div>
               <div className={styles.modalFooter}>
-                <div className={styles.footerLeft}><button type="button" className={styles.reset} onClick={handleReset}>Restablecer</button></div>
+                <div className={styles.footerLeft}>
+                  <button type="button" className={styles.reset} onClick={handleReset}>Restablecer</button>
+                  <button type="button" className={styles.exportBtn} onClick={handleExport}>Exportar</button>
+                  <button type="button" className={styles.importBtn} onClick={handleImport}>Importar</button>
+                </div>
                 <button type="button" className={styles.closeBtn} onClick={() => setSettingsOpen(false)}>Cerrar</button>
               </div>
             </div>

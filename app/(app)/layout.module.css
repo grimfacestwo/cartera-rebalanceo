@@ -207,3 +207,50 @@
     z-index: 15;
   }
 }
+
+/* Dark mode */
+[data-theme="dark"] .sidebar {
+  background: #1e293b;
+  border-right-color: #334155;
+}
+
+[data-theme="dark"] .sidebarFooter {
+  border-top-color: #334155;
+}
+
+[data-theme="dark"] .navLink {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .navLink:hover {
+  background: #334155;
+  color: #e2e8f0;
+}
+
+[data-theme="dark"] .navLinkActive {
+  background: #334155;
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .chevron {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .chevron:hover {
+  background: #334155;
+  color: #e2e8f0;
+}
+
+[data-theme="dark"] .hamburger {
+  background: #334155;
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .hamburger:hover {
+  background: #475569;
+  color: #e2e8f0;
+}
+
+[data-theme="dark"] .backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
