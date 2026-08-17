@@ -86,6 +86,7 @@ export default function Home() {
           const keys = sortMonthKeys(Object.keys(state.months));
           if (keys.length > 0) setActiveMonth(keys[keys.length - 1]);
           else setActiveMonth(currentMonthKey());
+          skipOnce.current = true;
           setLoadError(false);
         }
       } catch {

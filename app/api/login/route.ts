@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
 import { getSitePassword, safeEqual, sha256Hex } from "@/lib/auth";
+import { isRateLimited, recordAttempt } from "@/lib/rate-limit";
 
 const MAX_AGE = 60 * 60 * 24 * 30;
 
 export async function POST(request: Request) {
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+
+  if (isRateLimited(ip)) {
+    return NextResponse.json({ error: "Demasiados intentos" }, { status: 429 });
+  }
+
   let body: { password?: unknown } = {};
   try {
     body = (await request.json()) as { password?: unknown };
@@ -11,18 +18,21 @@ export async function POST(request: Request) {
     /* cuerpo no válido */
   }
 
-  const expected = getSitePassword();
-  if (
-    !expected ||
-    typeof body.password !== "string" ||
-    !safeEqual(body.password, expected)
-  ) {
+  const password = getSitePassword();
+  if (!password || typeof body.password !== "string") {
+    recordAttempt(ip);
     return NextResponse.json({ ok: false }, { status: 401 });
   }
 
-  const token = await sha256Hex(expected);
+  const expectedHash = await sha256Hex(password);
+  const submittedHash = await sha256Hex(body.password);
+  if (!safeEqual(submittedHash, expectedHash)) {
+    recordAttempt(ip);
+    return NextResponse.json({ ok: false }, { status: 401 });
+  }
+
   const res = NextResponse.json({ ok: true });
-  res.cookies.set("site_auth", token, {
+  res.cookies.set("site_auth", expectedHash, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",

@@ -20,7 +20,7 @@ export default function NoteSection({ slug }: { slug: string }) {
         if (!res.ok) throw new Error("no data");
         const data = (await res.json()) as { data?: { note?: string } };
         if (!cancelled) {
-          setNote(data.data?.note ?? "");
+          setNote(String(data.data?.note ?? ""));
           setLoadError(false);
         }
       } catch {

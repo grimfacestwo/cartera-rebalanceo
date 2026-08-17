@@ -12,10 +12,13 @@ export async function sha256Hex(input: string): Promise<string> {
     .join("");
 }
 
+let cachedToken: string | null | undefined;
+
 export async function expectedToken(): Promise<string | null> {
+  if (cachedToken !== undefined) return cachedToken;
   const password = getSitePassword();
-  if (!password) return null;
-  return sha256Hex(password);
+  cachedToken = password ? await sha256Hex(password) : null;
+  return cachedToken;
 }
 
 export function safeEqual(a: string, b: string): boolean {

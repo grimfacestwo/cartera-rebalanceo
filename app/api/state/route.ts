@@ -60,9 +60,15 @@ export async function GET() {
   }
 }
 
+const MAX_BODY_BYTES = 512 * 1024;
+
 export async function PUT(request: Request) {
   if (!(await isAuthed())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+  const cl = request.headers.get("content-length");
+  if (cl && Number(cl) > MAX_BODY_BYTES) {
+    return NextResponse.json({ error: "Cuerpo demasiado grande" }, { status: 413 });
   }
   let raw: unknown;
   try {

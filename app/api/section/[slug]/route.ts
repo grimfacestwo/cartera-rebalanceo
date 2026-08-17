@@ -59,7 +59,7 @@ export async function PUT(
   }
   const data: unknown =
     raw && typeof raw === "object" && !Array.isArray(raw)
-      ? raw
+      ? { note: typeof (raw as Record<string, unknown>).note === "string" ? (raw as Record<string, unknown>).note : "" }
       : { note: "" };
   try {
     await ensureSectionTable();
