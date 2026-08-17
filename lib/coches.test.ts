@@ -17,6 +17,7 @@ import {
   parseRepairs,
   parseRevisions,
   parseVehicles,
+  parseWorkshops,
   revisionStatus,
 } from "./coches";
 import type { MaintenanceItem, Repair } from "./coches";
@@ -98,6 +99,25 @@ describe("parseVehicles", () => {
     expect(result[0].maintenance[0].intervalMonths).toBe("");
     expect(result[0].maintenance[0].lastKm).toBe("");
     expect(result[0].maintenance[0].lastDate).toBe("");
+  });
+});
+
+describe("parseWorkshops", () => {
+  it("acepta solo cadenas no vacías y elimina duplicados", () => {
+    expect(parseWorkshops(["Taller A", " Taller B ", 123, "", "Taller A"])).toEqual([
+      "Taller A",
+      "Taller B",
+    ]);
+  });
+
+  it("devuelve lista vacía si no es un array", () => {
+    expect(parseWorkshops("Taller A")).toEqual([]);
+    expect(parseWorkshops(undefined)).toEqual([]);
+  });
+
+  it("parseCochesState incluye los talleres", () => {
+    const res = parseCochesState({ vehicles: [], repairs: [], revisions: [], workshops: ["Taller A"] });
+    expect(res.workshops).toEqual(["Taller A"]);
   });
 });
 

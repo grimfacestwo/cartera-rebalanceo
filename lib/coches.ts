@@ -39,6 +39,7 @@ export type CochesState = {
   vehicles: Vehicle[];
   repairs: Repair[];
   revisions: Revision[];
+  workshops: string[];
 };
 
 export const CORSAS_MAINTENANCE: MaintenanceItem[] = [
@@ -103,6 +104,7 @@ export const DEFAULT_STATE: CochesState = {
   vehicles: DEFAULT_VEHICLES,
   repairs: [],
   revisions: [],
+  workshops: [],
 };
 
 function str(v: unknown): string {
@@ -202,9 +204,23 @@ function cloneVehicles(vs: Vehicle[]): Vehicle[] {
   return vs.map((v) => ({ ...v, maintenance: v.maintenance.map((i) => ({ ...i })) }));
 }
 
+export function parseWorkshops(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of raw) {
+    const v = str(item).trim();
+    if (v && !seen.has(v)) {
+      seen.add(v);
+      out.push(v);
+    }
+  }
+  return out;
+}
+
 export function parseCochesState(raw: unknown): CochesState {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
-    return { vehicles: cloneVehicles(DEFAULT_VEHICLES), repairs: [], revisions: [] };
+    return { vehicles: cloneVehicles(DEFAULT_VEHICLES), repairs: [], revisions: [], workshops: [] };
   }
   const o = raw as Record<string, unknown>;
   const vehicles = "vehicles" in o ? parseVehicles(o.vehicles) : cloneVehicles(DEFAULT_VEHICLES);
@@ -212,6 +228,7 @@ export function parseCochesState(raw: unknown): CochesState {
     vehicles,
     repairs: parseRepairs(o.repairs),
     revisions: parseRevisions(o.revisions),
+    workshops: parseWorkshops(o.workshops),
   };
 }
 

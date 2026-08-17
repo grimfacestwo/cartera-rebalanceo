@@ -96,6 +96,7 @@ export default function CochesManager() {
   const [loadError, setLoadError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const [newWorkshop, setNewWorkshop] = useState("");
   const skipOnce = useRef(true);
 
   useEffect(() => {
@@ -208,6 +209,18 @@ export default function CochesManager() {
 
   const deleteRepair = (id: string) =>
     setState((s) => (s ? { ...s, repairs: s.repairs.filter((r) => r.id !== id) } : s));
+
+  const addWorkshop = () => {
+    const name = newWorkshop.trim();
+    if (!name) return;
+    setState((s) =>
+      s && !s.workshops.includes(name) ? { ...s, workshops: [...s.workshops, name] } : s
+    );
+    setNewWorkshop("");
+  };
+
+  const deleteWorkshop = (name: string) =>
+    setState((s) => (s ? { ...s, workshops: s.workshops.filter((w) => w !== name) } : s));
 
   const addRevision = () => {
     if (!active) return;
@@ -507,6 +520,61 @@ export default function CochesManager() {
 
           <div style={{ ...cardStyle, marginBottom: "1.25rem" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
+              <h2 style={{ fontSize: "0.95rem", margin: 0, color: "#e2e8f0", flex: 1 }}>Talleres</h2>
+            </div>
+            <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
+              <input
+                value={newWorkshop}
+                onChange={(e) => setNewWorkshop(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") addWorkshop();
+                }}
+                placeholder="Nombre del taller"
+                style={{ ...inputStyle, flex: 1 }}
+                aria-label="Nuevo taller"
+              />
+              <button type="button" onClick={addWorkshop} style={btnStyle}>
+                Añadir
+              </button>
+            </div>
+            {state.workshops.length === 0 ? (
+              <p style={{ color: "#94a3b8", fontSize: "0.85rem", margin: 0 }}>
+                Sin talleres. Añádelos y podrás elegirlos en las reparaciones.
+              </p>
+            ) : (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                {state.workshops.map((w) => (
+                  <span
+                    key={w}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "0.4rem",
+                      background: "#1e293b",
+                      border: "1px solid #334155",
+                      borderRadius: 999,
+                      padding: "0.2rem 0.6rem",
+                      fontSize: "0.8rem",
+                      color: "#e2e8f0",
+                    }}
+                  >
+                    {w}
+                    <button
+                      type="button"
+                      onClick={() => deleteWorkshop(w)}
+                      style={{ ...btnDanger, padding: 0, border: "none", fontSize: "0.8rem" }}
+                      aria-label={`Eliminar taller ${w}`}
+                    >
+                      ✕
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div style={{ ...cardStyle, marginBottom: "1.25rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
               <h2 style={{ fontSize: "0.95rem", margin: 0, color: "#e2e8f0", flex: 1 }}>
                 Reparaciones
                 <span style={{ color: "#94a3b8", fontSize: "0.8rem", fontWeight: 400, marginLeft: "0.5rem" }}>
@@ -548,13 +616,31 @@ export default function CochesManager() {
                   style={inputStyle}
                   aria-label="Kilómetros"
                 />
-                <input
-                  value={r.workshop}
-                  onChange={(e) => updateRepair(r.id, { workshop: e.target.value })}
-                  placeholder="Taller"
-                  style={inputStyle}
-                  aria-label="Taller"
-                />
+                {state.workshops.length > 0 ? (
+                  <select
+                    value={r.workshop}
+                    onChange={(e) => updateRepair(r.id, { workshop: e.target.value })}
+                    style={inputStyle}
+                    aria-label="Taller"
+                  >
+                    <option value="">Taller</option>
+                    {Array.from(
+                      new Set(state.workshops.concat(r.workshop ? [r.workshop] : []))
+                    ).map((w) => (
+                      <option key={w} value={w}>
+                        {w}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    value={r.workshop}
+                    onChange={(e) => updateRepair(r.id, { workshop: e.target.value })}
+                    placeholder="Taller"
+                    style={inputStyle}
+                    aria-label="Taller"
+                  />
+                )}
                 <button
                   type="button"
                   onClick={() => deleteRepair(r.id)}
