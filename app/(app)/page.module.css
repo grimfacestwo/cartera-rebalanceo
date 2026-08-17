@@ -78,6 +78,11 @@
   border-radius: 12px;
   padding: 1.25rem 1.5rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  margin-bottom: 1rem;
+}
+
+.grid .card {
+  margin-bottom: 0;
 }
 
 .card h2 {
