@@ -176,11 +176,6 @@ export default function Home() {
     }
   };
 
-  const bankExpenses = (bankId: BankId) => {
-    const exp = activeData.expenses.reduce((s, e) => e.bank === bankId ? s + (Number.parseFloat(e.amount) || 0) : s, 0);
-    return exp + (activeData.comidaBank === bankId ? activeComida : 0);
-  };
-
   const bankPendientes = (bankId: BankId) => {
     const pen = activeData.expenses.filter((e) => e.bank === bankId && !e.paid).reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
     return pen + (activeData.comidaBank === bankId ? activeComida : 0);
@@ -440,7 +435,7 @@ export default function Home() {
                   <tbody>
                     {BANK_IDS.map((id) => {
                       const saldo = Number.parseFloat(activeData.banks[id]) || 0;
-                      const gastos = bankExpenses(id);
+                      const gastos = bankPendientes(id);
                       const pend = bankPendientes(id);
                       const rest = saldo - pend;
                       return (
@@ -456,7 +451,7 @@ export default function Home() {
                     <tr className={styles.totalRow}>
                       <td>Total</td>
                       <td>{currency.format(bankTotal)}</td>
-                      <td>{currency.format(totalExpenses)}</td>
+                      <td>{currency.format(totalPendientes)}</td>
                       <td className={remaining >= 0 ? styles.inject : ""}>{currency.format(remaining)}</td>
                       <td className={styles.pending}>{currency.format(totalPendientes)}</td>
                     </tr>
