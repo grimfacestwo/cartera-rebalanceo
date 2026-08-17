@@ -10,6 +10,7 @@ import {
   DEFAULT_VALUES,
   monthLabel,
   parseExpenses,
+  parseGoals,
   parseState,
   sortMonthKeys,
 } from "./state";
@@ -246,5 +247,56 @@ describe("comidaAmount", () => {
   it("comidaDaily vacío = 0", () => {
     const empty = { ...month, comidaDaily: "" };
     expect(comidaAmount(empty, "2999-01")).toBe(0);
+  });
+});
+
+describe("parseGoals", () => {
+  it("devuelve [] si no es array", () => {
+    expect(parseGoals(null)).toEqual([]);
+    expect(parseGoals(undefined)).toEqual([]);
+    expect(parseGoals("string")).toEqual([]);
+    expect(parseGoals(42)).toEqual([]);
+  });
+
+  it("filtra items sin id o name", () => {
+    const raw = [
+      { id: "g1", name: "Viaje", target: "5000", current: "2000", deadline: "2026-12" },
+      { id: "g2" },
+      { name: "Sin id" },
+      { id: 123, name: "Id numérico" },
+    ];
+    const goals = parseGoals(raw);
+    expect(goals).toHaveLength(1);
+    expect(goals[0].name).toBe("Viaje");
+  });
+
+  it("conserva strings y pone defaults para faltantes", () => {
+    const raw = [{ id: "g1", name: "Fondo" }];
+    const goals = parseGoals(raw);
+    expect(goals[0]).toEqual({ id: "g1", name: "Fondo", target: "", current: "", deadline: "" });
+  });
+
+  it("parsea goals válidos", () => {
+    const raw = [
+      { id: "g1", name: "Viaje", target: "5000", current: "2000", deadline: "2026-12" },
+      { id: "g2", name: "Coche", target: "15000", current: "8000", deadline: "" },
+    ];
+    const goals = parseGoals(raw);
+    expect(goals).toHaveLength(2);
+    expect(goals[1].name).toBe("Coche");
+    expect(goals[1].deadline).toBe("");
+  });
+
+  it("parseState incluye goals por defecto", () => {
+    const state = parseState({});
+    expect(state.goals).toEqual([]);
+  });
+
+  it("parseState parsea goals proporcionados", () => {
+    const state = parseState({
+      goals: [{ id: "g1", name: "A", target: "100", current: "50", deadline: "" }],
+    });
+    expect(state.goals).toHaveLength(1);
+    expect(state.goals[0].target).toBe("100");
   });
 });

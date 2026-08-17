@@ -736,3 +736,61 @@
   cursor: pointer;
   accent-color: #3b82f6;
 }
+
+.goalRow {
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.goalFields {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.goalInput {
+  border: none;
+  background: transparent;
+  padding: 0.3rem 0.4rem;
+  font-size: 0.85rem;
+  color: #0f172a;
+  border-radius: 6px;
+  transition: background 0.12s;
+}
+
+.goalInput:hover {
+  background: #f1f5f9;
+}
+
+.goalInput:focus {
+  outline: none;
+  background: #f1f5f9;
+}
+
+.goalProgress {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.progressBar {
+  flex: 1;
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.goalProgressText {
+  font-size: 0.75rem;
+  color: #64748b;
+  white-space: nowrap;
+}

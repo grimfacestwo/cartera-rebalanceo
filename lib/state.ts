@@ -11,6 +11,14 @@ export type Expense = {
   paid: boolean;
 };
 
+export type Goal = {
+  id: string;
+  name: string;
+  target: string;
+  current: string;
+  deadline: string;
+};
+
 export const BANK_IDS = ["ing", "santander", "trade"] as const;
 export type BankId = (typeof BANK_IDS)[number];
 
@@ -44,6 +52,7 @@ export type PortfolioState = {
   values: PortfolioValues;
   contribution: string;
   months: Record<string, MonthData>;
+  goals: Goal[];
 };
 
 export const DEFAULT_ASSETS: AssetDef[] = [
@@ -63,6 +72,7 @@ export const DEFAULT_STATE: PortfolioState = {
   values: DEFAULT_VALUES,
   contribution: "",
   months: {},
+  goals: [],
 };
 
 export const PALETTE = [
@@ -199,6 +209,26 @@ export function parseExpenses(raw: unknown): Expense[] {
   return out;
 }
 
+export function parseGoals(raw: unknown): Goal[] {
+  if (!Array.isArray(raw)) return [];
+  const out: Goal[] = [];
+  for (const item of raw) {
+    if (item && typeof item === "object") {
+      const o = item as Record<string, unknown>;
+      if (typeof o.id === "string" && typeof o.name === "string") {
+        out.push({
+          id: o.id,
+          name: o.name,
+          target: typeof o.target === "string" ? o.target : "",
+          current: typeof o.current === "string" ? o.current : "",
+          deadline: typeof o.deadline === "string" ? o.deadline : "",
+        });
+      }
+    }
+  }
+  return out;
+}
+
 function parseMonthData(raw: unknown): MonthData | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const o = raw as Record<string, unknown>;
@@ -262,5 +292,6 @@ export function parseState(raw: unknown): PortfolioState {
     values,
     contribution: typeof o.contribution === "string" ? o.contribution : "",
     months,
+    goals: parseGoals(o.goals),
   };
 }

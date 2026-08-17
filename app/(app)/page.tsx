@@ -20,6 +20,7 @@ import {
   sortMonthKeys,
   type BankId,
   type Expense,
+  type Goal,
   type MonthData,
   type PortfolioValues,
 } from "@/lib/state";
@@ -35,7 +36,7 @@ const currency = new Intl.NumberFormat("es-ES", {
 const pct = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 });
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
-type TabId = "cartera" | "hogar";
+type TabId = "cartera" | "hogar" | "objetivos";
 
 const EMPTY_MONTH: MonthData = { banks: { ...DEFAULT_BANKS }, expenses: [], comidaDaily: "40", comidaBank: "ing" };
 
@@ -67,6 +68,11 @@ export default function Home() {
   const [newExpName, setNewExpName] = useState("");
   const [newExpAmount, setNewExpAmount] = useState("");
   const [newExpType, setNewExpType] = useState<"fijo" | "variable">("variable");
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [goalName, setGoalName] = useState("");
+  const [goalTarget, setGoalTarget] = useState("");
+  const [goalCurrent, setGoalCurrent] = useState("");
+  const [goalDeadline, setGoalDeadline] = useState("");
   const skipOnce = useRef(true);
 
   // --- Load ---
@@ -83,6 +89,7 @@ export default function Home() {
           setValues(state.values);
           setContribution(state.contribution);
           setMonths(state.months);
+          setGoals(state.goals);
           const keys = sortMonthKeys(Object.keys(state.months));
           if (keys.length > 0) setActiveMonth(keys[keys.length - 1]);
           else setActiveMonth(currentMonthKey());
@@ -107,13 +114,13 @@ export default function Home() {
       fetch("/api/state", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assets, values, contribution, months }),
+        body: JSON.stringify({ assets, values, contribution, months, goals }),
       })
         .then((res) => setSaveStatus(res.ok ? "saved" : "error"))
         .catch(() => setSaveStatus("error"));
     }, 500);
     return () => clearTimeout(timer);
-  }, [assets, values, contribution, months, loading, loadError]);
+  }, [assets, values, contribution, months, goals, loading, loadError]);
 
   const retryLoad = () => { setLoadError(false); setLoading(true); setReloadKey((k) => k + 1); };
 
@@ -246,6 +253,25 @@ export default function Home() {
   const pagados = activeExpenses.filter((e) => e.paid).length;
   const sortedExpenses = useMemo(() => [...activeExpenses].sort((a, b) => Number(a.paid) - Number(b.paid)), [activeExpenses]);
 
+  // Goals helpers
+  const setGoalField = (id: string, field: keyof Goal, val: string) => {
+    setGoals((prev) => prev.map((g) => (g.id === id ? { ...g, [field]: val } : g)));
+  };
+
+  const addGoal = () => {
+    const name = goalName.trim();
+    if (!name) return;
+    setGoals([...goals, { id: newId(), name, target: goalTarget, current: goalCurrent, deadline: goalDeadline }]);
+    setGoalName(""); setGoalTarget(""); setGoalCurrent(""); setGoalDeadline("");
+  };
+
+  const removeGoal = (id: string) => {
+    setGoals(goals.filter((g) => g.id !== id));
+  };
+
+  const goalTargetTotal = goals.reduce((s, g) => s + (Number.parseFloat(g.target) || 0), 0);
+  const goalCurrentTotal = goals.reduce((s, g) => s + (Number.parseFloat(g.current) || 0), 0);
+
   return (
     <div className={styles.page}>
       <main className={styles.main}>
@@ -269,6 +295,7 @@ export default function Home() {
         <nav className={styles.tabs} role="tablist">
           <button type="button" role="tab" aria-selected={tab === "cartera"} className={`${styles.tab} ${tab === "cartera" ? styles.tabActive : ""}`} onClick={() => setTab("cartera")}>Cartera</button>
           <button type="button" role="tab" aria-selected={tab === "hogar"} className={`${styles.tab} ${tab === "hogar" ? styles.tabActive : ""}`} onClick={() => setTab("hogar")}>Hogar</button>
+          <button type="button" role="tab" aria-selected={tab === "objetivos"} className={`${styles.tab} ${tab === "objetivos" ? styles.tabActive : ""}`} onClick={() => setTab("objetivos")}>Objetivos</button>
         </nav>
 
         {loading ? (
@@ -472,6 +499,66 @@ export default function Home() {
                 </table>
               </div>
               <p className={`${styles.disponibleTotal} ${remaining >= 0 ? styles.inject : styles.negative}`}>Disponible total: {currency.format(remaining)} €</p>
+            </section>
+          </>
+        )}
+
+        {tab === "objetivos" && !loading && !loadError && (
+          <>
+            <section className={styles.card}>
+              <h2>Objetivos de ahorro</h2>
+              {goals.length === 0 ? (
+                <p className={styles.empty}>Sin objetivos. Crea el primero abajo.</p>
+              ) : (
+                goals.map((g) => {
+                  const target = Number.parseFloat(g.target) || 0;
+                  const current = Number.parseFloat(g.current) || 0;
+                  const pctVal = target > 0 ? Math.min(100, (current / target) * 100) : 0;
+                  const barColor = pctVal >= 100 ? "#16a34a" : current > 0 ? "#3b82f6" : "#e2e8f0";
+                  return (
+                    <div key={g.id} className={styles.goalRow}>
+                      <div className={styles.goalFields}>
+                        <input type="text" value={g.name} onChange={(e) => setGoalField(g.id, "name", e.target.value)} className={styles.goalInput} style={{ flex: 2 }} aria-label="Nombre del objetivo" />
+                        <div className={styles.amountCell}>
+                          <input type="text" inputMode="decimal" value={g.target} onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setGoalField(g.id, "target", v); }} className={styles.goalInput} placeholder="Objetivo" aria-label="Importe objetivo" style={{ flex: 1 }} />
+                          <span className={styles.amountUnit}>€</span>
+                        </div>
+                        <div className={styles.amountCell}>
+                          <input type="text" inputMode="decimal" value={g.current} onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setGoalField(g.id, "current", v); }} className={styles.goalInput} placeholder="Ahorrado" aria-label="Ahorrado" style={{ flex: 1 }} />
+                          <span className={styles.amountUnit}>€</span>
+                        </div>
+                        <input type="text" value={g.deadline} onChange={(e) => setGoalField(g.id, "deadline", e.target.value)} className={styles.goalInput} placeholder="YYYY-MM" aria-label="Plazo" style={{ flex: 1 }} />
+                        <button type="button" className={styles.removeBtn} onClick={() => removeGoal(g.id)} aria-label={`Eliminar objetivo ${g.name}`}>×</button>
+                      </div>
+                      <div className={styles.goalProgress}>
+                        <div className={styles.progressBar}>
+                          <div className={styles.progressFill} style={{ width: `${pctVal}%`, background: barColor }} />
+                        </div>
+                        <span className={styles.goalProgressText}>{currency.format(current)} / {currency.format(target)} ({pctVal.toFixed(0)}%)</span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+              <div className={styles.addRow}>
+                <input type="text" value={goalName} onChange={(e) => setGoalName(e.target.value)} placeholder="Nombre" className={styles.goalInput} aria-label="Nombre del objetivo" style={{ flex: 2 }} />
+                <div className={styles.amountCell}>
+                  <input type="text" inputMode="decimal" value={goalTarget} onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setGoalTarget(v); }} className={styles.goalInput} placeholder="Objetivo" aria-label="Importe objetivo" style={{ flex: 1 }} />
+                  <span className={styles.amountUnit}>€</span>
+                </div>
+                <div className={styles.amountCell}>
+                  <input type="text" inputMode="decimal" value={goalCurrent} onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setGoalCurrent(v); }} className={styles.goalInput} placeholder="Ahorrado" aria-label="Ahorrado" style={{ flex: 1 }} />
+                  <span className={styles.amountUnit}>€</span>
+                </div>
+                <input type="text" value={goalDeadline} onChange={(e) => setGoalDeadline(e.target.value)} className={styles.goalInput} placeholder="YYYY-MM" aria-label="Plazo" style={{ flex: 1 }} />
+                <button type="button" className={styles.addBtn} onClick={addGoal}>Añadir</button>
+              </div>
+            </section>
+            <section className={styles.card}>
+              <p className={`${styles.disponibleTotal} ${goalCurrentTotal >= goalTargetTotal ? styles.inject : ""}`}>
+                Ahorrado: {currency.format(goalCurrentTotal)} € / Objetivos: {currency.format(goalTargetTotal)} € —
+                Libre: {currency.format(remaining - goalCurrentTotal)} €
+              </p>
             </section>
           </>
         )}

@@ -24,11 +24,13 @@ async function ensureTable() {
     banks jsonb NOT NULL DEFAULT '{}'::jsonb,
     expenses jsonb NOT NULL DEFAULT '[]'::jsonb,
     months jsonb NOT NULL DEFAULT '{}'::jsonb,
+    goals jsonb NOT NULL DEFAULT '[]'::jsonb,
     updated_at timestamptz NOT NULL DEFAULT now()
   )`;
   await sql`ALTER TABLE portfolio_state ADD COLUMN IF NOT EXISTS banks jsonb NOT NULL DEFAULT '{}'::jsonb`;
   await sql`ALTER TABLE portfolio_state ADD COLUMN IF NOT EXISTS expenses jsonb NOT NULL DEFAULT '[]'::jsonb`;
   await sql`ALTER TABLE portfolio_state ADD COLUMN IF NOT EXISTS months jsonb NOT NULL DEFAULT '{}'::jsonb`;
+  await sql`ALTER TABLE portfolio_state ADD COLUMN IF NOT EXISTS goals jsonb NOT NULL DEFAULT '[]'::jsonb`;
   ensured = true;
 }
 
@@ -45,7 +47,8 @@ export async function GET() {
       banks: unknown;
       expenses: unknown;
       months: unknown;
-    }>`SELECT assets, values, contribution, banks, expenses, months FROM portfolio_state WHERE id = 1`;
+      goals: unknown;
+    }>`SELECT assets, values, contribution, banks, expenses, months, goals FROM portfolio_state WHERE id = 1`;
     if (rows.length === 0) {
       return NextResponse.json({ state: DEFAULT_STATE });
     }
@@ -80,13 +83,14 @@ export async function PUT(request: Request) {
   try {
     await ensureTable();
     await sql`
-      INSERT INTO portfolio_state (id, assets, values, contribution, months, updated_at)
+      INSERT INTO portfolio_state (id, assets, values, contribution, months, goals, updated_at)
       VALUES (
         1,
         ${JSON.stringify(state.assets)}::jsonb,
         ${JSON.stringify(state.values)}::jsonb,
         ${state.contribution},
         ${JSON.stringify(state.months)}::jsonb,
+        ${JSON.stringify(state.goals)}::jsonb,
         now()
       )
       ON CONFLICT (id) DO UPDATE SET
@@ -94,6 +98,7 @@ export async function PUT(request: Request) {
         values = EXCLUDED.values,
         contribution = EXCLUDED.contribution,
         months = EXCLUDED.months,
+        goals = EXCLUDED.goals,
         updated_at = now()
     `;
     return NextResponse.json({ ok: true });
