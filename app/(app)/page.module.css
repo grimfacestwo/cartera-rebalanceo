@@ -670,6 +670,27 @@
   color: #64748b;
 }
 
+.amountCell {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.amountUnit {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.disponibleTotal {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 2px solid #e2e8f0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
 .bankCell {
   text-align: center;
   cursor: pointer;

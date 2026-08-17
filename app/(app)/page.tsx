@@ -393,7 +393,12 @@ export default function Home() {
                     {sortedExpenses.map((e) => (
                       <tr key={e.id} className={e.paid ? styles.done : ""}>
                         <td><input type="text" value={e.name} onChange={(ev) => setExpField(e.id, "name", ev.target.value)} className={styles.expenseInput} aria-label="Nombre del gasto" /></td>
-                        <td><input type="text" inputMode="decimal" value={e.amount} onChange={(ev) => { const v = ev.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setExpField(e.id, "amount", v); }} className={styles.expenseInput} aria-label="Importe" style={{ width: 5 + "rem" }} /></td>
+                        <td>
+                          <div className={styles.amountCell}>
+                            <input type="text" inputMode="decimal" value={e.amount} onChange={(ev) => { const v = ev.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setExpField(e.id, "amount", v); }} className={styles.expenseInput} aria-label="Importe" style={{ width: 4 + "rem" }} />
+                            <span className={styles.amountUnit}>€</span>
+                          </div>
+                        </td>
                         {BANK_IDS.map((b) => (
                           <td key={b} className={styles.bankCell} onClick={() => setExpField(e.id, "bank", e.bank === b ? "" : b)}>
                             {e.bank === b && <span className={styles.bankDot} style={{ background: BANK_COLORS[b] }} />}
@@ -406,7 +411,12 @@ export default function Home() {
                     ))}
                     <tr className={styles.expenseAddRow}>
                       <td><input type="text" value={newExpName} onChange={(ev) => setNewExpName(ev.target.value)} placeholder="Nuevo gasto" className={styles.expenseInput} aria-label="Nombre del gasto" /></td>
-                      <td><input type="text" inputMode="decimal" value={newExpAmount} onChange={(ev) => { const v = ev.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setNewExpAmount(v); }} placeholder="0" className={styles.expenseInput} aria-label="Importe" style={{ width: 5 + "rem" }} /></td>
+                      <td>
+                        <div className={styles.amountCell}>
+                          <input type="text" inputMode="decimal" value={newExpAmount} onChange={(ev) => { const v = ev.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setNewExpAmount(v); }} placeholder="0" className={styles.expenseInput} aria-label="Importe" style={{ width: 4 + "rem" }} />
+                          <span className={styles.amountUnit}>€</span>
+                        </div>
+                      </td>
                       <td colSpan={3} />
                       <td><select value={newExpType} onChange={(ev) => setNewExpType(ev.target.value as "fijo" | "variable")} className={styles.expenseSelect} aria-label="Tipo de gasto"><option value="fijo">Fijo</option><option value="variable">Variable</option></select></td>
                       <td colSpan={2}><button type="button" className={styles.addBtn} onClick={addExpense}>Añadir</button></td>
@@ -426,7 +436,7 @@ export default function Home() {
               <h2>Bancos</h2>
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
-                  <thead><tr><th>Banco</th><th>Saldo</th><th>Gastos</th><th>Restante</th><th>Pendientes</th></tr></thead>
+                  <thead><tr><th>Banco</th><th>Saldo</th><th>Gastos</th><th>Disponible</th><th>Pendientes</th></tr></thead>
                   <tbody>
                     {BANK_IDS.map((id) => {
                       const saldo = Number.parseFloat(activeData.banks[id]) || 0;
@@ -453,6 +463,7 @@ export default function Home() {
                   </tbody>
                 </table>
               </div>
+              <p className={styles.disponibleTotal}>Disponible total: {currency.format(remaining)} €</p>
             </section>
           </>
         )}
