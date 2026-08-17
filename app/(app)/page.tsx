@@ -431,20 +431,20 @@ export default function Home() {
               <h2>Bancos</h2>
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
-                  <thead><tr><th>Banco</th><th>Saldo</th><th>Gastos</th><th>Disponible</th><th>Pendientes</th></tr></thead>
+                  <thead><tr><th>Banco</th><th>Saldo</th><th>Gastos</th><th>Disponible</th><th>Total</th></tr></thead>
                   <tbody>
                     {BANK_IDS.map((id) => {
                       const saldo = Number.parseFloat(activeData.banks[id]) || 0;
                       const gastos = bankPendientes(id);
-                      const pend = bankPendientes(id);
-                      const rest = saldo - pend;
+                      const rest = saldo - gastos;
+                      const total = gastos - rest;
                       return (
                         <tr key={id}>
                           <td className={styles.cellName}>{BANK_LABELS[id]}</td>
                           <td><input type="text" inputMode="decimal" value={activeData.banks[id]} onChange={(e) => setBank(id, e.target.value)} placeholder="0" className={styles.expenseInput} aria-label={`Saldo ${BANK_LABELS[id]}`} /></td>
                           <td>{currency.format(gastos)}</td>
                           <td className={rest >= 0 ? styles.inject : ""}>{currency.format(rest)}</td>
-                          <td className={pend > 0 ? styles.pending : ""}>{currency.format(pend)}</td>
+                          <td>{currency.format(total)}</td>
                         </tr>
                       );
                     })}
@@ -453,7 +453,7 @@ export default function Home() {
                       <td>{currency.format(bankTotal)}</td>
                       <td>{currency.format(totalPendientes)}</td>
                       <td className={remaining >= 0 ? styles.inject : ""}>{currency.format(remaining)}</td>
-                      <td className={styles.pending}>{currency.format(totalPendientes)}</td>
+                      <td>{currency.format(totalPendientes - remaining)}</td>
                     </tr>
                   </tbody>
                 </table>
