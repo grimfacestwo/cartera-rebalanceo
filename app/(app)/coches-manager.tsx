@@ -182,6 +182,9 @@ export default function CochesManager() {
         })
     : [];
   const pendingCount = revisions.filter((r) => !r.done).length;
+  const componentOptions = active
+    ? Array.from(new Set(active.maintenance.map((m) => m.name.trim()).filter(Boolean)))
+    : [];
 
   const updateVehicle = (id: string, patch: Partial<Vehicle>) =>
     setState((s) =>
@@ -198,6 +201,7 @@ export default function CochesManager() {
       cost: "",
       km: "",
       workshop: "",
+      component: "",
     };
     setState((s) => (s ? { ...s, repairs: [...s.repairs, repair] } : s));
   };
@@ -616,6 +620,40 @@ export default function CochesManager() {
                   style={inputStyle}
                   aria-label="Kilómetros"
                 />
+                {(() => {
+                  const isOther =
+                    r.component === "__other" ||
+                    (r.component !== "" && !componentOptions.includes(r.component));
+                  if (!isOther) {
+                    return (
+                      <select
+                        value={r.component}
+                        onChange={(e) =>
+                          updateRepair(r.id, { component: e.target.value === "__other" ? "__other" : e.target.value })
+                        }
+                        style={inputStyle}
+                        aria-label="Componente"
+                      >
+                        <option value="">Componente</option>
+                        {componentOptions.map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                        <option value="__other">Otro…</option>
+                      </select>
+                    );
+                  }
+                  return (
+                    <input
+                      value={r.component === "__other" ? "" : r.component}
+                      onChange={(e) => updateRepair(r.id, { component: e.target.value })}
+                      placeholder="Componente (otro)"
+                      style={inputStyle}
+                      aria-label="Componente (personalizado)"
+                    />
+                  );
+                })()}
                 {state.workshops.length > 0 ? (
                   <select
                     value={r.workshop}

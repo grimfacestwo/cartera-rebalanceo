@@ -15,6 +15,7 @@ export type Repair = {
   cost: string;
   km: string;
   workshop: string;
+  component: string;
 };
 
 export type Revision = {
@@ -172,6 +173,7 @@ export function parseRepairs(raw: unknown): Repair[] {
           cost: str(o.cost),
           km: str(o.km),
           workshop: str(o.workshop),
+          component: str(o.component),
         });
       }
     }
@@ -291,7 +293,8 @@ export function latestMatchingRepair(
   for (const r of repairs) {
     if (r.vehicleId !== vehicleId) continue;
     if (!r.km) continue;
-    if (!maintenanceMatchesRepair(name, r.description)) continue;
+    const matchesComponent = normalize(r.component) !== "" && normalize(r.component) === normalize(name);
+    if (!matchesComponent && !maintenanceMatchesRepair(name, r.description)) continue;
     if (!best || r.date > best.date) best = r;
   }
   return best;

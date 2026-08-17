@@ -27,9 +27,10 @@ function mkRepair(
   date: string,
   description: string,
   km: string,
-  vehicleId = "v1"
+  vehicleId = "v1",
+  component = ""
 ): Repair {
-  return { id, vehicleId, date, description, cost: "", km, workshop: "" };
+  return { id, vehicleId, date, description, cost: "", km, workshop: "", component };
 }
 
 function mkMaint(name: string, lastKm = ""): MaintenanceItem {
@@ -134,6 +135,15 @@ describe("parseRepairs", () => {
     ]);
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe("r1");
+  });
+
+  it("incluye el campo componente", () => {
+    const result = parseRepairs([
+      { id: "r1", vehicleId: "v1", description: "ok", component: "Aceite" },
+      { id: "r2", vehicleId: "v1", description: "ok" },
+    ]);
+    expect(result[0].component).toBe("Aceite");
+    expect(result[1].component).toBe("");
   });
 });
 
@@ -359,6 +369,26 @@ describe("maintenanceMatchesRepair", () => {
 });
 
 describe("latestMatchingRepair", () => {
+  it("coincide por el campo componente aunque la descripción no lo mencione", () => {
+    const repairs = [mkRepair("r1", "2026-05-20", "revisión general", "105000", "v1", "Aceite")];
+    expect(latestMatchingRepair(repairs, "v1", "Aceite")?.id).toBe("r1");
+    expect(latestMatchingRepair(repairs, "v1", "Filtro de aceite")).toBeNull();
+  });
+
+  it("el componente exacto gana sobre la coincidencia por descripción", () => {
+    const repairs = [
+      mkRepair("r1", "2026-05-20", "revisión general", "105000", "v1", "Filtro de aire"),
+      mkRepair("r2", "2026-01-10", "aceite", "90000", "v1", "Aceite"),
+    ];
+    expect(latestMatchingRepair(repairs, "v1", "Filtro de aire")?.id).toBe("r1");
+    expect(latestMatchingRepair(repairs, "v1", "Aceite")?.id).toBe("r2");
+  });
+
+  it("cae a la descripción si el componente está vacío", () => {
+    const repairs = [mkRepair("r1", "2026-05-20", "aceite y filtro", "105000")];
+    expect(latestMatchingRepair(repairs, "v1", "Aceite")?.id).toBe("r1");
+  });
+
   it("elige la reparación más reciente que coincida", () => {
     const repairs = [
       mkRepair("r1", "2026-01-10", "Cambio de aceite", "100000"),
