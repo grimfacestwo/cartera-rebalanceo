@@ -13,14 +13,20 @@ import {
   maintenanceMonthsRemaining,
   maintenanceStatus,
   parseCochesState,
+  parseDocuments,
   parseMaintenanceItems,
   parseRepairs,
   parseRevisions,
   parseVehicles,
   parseWorkshops,
+  pendingAlerts,
+  repairCostByComponent,
+  repairCostByWorkshop,
+  repairCostByYear,
   revisionStatus,
+  vehicleCostPerKm,
 } from "./coches";
-import type { MaintenanceItem, Repair } from "./coches";
+import type { CochesState, MaintenanceItem, Repair } from "./coches";
 
 function mkRepair(
   id: string,
@@ -439,5 +445,180 @@ describe("effectiveLastKm", () => {
     const res = effectiveLastKm(mkMaint("Aceite"), [], "v1");
     expect(res.km).toBe("");
     expect(res.source).toBe("none");
+  });
+});
+
+describe("parseMaintenanceItems warn thresholds", () => {
+  it("parsea warnKm y warnMonths con valores por defecto vacíos", () => {
+    const result = parseMaintenanceItems([
+      { id: "m1", name: "Aceite", warnKm: "500", warnMonths: "1" },
+      { id: "m2", name: "Filtro" },
+    ]);
+    expect(result[0].warnKm).toBe("500");
+    expect(result[0].warnMonths).toBe("1");
+    expect(result[1].warnKm).toBe("");
+    expect(result[1].warnMonths).toBe("");
+  });
+});
+
+describe("maintenanceStatus umbrales configurables", () => {
+  const today = new Date("2026-08-16T12:00:00");
+  const item = (lastKm: string, lastDate: string, warnKm?: string, warnMonths?: string) => ({
+    id: "m1",
+    name: "Aceite",
+    intervalKm: "30000",
+    intervalMonths: "12",
+    lastKm,
+    lastDate,
+    warnKm,
+    warnMonths,
+  });
+
+  it("usa el umbral por defecto si no se configura", () => {
+    expect(maintenanceStatus(item("22000", ""), "50000", today)).toBe("soon");
+  });
+
+  it("usa warnKm si se configura", () => {
+    expect(maintenanceStatus(item("48000", "", "10000"), "50000", today)).toBe("ok");
+    expect(maintenanceStatus(item("15000", "", "1000"), "50000", today)).toBe("overdue");
+  });
+
+  it("usa warnMonths si se configura", () => {
+    const lastDate = "2026-08-01";
+    expect(maintenanceStatus(item("", lastDate, "", "1"), "50000", today)).toBe("ok");
+  });
+});
+
+describe("parseDocuments", () => {
+  it("parsea documentos válidos y descarta inválidos", () => {
+    const result = parseDocuments([
+      { id: "d1", vehicleId: "v1", name: "factura.pdf", size: 1024, data: "data:application/pdf;base64,AA" },
+      { id: "d2", vehicleId: "v1" },
+      "mal",
+    ]);
+    expect(result).toHaveLength(2);
+    expect(result[0].name).toBe("factura.pdf");
+    expect(result[0].size).toBe(1024);
+    expect(result[0].data).toBe("data:application/pdf;base64,AA");
+    expect(result[1].name).toBe("");
+    expect(result[1].size).toBe(0);
+  });
+
+  it("devuelve [] si no es un array", () => {
+    expect(parseDocuments(null)).toEqual([]);
+  });
+});
+
+describe("estadísticas de costes", () => {
+  it("agrupa por año, componente y taller", () => {
+    const repairs = [
+      mkRepair("r1", "2026-05-20", "cambio de aceite", "105000", "v1"),
+      mkRepair("r2", "2025-01-10", "pastillas", "90000", "v1"),
+      mkRepair("r3", "2026-03-01", "frenos", "102000", "v2"),
+    ];
+    repairs[0].cost = "100";
+    repairs[1].cost = "200";
+    repairs[2].cost = "50";
+    repairs[0].component = "Aceite";
+    repairs[1].workshop = "Taller A";
+    repairs[2].workshop = "Taller A";
+
+    expect(repairCostByYear(repairs, "v1").map((s) => [s.label, s.total])).toEqual([
+      ["2026", 100],
+      ["2025", 200],
+    ]);
+    expect(repairCostByComponent(repairs, "v1")).toEqual([
+      { label: "Sin componente", total: 200 },
+      { label: "Aceite", total: 100 },
+    ]);
+    expect(repairCostByWorkshop(repairs, "v1")).toEqual([
+      { label: "Taller A", total: 200 },
+      { label: "Sin taller", total: 100 },
+    ]);
+  });
+
+  it("usa 'Sin componente'/'Sin taller' cuando no hay valor", () => {
+    const repairs = [mkRepair("r1", "2026-05-20", "revisión", "105000", "v1")];
+    repairs[0].cost = "100";
+    expect(repairCostByComponent(repairs, "v1")).toEqual([{ label: "Sin componente", total: 100 }]);
+    expect(repairCostByWorkshop(repairs, "v1")).toEqual([{ label: "Sin taller", total: 100 }]);
+  });
+
+  it("vehicleCostPerKm devuelve total y coste por km", () => {
+    const repairs = [mkRepair("r1", "2026-05-20", "revisión", "100000", "v1")];
+    repairs[0].cost = "2000";
+    expect(vehicleCostPerKm(repairs, "v1", "100000")).toEqual({ total: 2000, perKm: 0.02 });
+  });
+
+  it("vehicleCostPerKm null si no hay costes o km", () => {
+    expect(vehicleCostPerKm([], "v1", "100000")).toBeNull();
+    expect(vehicleCostPerKm([mkRepair("r1", "2026-05-20", "x", "100000", "v1")], "v1", "")).toBeNull();
+  });
+});
+
+describe("pendingAlerts", () => {
+  const today = new Date("2026-08-16T12:00:00");
+
+  function stateWith(
+    vehicles: unknown[],
+    repairs: Repair[] = [],
+    revisions: unknown[] = []
+  ): CochesState {
+    return parseCochesState({ vehicles, repairs, revisions, workshops: [], documents: [] });
+  }
+
+  it("cuenta mantenimientos vencidos y próximos", () => {
+    const state = stateWith([
+      {
+        id: "v1",
+        name: "Opel Corsa",
+        currentKm: "50000",
+        maintenance: [
+          { id: "m1", name: "Aceite", intervalKm: "30000", intervalMonths: "", lastKm: "10000", lastDate: "" },
+          { id: "m2", name: "Filtro de aire", intervalKm: "30000", intervalMonths: "", lastKm: "22000", lastDate: "" },
+        ],
+      },
+    ]);
+    const alerts = pendingAlerts(state, today);
+    expect(alerts.overdue).toBe(1);
+    expect(alerts.soon).toBe(1);
+  });
+
+  it("usa el km automático desde las reparaciones", () => {
+    const repairs = [mkRepair("r1", "2026-05-20", "cambio de aceite", "10000", "v1")];
+    repairs[0].cost = "100";
+    const state = stateWith(
+      [
+        {
+          id: "v1",
+          name: "Opel Corsa",
+          currentKm: "50000",
+          maintenance: [
+            { id: "m1", name: "Aceite", intervalKm: "30000", intervalMonths: "", lastKm: "", lastDate: "" },
+          ],
+        },
+      ],
+      repairs
+    );
+    const alerts = pendingAlerts(state, today);
+    expect(alerts.overdue).toBe(1);
+  });
+
+  it("cuenta revisiones vencidas y próximas", () => {
+    const state = stateWith(
+      [],
+      [],
+      [
+        { id: "s1", vehicleId: "v1", title: "ITV", dueDate: "2026-01-01", done: false },
+        { id: "s2", vehicleId: "v1", title: "ITV 2", dueDate: "2026-08-20", done: false },
+      ]
+    );
+    const alerts = pendingAlerts(state, today);
+    expect(alerts.overdue).toBe(1);
+    expect(alerts.soon).toBe(1);
+  });
+
+  it("cero sin datos", () => {
+    expect(pendingAlerts(stateWith([]), today)).toEqual({ overdue: 0, soon: 0 });
   });
 });

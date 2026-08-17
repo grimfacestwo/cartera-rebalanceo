@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { parseCochesState, pendingAlerts, type Alerts } from "@/lib/coches";
 import styles from "./layout.module.css";
 
 const SECTIONS = [
@@ -56,8 +57,27 @@ function readCollapsed(): boolean {
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [alerts, setAlerts] = useState<Alerts | null>(null);
   const pathname = usePathname();
   const router = useRouter();
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/section/coches");
+        if (!res.ok) throw new Error("no data");
+        const data = (await res.json()) as { data?: unknown };
+        const state = parseCochesState(data.data);
+        if (!cancelled) setAlerts(pendingAlerts(state));
+      } catch {
+        if (!cancelled) setAlerts(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const toggleCollapsed = () => {
     setCollapsed((c) => {
@@ -78,16 +98,30 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <nav className={styles.nav}>
       {SECTIONS.map((s) => {
         const active = s.slug === "/" ? pathname === "/" : pathname.startsWith(s.slug);
+        const total = alerts ? alerts.overdue + alerts.soon : 0;
+        const isCoches = s.slug === "/coches";
         return (
           <Link
             key={s.slug}
             href={s.slug}
             className={`${styles.navLink} ${active ? styles.navLinkActive : ""}`}
-            title={s.label}
+            title={
+              isCoches && alerts && total > 0
+                ? `${alerts.overdue} vencido${alerts.overdue === 1 ? "" : "s"}, ${alerts.soon} próxim${alerts.soon === 1 ? "o" : "os"} en Coches`
+                : s.label
+            }
             onClick={closeDrawer}
           >
             {s.icon}
             {!collapsed && <span className={styles.navLabel}>{s.label}</span>}
+            {isCoches && total > 0 && (
+              <span
+                className={styles.navBadge}
+                style={{ background: alerts!.overdue > 0 ? "#ef4444" : "#f59e0b" }}
+              >
+                {total}
+              </span>
+            )}
           </Link>
         );
       })}

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import {
+  type CarDocument,
   type CochesState,
   type MaintenanceItem,
   type MaintenanceStatus,
@@ -15,8 +16,12 @@ import {
   maintenanceMessage,
   maintenanceStatus,
   parseCochesState,
+  repairCostByComponent,
+  repairCostByWorkshop,
+  repairCostByYear,
   revisionStatus,
   revisionStatusLabel,
+  vehicleCostPerKm,
 } from "@/lib/coches";
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
@@ -90,6 +95,12 @@ function fmtCost(total: number): string {
   }).format(total);
 }
 
+function fmtSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export default function CochesManager() {
   const [state, setState] = useState<CochesState | null>(null);
   const [activeId, setActiveId] = useState("");
@@ -97,6 +108,9 @@ export default function CochesManager() {
   const [reloadKey, setReloadKey] = useState(0);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [newWorkshop, setNewWorkshop] = useState("");
+  const [filterComponent, setFilterComponent] = useState("");
+  const [filterWorkshop, setFilterWorkshop] = useState("");
+  const [filterYear, setFilterYear] = useState("");
   const skipOnce = useRef(true);
 
   useEffect(() => {
@@ -171,7 +185,24 @@ export default function CochesManager() {
         .filter((r) => r.vehicleId === active.id)
         .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
     : [];
-  const totalCost = repairs.reduce((s, r) => s + (Number.parseFloat(r.cost) || 0), 0);
+  const filteredRepairs = repairs.filter(
+    (r) =>
+      (!filterComponent || r.component === filterComponent) &&
+      (!filterWorkshop || r.workshop === filterWorkshop) &&
+      (!filterYear || r.date.slice(0, 4) === filterYear)
+  );
+  const totalCost = filteredRepairs.reduce((s, r) => s + (Number.parseFloat(r.cost) || 0), 0);
+  const usedComponents = Array.from(new Set(repairs.map((r) => r.component).filter(Boolean))).sort();
+  const usedWorkshops = Array.from(new Set(repairs.map((r) => r.workshop).filter(Boolean))).sort();
+  const usedYears = Array.from(new Set(repairs.map((r) => r.date.slice(0, 4)).filter(Boolean))).sort().reverse();
+  const hasRepairFilters = filterComponent !== "" || filterWorkshop !== "" || filterYear !== "";
+  const activeDocs = active
+    ? state.documents.filter((d) => d.vehicleId === active.id).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+    : [];
+  const yearStats = repairCostByYear(state.repairs, activeId);
+  const componentStats = repairCostByComponent(state.repairs, activeId);
+  const workshopStats = repairCostByWorkshop(state.repairs, activeId);
+  const perKm = vehicleCostPerKm(state.repairs, activeId, active?.currentKm ?? "");
   const revisions = active
     ? state.revisions
         .filter((r) => r.vehicleId === active.id)
@@ -225,6 +256,35 @@ export default function CochesManager() {
 
   const deleteWorkshop = (name: string) =>
     setState((s) => (s ? { ...s, workshops: s.workshops.filter((w) => w !== name) } : s));
+
+  const addDocument = (file: File) => {
+    const MAX_SIZE = 2 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      window.alert("El archivo supera 2 MB. Sube un archivo más pequeño.");
+      return;
+    }
+    if (!active) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const data = typeof reader.result === "string" ? reader.result : "";
+      if (!data) return;
+      const doc: CarDocument = {
+        id: uid(),
+        vehicleId: active.id,
+        name: file.name,
+        fileName: file.name,
+        mimeType: file.type,
+        size: file.size,
+        data,
+        date: new Date().toISOString().slice(0, 10),
+      };
+      setState((s) => (s ? { ...s, documents: [...s.documents, doc] } : s));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const deleteDocument = (id: string) =>
+    setState((s) => (s ? { ...s, documents: s.documents.filter((d) => d.id !== id) } : s));
 
   const addRevision = () => {
     if (!active) return;
@@ -468,6 +528,22 @@ export default function CochesManager() {
                       aria-label="Intervalo en meses"
                     />
                     <input
+                      value={m.warnKm ?? ""}
+                      onChange={(e) => updateMaintenance(m.id, { warnKm: e.target.value })}
+                      placeholder="Avisar a X km"
+                      style={inputStyle}
+                      aria-label="Avisar a X kilómetros de margen"
+                      title="Con cuántos km de margen pasar a 'próximo' (vacío = 2000)"
+                    />
+                    <input
+                      value={m.warnMonths ?? ""}
+                      onChange={(e) => updateMaintenance(m.id, { warnMonths: e.target.value })}
+                      placeholder="Avisar a X meses"
+                      style={inputStyle}
+                      aria-label="Avisar a X meses de margen"
+                      title="Con cuántos meses de margen pasar a 'próximo' (vacío = 2)"
+                    />
+                    <input
                       value={derived.km}
                       readOnly
                       placeholder="Últ. cambio km"
@@ -589,8 +665,87 @@ export default function CochesManager() {
                 + Reparación
               </button>
             </div>
-            {repairs.length === 0 && <p style={{ color: "#94a3b8", fontSize: "0.85rem", margin: 0 }}>Sin reparaciones registradas.</p>}
-            {repairs.map((r) => (
+            {repairs.length === 0 ? (
+              <p style={{ color: "#94a3b8", fontSize: "0.85rem", margin: 0 }}>Sin reparaciones registradas.</p>
+            ) : (
+              <>
+                {(usedComponents.length > 0 || usedWorkshops.length > 0 || usedYears.length > 0) && (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: "0.5rem",
+                      marginBottom: "0.75rem",
+                    }}
+                  >
+                    {usedComponents.length > 0 && (
+                      <select
+                        value={filterComponent}
+                        onChange={(e) => setFilterComponent(e.target.value)}
+                        style={{ ...inputStyle, flex: 1, minWidth: "120px" }}
+                        aria-label="Filtrar por componente"
+                      >
+                        <option value="">Componente: todos</option>
+                        {usedComponents.map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    {usedWorkshops.length > 0 && (
+                      <select
+                        value={filterWorkshop}
+                        onChange={(e) => setFilterWorkshop(e.target.value)}
+                        style={{ ...inputStyle, flex: 1, minWidth: "120px" }}
+                        aria-label="Filtrar por taller"
+                      >
+                        <option value="">Taller: todos</option>
+                        {usedWorkshops.map((w) => (
+                          <option key={w} value={w}>
+                            {w}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    {usedYears.length > 0 && (
+                      <select
+                        value={filterYear}
+                        onChange={(e) => setFilterYear(e.target.value)}
+                        style={{ ...inputStyle, flex: 1, minWidth: "110px" }}
+                        aria-label="Filtrar por año"
+                      >
+                        <option value="">Año: todos</option>
+                        {usedYears.map((y) => (
+                          <option key={y} value={y}>
+                            {y}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    {hasRepairFilters && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFilterComponent("");
+                          setFilterWorkshop("");
+                          setFilterYear("");
+                        }}
+                        style={btnStyle}
+                      >
+                        Limpiar
+                      </button>
+                    )}
+                  </div>
+                )}
+                {filteredRepairs.length === 0 && (
+                  <p style={{ color: "#94a3b8", fontSize: "0.85rem", marginBottom: "0.5rem" }}>
+                    Sin reparaciones con los filtros aplicados.
+                  </p>
+                )}
+              </>
+            )}
+            {filteredRepairs.map((r) => (
               <div key={r.id} style={{ ...fieldGrid, marginBottom: "0.5rem" }}>
                 <input
                   type="date"
@@ -689,6 +844,140 @@ export default function CochesManager() {
                 </button>
               </div>
             ))}
+          </div>
+
+          {repairs.length > 0 && (
+            <div style={{ ...cardStyle, marginBottom: "1.25rem" }}>
+              <h2 style={{ fontSize: "0.95rem", margin: "0 0 0.75rem", color: "#e2e8f0" }}>
+                Estadísticas
+              </h2>
+              {yearStats.length > 0 && (
+                <div style={{ marginBottom: "0.75rem" }}>
+                  <h3 style={{ fontSize: "0.85rem", margin: "0 0 0.4rem", color: "#94a3b8" }}>
+                    Coste por año
+                  </h3>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                    {yearStats.map((s) => (
+                      <div
+                        key={s.label}
+                        style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", color: "#e2e8f0" }}
+                      >
+                        <span>{s.label}</span>
+                        <span>{fmtCost(s.total)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {perKm && (
+                <p style={{ color: "#94a3b8", fontSize: "0.85rem", margin: "0 0 0.75rem" }}>
+                  Coste por km: {fmtCost(perKm.total)} ÷{" "}
+                  {Number.parseFloat(active?.currentKm ?? "") || 0} km ={" "}
+                  <span style={{ color: "#e2e8f0" }}>
+                    {new Intl.NumberFormat("es-ES", {
+                      style: "currency",
+                      currency: "EUR",
+                      minimumFractionDigits: 3,
+                      maximumFractionDigits: 3,
+                    }).format(perKm.perKm)}
+                  </span>
+                  /km
+                </p>
+              )}
+              {componentStats.length > 0 && (
+                <div style={{ marginBottom: "0.75rem" }}>
+                  <h3 style={{ fontSize: "0.85rem", margin: "0 0 0.4rem", color: "#94a3b8" }}>
+                    Por componente
+                  </h3>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                    {componentStats.slice(0, 5).map((s) => (
+                      <div
+                        key={s.label}
+                        style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", color: "#e2e8f0" }}
+                      >
+                        <span>{s.label}</span>
+                        <span>{fmtCost(s.total)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {workshopStats.length > 0 && (
+                <div>
+                  <h3 style={{ fontSize: "0.85rem", margin: "0 0 0.4rem", color: "#94a3b8" }}>
+                    Por taller
+                  </h3>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                    {workshopStats.slice(0, 5).map((s) => (
+                      <div
+                        key={s.label}
+                        style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", color: "#e2e8f0" }}
+                      >
+                        <span>{s.label}</span>
+                        <span>{fmtCost(s.total)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div style={{ ...cardStyle, marginBottom: "1.25rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
+              <h2 style={{ fontSize: "0.95rem", margin: 0, color: "#e2e8f0", flex: 1 }}>Documentos</h2>
+            </div>
+            <input
+              type="file"
+              accept=".pdf,image/*"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) addDocument(f);
+                e.target.value = "";
+              }}
+              style={{ ...inputStyle, color: "#94a3b8", marginBottom: "0.75rem" }}
+              aria-label="Subir documento"
+            />
+            {activeDocs.length === 0 ? (
+              <p style={{ color: "#94a3b8", fontSize: "0.85rem", margin: 0 }}>
+                Sin documentos. Sube facturas, informes o lo que quieras (máx. 2 MB).
+              </p>
+            ) : (
+              activeDocs.map((d) => (
+                <div
+                  key={d.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    marginBottom: "0.5rem",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <span style={{ color: "#e2e8f0", fontSize: "0.85rem", flex: 1, minWidth: "140px" }}>
+                    {d.name}
+                  </span>
+                  <span style={{ color: "#94a3b8", fontSize: "0.75rem", whiteSpace: "nowrap" }}>
+                    {fmtSize(d.size)} · {d.date}
+                  </span>
+                  <a
+                    href={d.data}
+                    download={d.fileName}
+                    style={{ ...btnStyle, textDecoration: "none", display: "inline-block" }}
+                  >
+                    Descargar
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => deleteDocument(d.id)}
+                    style={btnDanger}
+                    aria-label={`Eliminar documento ${d.name}`}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))
+            )}
           </div>
 
           <div style={cardStyle}>

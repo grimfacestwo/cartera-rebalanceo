@@ -34,6 +34,19 @@ export type MaintenanceItem = {
   intervalMonths: string;
   lastKm: string;
   lastDate: string;
+  warnKm?: string;
+  warnMonths?: string;
+};
+
+export type CarDocument = {
+  id: string;
+  vehicleId: string;
+  name: string;
+  fileName: string;
+  mimeType: string;
+  size: number;
+  data: string;
+  date: string;
 };
 
 export type CochesState = {
@@ -41,6 +54,7 @@ export type CochesState = {
   repairs: Repair[];
   revisions: Revision[];
   workshops: string[];
+  documents: CarDocument[];
 };
 
 export const CORSAS_MAINTENANCE: MaintenanceItem[] = [
@@ -106,6 +120,7 @@ export const DEFAULT_STATE: CochesState = {
   repairs: [],
   revisions: [],
   workshops: [],
+  documents: [],
 };
 
 function str(v: unknown): string {
@@ -126,6 +141,8 @@ export function parseMaintenanceItems(raw: unknown): MaintenanceItem[] {
           intervalMonths: str(o.intervalMonths),
           lastKm: str(o.lastKm),
           lastDate: str(o.lastDate),
+          warnKm: str(o.warnKm),
+          warnMonths: str(o.warnMonths),
         });
       }
     }
@@ -220,9 +237,38 @@ export function parseWorkshops(raw: unknown): string[] {
   return out;
 }
 
+export function parseDocuments(raw: unknown): CarDocument[] {
+  if (!Array.isArray(raw)) return [];
+  const out: CarDocument[] = [];
+  for (const item of raw) {
+    if (item && typeof item === "object") {
+      const o = item as Record<string, unknown>;
+      if (typeof o.id === "string" && typeof o.vehicleId === "string") {
+        out.push({
+          id: o.id,
+          vehicleId: o.vehicleId,
+          name: str(o.name),
+          fileName: str(o.fileName),
+          mimeType: str(o.mimeType),
+          size: typeof o.size === "number" ? o.size : Number.parseInt(str(o.size), 10) || 0,
+          data: str(o.data),
+          date: str(o.date),
+        });
+      }
+    }
+  }
+  return out;
+}
+
 export function parseCochesState(raw: unknown): CochesState {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
-    return { vehicles: cloneVehicles(DEFAULT_VEHICLES), repairs: [], revisions: [], workshops: [] };
+    return {
+      vehicles: cloneVehicles(DEFAULT_VEHICLES),
+      repairs: [],
+      revisions: [],
+      workshops: [],
+      documents: [],
+    };
   }
   const o = raw as Record<string, unknown>;
   const vehicles = "vehicles" in o ? parseVehicles(o.vehicles) : cloneVehicles(DEFAULT_VEHICLES);
@@ -231,6 +277,7 @@ export function parseCochesState(raw: unknown): CochesState {
     repairs: parseRepairs(o.repairs),
     revisions: parseRevisions(o.revisions),
     workshops: parseWorkshops(o.workshops),
+    documents: parseDocuments(o.documents),
   };
 }
 
@@ -352,8 +399,10 @@ export function maintenanceStatus(
   currentKm: string,
   today: Date = new Date()
 ): MaintenanceStatus {
-  const km = perStatus(maintenanceKmRemaining(item, currentKm), 2000);
-  const months = perStatus(maintenanceMonthsRemaining(item, today), 2);
+  const kmWarn = Number.parseFloat(item.warnKm ?? "") || 2000;
+  const moWarn = Number.parseFloat(item.warnMonths ?? "") || 2;
+  const km = perStatus(maintenanceKmRemaining(item, currentKm), kmWarn);
+  const months = perStatus(maintenanceMonthsRemaining(item, today), moWarn);
   const rank: Record<MaintenanceStatus, number> = { unknown: 0, ok: 1, soon: 2, overdue: 3 };
   return rank[months] > rank[km] ? months : km;
 }
@@ -392,4 +441,82 @@ export function maintenanceMessage(
     return `Te faltan ${fmtMonth(months)} para cambiar ${name}`;
   }
   return `Fija el km o la fecha del último cambio de ${name}`;
+}
+
+// --- Estadísticas ---
+
+function sumBy(
+  repairs: Repair[],
+  vehicleId: string,
+  key: (r: Repair) => string,
+  emptyLabel: string
+): { label: string; total: number }[] {
+  const totals = new Map<string, number>();
+  for (const r of repairs) {
+    if (r.vehicleId !== vehicleId) continue;
+    const label = key(r).trim() || emptyLabel;
+    totals.set(label, (totals.get(label) ?? 0) + (Number.parseFloat(r.cost) || 0));
+  }
+  return [...totals.entries()]
+    .map(([label, total]) => ({ label, total }))
+    .sort((a, b) => b.total - a.total);
+}
+
+export function repairCostByYear(
+  repairs: Repair[],
+  vehicleId: string
+): { label: string; total: number }[] {
+  return sumBy(repairs, vehicleId, (r) => r.date.slice(0, 4), "Sin año").sort((a, b) =>
+    a.label < b.label ? 1 : a.label > b.label ? -1 : 0
+  );
+}
+
+export function repairCostByComponent(
+  repairs: Repair[],
+  vehicleId: string
+): { label: string; total: number }[] {
+  return sumBy(repairs, vehicleId, (r) => r.component, "Sin componente");
+}
+
+export function repairCostByWorkshop(
+  repairs: Repair[],
+  vehicleId: string
+): { label: string; total: number }[] {
+  return sumBy(repairs, vehicleId, (r) => r.workshop, "Sin taller");
+}
+
+export function vehicleCostPerKm(
+  repairs: Repair[],
+  vehicleId: string,
+  currentKm: string
+): { total: number; perKm: number } | null {
+  const total = repairs
+    .filter((r) => r.vehicleId === vehicleId)
+    .reduce((s, r) => s + (Number.parseFloat(r.cost) || 0), 0);
+  const km = Number.parseFloat(currentKm);
+  if (total <= 0 || !Number.isFinite(km) || km <= 0) return null;
+  return { total, perKm: total / km };
+}
+
+// --- Alertas ---
+
+export type Alerts = { overdue: number; soon: number };
+
+export function pendingAlerts(state: CochesState, today: Date = new Date()): Alerts {
+  let overdue = 0;
+  let soon = 0;
+  for (const v of state.vehicles) {
+    for (const m of v.maintenance) {
+      const eff = effectiveLastKm(m, state.repairs, v.id);
+      const status = maintenanceStatus({ ...m, lastKm: eff.km }, v.currentKm, today);
+      if (status === "overdue") overdue++;
+      else if (status === "soon") soon++;
+    }
+  }
+  for (const rev of state.revisions) {
+    const st = revisionStatus(rev, today);
+    if (st === "overdue") overdue++;
+    else if (st === "soon") soon++;
+  }
+  return { overdue, soon };
 }
