@@ -477,6 +477,83 @@ export default function CochesManager() {
             </div>
           </div>
 
+          {repairs.length > 0 && (
+            <div style={{ ...cardStyle, marginBottom: "1.25rem" }}>
+              <h2 style={{ fontSize: "0.95rem", margin: "0 0 0.75rem", color: "#e2e8f0" }}>
+                Estadísticas
+              </h2>
+              {yearStats.length > 0 && (
+                <div style={{ marginBottom: "0.75rem" }}>
+                  <h3 style={{ fontSize: "0.85rem", margin: "0 0 0.4rem", color: "#94a3b8" }}>
+                    Coste por año
+                  </h3>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                    {yearStats.map((s) => (
+                      <div
+                        key={s.label}
+                        style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", color: "#e2e8f0" }}
+                      >
+                        <span>{s.label}</span>
+                        <span>{fmtCost(s.total)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {perKm && (
+                <p style={{ color: "#94a3b8", fontSize: "0.85rem", margin: "0 0 0.75rem" }}>
+                  Coste por km: {fmtCost(perKm.total)} ÷{" "}
+                  {Number.parseFloat(active?.currentKm ?? "") || 0} km ={" "}
+                  <span style={{ color: "#e2e8f0" }}>
+                    {new Intl.NumberFormat("es-ES", {
+                      style: "currency",
+                      currency: "EUR",
+                      minimumFractionDigits: 3,
+                      maximumFractionDigits: 3,
+                    }).format(perKm.perKm)}
+                  </span>
+                  /km
+                </p>
+              )}
+              {componentStats.length > 0 && (
+                <div style={{ marginBottom: "0.75rem" }}>
+                  <h3 style={{ fontSize: "0.85rem", margin: "0 0 0.4rem", color: "#94a3b8" }}>
+                    Por componente
+                  </h3>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                    {componentStats.slice(0, 5).map((s) => (
+                      <div
+                        key={s.label}
+                        style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", color: "#e2e8f0" }}
+                      >
+                        <span>{s.label}</span>
+                        <span>{fmtCost(s.total)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {workshopStats.length > 0 && (
+                <div>
+                  <h3 style={{ fontSize: "0.85rem", margin: "0 0 0.4rem", color: "#94a3b8" }}>
+                    Por taller
+                  </h3>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                    {workshopStats.slice(0, 5).map((s) => (
+                      <div
+                        key={s.label}
+                        style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", color: "#e2e8f0" }}
+                      >
+                        <span>{s.label}</span>
+                        <span>{fmtCost(s.total)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           <div style={{ ...cardStyle, marginBottom: "1.25rem" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
               <h2 style={{ fontSize: "0.95rem", margin: 0, color: "#e2e8f0", flex: 1 }}>
@@ -845,83 +922,6 @@ export default function CochesManager() {
               </div>
             ))}
           </div>
-
-          {repairs.length > 0 && (
-            <div style={{ ...cardStyle, marginBottom: "1.25rem" }}>
-              <h2 style={{ fontSize: "0.95rem", margin: "0 0 0.75rem", color: "#e2e8f0" }}>
-                Estadísticas
-              </h2>
-              {yearStats.length > 0 && (
-                <div style={{ marginBottom: "0.75rem" }}>
-                  <h3 style={{ fontSize: "0.85rem", margin: "0 0 0.4rem", color: "#94a3b8" }}>
-                    Coste por año
-                  </h3>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-                    {yearStats.map((s) => (
-                      <div
-                        key={s.label}
-                        style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", color: "#e2e8f0" }}
-                      >
-                        <span>{s.label}</span>
-                        <span>{fmtCost(s.total)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {perKm && (
-                <p style={{ color: "#94a3b8", fontSize: "0.85rem", margin: "0 0 0.75rem" }}>
-                  Coste por km: {fmtCost(perKm.total)} ÷{" "}
-                  {Number.parseFloat(active?.currentKm ?? "") || 0} km ={" "}
-                  <span style={{ color: "#e2e8f0" }}>
-                    {new Intl.NumberFormat("es-ES", {
-                      style: "currency",
-                      currency: "EUR",
-                      minimumFractionDigits: 3,
-                      maximumFractionDigits: 3,
-                    }).format(perKm.perKm)}
-                  </span>
-                  /km
-                </p>
-              )}
-              {componentStats.length > 0 && (
-                <div style={{ marginBottom: "0.75rem" }}>
-                  <h3 style={{ fontSize: "0.85rem", margin: "0 0 0.4rem", color: "#94a3b8" }}>
-                    Por componente
-                  </h3>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-                    {componentStats.slice(0, 5).map((s) => (
-                      <div
-                        key={s.label}
-                        style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", color: "#e2e8f0" }}
-                      >
-                        <span>{s.label}</span>
-                        <span>{fmtCost(s.total)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {workshopStats.length > 0 && (
-                <div>
-                  <h3 style={{ fontSize: "0.85rem", margin: "0 0 0.4rem", color: "#94a3b8" }}>
-                    Por taller
-                  </h3>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-                    {workshopStats.slice(0, 5).map((s) => (
-                      <div
-                        key={s.label}
-                        style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", color: "#e2e8f0" }}
-                      >
-                        <span>{s.label}</span>
-                        <span>{fmtCost(s.total)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
 
           <div style={{ ...cardStyle, marginBottom: "1.25rem" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
