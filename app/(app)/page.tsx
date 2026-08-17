@@ -437,7 +437,7 @@ export default function Home() {
                       const saldo = Number.parseFloat(activeData.banks[id]) || 0;
                       const gastos = bankPendientes(id);
                       const rest = saldo - gastos;
-                      const total = gastos - rest;
+                      const total = rest - gastos;
                       return (
                         <tr key={id}>
                           <td className={styles.cellName}>{BANK_LABELS[id]}</td>
@@ -453,7 +453,7 @@ export default function Home() {
                       <td>{currency.format(bankTotal)}</td>
                       <td>{currency.format(totalPendientes)}</td>
                       <td className={remaining >= 0 ? styles.inject : ""}>{currency.format(remaining)}</td>
-                      <td>{currency.format(totalPendientes - remaining)}</td>
+                      <td>{currency.format(remaining - totalPendientes)}</td>
                     </tr>
                   </tbody>
                 </table>
