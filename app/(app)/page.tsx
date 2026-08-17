@@ -442,7 +442,7 @@ export default function Home() {
                           <td className={styles.cellName}>{BANK_LABELS[id]}</td>
                           <td><input type="text" inputMode="decimal" value={activeData.banks[id]} onChange={(e) => setBank(id, e.target.value)} placeholder="0" className={styles.expenseInput} aria-label={`Saldo ${BANK_LABELS[id]}`} /></td>
                           <td>{currency.format(gastos)}</td>
-                          <td className={rest >= 0 ? styles.inject : ""}>{currency.format(rest)}</td>
+                          <td className={rest >= 0 ? styles.inject : styles.negative}>{currency.format(rest)}</td>
                         </tr>
                       );
                     })}
@@ -450,12 +450,12 @@ export default function Home() {
                       <td>Total</td>
                       <td>{currency.format(bankTotal)}</td>
                       <td>{currency.format(totalPendientes)}</td>
-                      <td className={remaining >= 0 ? styles.inject : ""}>{currency.format(remaining)}</td>
+                      <td className={remaining >= 0 ? styles.inject : styles.negative}>{currency.format(remaining)}</td>
                     </tr>
                   </tbody>
                 </table>
               </div>
-              <p className={styles.disponibleTotal}>Disponible total: {currency.format(remaining)} €</p>
+              <p className={`${styles.disponibleTotal} ${remaining >= 0 ? styles.inject : styles.negative}`}>Disponible total: {currency.format(remaining)} €</p>
             </section>
           </>
         )}

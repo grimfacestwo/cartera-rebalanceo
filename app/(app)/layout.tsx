@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { parseCochesState, pendingAlerts, type Alerts } from "@/lib/coches";
+import { parseState, BANK_IDS, currentMonthKey, comidaAmount } from "@/lib/state";
 import styles from "./layout.module.css";
 
 const SECTIONS = [
@@ -47,6 +48,8 @@ const SECTIONS = [
 
 const SIDEBAR_KEY = "cartera:sidebar";
 
+const currencySidebar = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", minimumFractionDigits: 0, maximumFractionDigits: 0 });
+
 function readCollapsed(): boolean {
   if (typeof window === "undefined") return false;
   try {
@@ -58,6 +61,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [alerts, setAlerts] = useState<Alerts | null>(null);
+  const [disponible, setDisponible] = useState<number | null>(null);
   const pathname = usePathname();
   const router = useRouter();
 
@@ -77,6 +81,26 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/state");
+        if (!res.ok) throw new Error("no data");
+        const { state: raw } = (await res.json()) as { state?: unknown };
+        const state = parseState(raw);
+        const curKey = currentMonthKey();
+        const active = state.months[curKey] ?? { banks: {} as Record<string, string>, expenses: [], comidaDaily: "40", comidaBank: "" as const };
+        const bankTotal = BANK_IDS.reduce((s, id) => s + (Number.parseFloat(active.banks[id]) || 0), 0);
+        const pendientes = active.expenses.filter((e: { paid?: boolean }) => !e.paid).reduce((s: number, e: { amount: string }) => s + (Number.parseFloat(e.amount) || 0), 0) + comidaAmount(active, curKey);
+        if (!cancelled) setDisponible(bankTotal - pendientes);
+      } catch {
+        if (!cancelled) setDisponible(null);
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   const toggleCollapsed = () => {
@@ -100,6 +124,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         const active = s.slug === "/" ? pathname === "/" : pathname.startsWith(s.slug);
         const total = alerts ? alerts.overdue + alerts.soon : 0;
         const isCoches = s.slug === "/coches";
+        const isFinanzas = s.slug === "/";
         return (
           <Link
             key={s.slug}
@@ -108,12 +133,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             title={
               isCoches && alerts && total > 0
                 ? `${alerts.overdue} vencido${alerts.overdue === 1 ? "" : "s"}, ${alerts.soon} próxim${alerts.soon === 1 ? "o" : "os"} en Coches`
-                : s.label
+                : isFinanzas && disponible !== null
+                  ? `Disponible total: ${currencySidebar.format(disponible)}`
+                  : s.label
             }
             onClick={closeDrawer}
           >
             {s.icon}
             {!collapsed && <span className={styles.navLabel}>{s.label}</span>}
+            {isFinanzas && disponible !== null && (
+              <span
+                className={styles.navBadge}
+                style={{ background: disponible >= 0 ? "#16a34a" : "#dc2626" }}
+              >
+                {currencySidebar.format(disponible)}
+              </span>
+            )}
             {isCoches && total > 0 && (
               <span
                 className={styles.navBadge}

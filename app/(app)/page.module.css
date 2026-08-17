@@ -436,6 +436,12 @@
   white-space: nowrap;
 }
 
+.negative {
+  color: #dc2626;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .plain {
   color: #64748b;
 }
