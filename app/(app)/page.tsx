@@ -191,7 +191,8 @@ export default function Home() {
   const activeDaysRemaining = daysRemaining(activeMonth);
   const activeComida = comidaAmount(activeData, activeMonth);
   const totalExpenses = totalExpensesBank + activeComida;
-  const remaining = bankTotal - totalExpenses;
+  const totalPendientes = activeData.expenses.filter((e) => !e.paid).reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0) + activeComida;
+  const remaining = bankTotal - totalPendientes;
 
   // Expenses
   const setExpField = (id: string, field: keyof Expense, val: unknown) => {
@@ -247,7 +248,6 @@ export default function Home() {
   const activeExpenses = activeData.expenses;
   const totalFijos = activeExpenses.filter((e) => e.type === "fijo").reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
   const pagados = activeExpenses.filter((e) => e.paid).length;
-  const totalPendientes = activeExpenses.filter((e) => !e.paid).reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0) + activeComida;
   const sortedExpenses = useMemo(() => [...activeExpenses].sort((a, b) => Number(a.paid) - Number(b.paid)), [activeExpenses]);
 
   return (
@@ -441,8 +441,8 @@ export default function Home() {
                     {BANK_IDS.map((id) => {
                       const saldo = Number.parseFloat(activeData.banks[id]) || 0;
                       const gastos = bankExpenses(id);
-                      const rest = saldo - gastos;
                       const pend = bankPendientes(id);
+                      const rest = saldo - pend;
                       return (
                         <tr key={id}>
                           <td className={styles.cellName}>{BANK_LABELS[id]}</td>
