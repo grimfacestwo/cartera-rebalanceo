@@ -10,6 +10,7 @@ import {
   type Revision,
   type RevisionStatus,
   type Vehicle,
+  effectiveLastKm,
   maintenanceForName,
   maintenanceMessage,
   maintenanceStatus,
@@ -414,7 +415,9 @@ export default function CochesManager() {
               </p>
             )}
             {active.maintenance.map((m) => {
-              const status = maintenanceStatus(m, active.currentKm);
+              const derived = effectiveLastKm(m, repairs, active.id);
+              const effectiveItem = { ...m, lastKm: derived.km };
+              const status = maintenanceStatus(effectiveItem, active.currentKm);
               return (
                 <div
                   key={m.id}
@@ -448,11 +451,12 @@ export default function CochesManager() {
                       aria-label="Intervalo en meses"
                     />
                     <input
-                      value={m.lastKm}
-                      onChange={(e) => updateMaintenance(m.id, { lastKm: e.target.value })}
+                      value={derived.km}
+                      readOnly
                       placeholder="Últ. cambio km"
-                      style={inputStyle}
-                      aria-label="Kilómetros del último cambio"
+                      style={{ ...inputStyle, background: "#16223a", color: "#94a3b8" }}
+                      aria-label="Último cambio en kilómetros (automático)"
+                      title={derived.source === "auto" ? "Automático desde la reparación" : undefined}
                     />
                     <input
                       type="date"
@@ -477,11 +481,25 @@ export default function CochesManager() {
                     style={{
                       color: MNT_STATUS_COLORS[status],
                       fontSize: "0.8rem",
-                      margin: 0,
+                      margin: "0 0 0.2rem",
                     }}
                   >
-                    {maintenanceMessage(m, active.currentKm)}
+                    {maintenanceMessage(effectiveItem, active.currentKm)}
                   </p>
+                  {derived.source === "auto" && derived.repair ? (
+                    <p style={{ color: "#64748b", fontSize: "0.75rem", margin: 0 }}>
+                      Automático · de la reparación “{derived.repair.description}” (
+                      {derived.repair.date || "sin fecha"})
+                    </p>
+                  ) : derived.source === "manual" ? (
+                    <p style={{ color: "#64748b", fontSize: "0.75rem", margin: 0 }}>
+                      Km manual (sin reparación coincidente)
+                    </p>
+                  ) : (
+                    <p style={{ color: "#64748b", fontSize: "0.75rem", margin: 0 }}>
+                      Sin dato: añade una reparación con su km, p. ej. “Cambio de aceite”
+                    </p>
+                  )}
                 </div>
               );
             })}

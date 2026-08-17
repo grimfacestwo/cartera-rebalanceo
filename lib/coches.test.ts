@@ -4,8 +4,11 @@ import {
   CORSAS_MAINTENANCE,
   DEFAULT_VEHICLES,
   GENERIC_MAINTENANCE,
+  effectiveLastKm,
+  latestMatchingRepair,
   maintenanceForName,
   maintenanceKmRemaining,
+  maintenanceMatchesRepair,
   maintenanceMessage,
   maintenanceMonthsRemaining,
   maintenanceStatus,
@@ -16,6 +19,21 @@ import {
   parseVehicles,
   revisionStatus,
 } from "./coches";
+import type { MaintenanceItem, Repair } from "./coches";
+
+function mkRepair(
+  id: string,
+  date: string,
+  description: string,
+  km: string,
+  vehicleId = "v1"
+): Repair {
+  return { id, vehicleId, date, description, cost: "", km, workshop: "" };
+}
+
+function mkMaint(name: string, lastKm = ""): MaintenanceItem {
+  return { id: "m1", name, intervalKm: "30000", intervalMonths: "12", lastKm, lastDate: "" };
+}
 
 describe("parseCochesState", () => {
   it("devuelve los dos vehículos por defecto si no hay datos", () => {
@@ -295,5 +313,81 @@ describe("maintenanceMessage", () => {
     expect(maintenanceMessage(item("Aceite", "30000", ""), "50000")).toBe(
       "Fija el km o la fecha del último cambio de aceite"
     );
+  });
+});
+
+describe("maintenanceMatchesRepair", () => {
+  it("coincide con el nombre completo en la descripción", () => {
+    expect(maintenanceMatchesRepair("Aceite", "Cambio de aceite")).toBe(true);
+    expect(maintenanceMatchesRepair("Líquido de frenos", "Cambio del líquido de frenos")).toBe(true);
+  });
+
+  it("coincide por primera o última palabra", () => {
+    expect(maintenanceMatchesRepair("Filtro de aceite", "Cambio aceite y filtros")).toBe(true);
+    expect(maintenanceMatchesRepair("Pastillas de freno", "pastillas y discos")).toBe(true);
+    expect(maintenanceMatchesRepair("Filtro de habitáculo", "cambio filtro habitaculo")).toBe(true);
+  });
+
+  it("no coincide cuando no hay relación", () => {
+    expect(maintenanceMatchesRepair("Aceite", "Cambio de frenos")).toBe(false);
+    expect(maintenanceMatchesRepair("Filtro de aire", "pastillas y discos")).toBe(false);
+  });
+
+  it("normaliza acentos y mayúsculas", () => {
+    expect(maintenanceMatchesRepair("Habitáculo", "CAMBIO HABITACULO")).toBe(true);
+  });
+});
+
+describe("latestMatchingRepair", () => {
+  it("elige la reparación más reciente que coincida", () => {
+    const repairs = [
+      mkRepair("r1", "2026-01-10", "Cambio de aceite", "100000"),
+      mkRepair("r2", "2026-05-20", "aceite y filtro", "105000"),
+      mkRepair("r3", "2026-03-01", "pastillas", "102000"),
+    ];
+    expect(latestMatchingRepair(repairs, "v1", "Aceite")?.id).toBe("r2");
+  });
+
+  it("ignora reparaciones sin km", () => {
+    const repairs = [
+      mkRepair("r1", "2026-05-20", "cambio de aceite", ""),
+      mkRepair("r2", "2026-01-10", "aceite", "100000"),
+    ];
+    expect(latestMatchingRepair(repairs, "v1", "Aceite")?.id).toBe("r2");
+  });
+
+  it("respeta el vehículo", () => {
+    const repairs = [
+      mkRepair("r1", "2026-05-20", "aceite", "100000", "v2"),
+      mkRepair("r2", "2026-01-10", "aceite", "90000", "v1"),
+    ];
+    expect(latestMatchingRepair(repairs, "v1", "Aceite")?.id).toBe("r2");
+  });
+
+  it("null si no hay coincidencia", () => {
+    expect(latestMatchingRepair([mkRepair("r1", "2026-01-01", "frenos", "100000")], "v1", "Aceite")).toBeNull();
+  });
+});
+
+describe("effectiveLastKm", () => {
+  it("usa el km de la reparación coincidente (automático)", () => {
+    const repairs = [mkRepair("r1", "2026-05-20", "cambio de aceite", "105000")];
+    const res = effectiveLastKm(mkMaint("Aceite", "90000"), repairs, "v1");
+    expect(res.km).toBe("105000");
+    expect(res.source).toBe("auto");
+    expect(res.repair?.id).toBe("r1");
+  });
+
+  it("cae al manual si no hay reparación coincidente", () => {
+    const repairs = [mkRepair("r1", "2026-05-20", "pastillas", "105000")];
+    const res = effectiveLastKm(mkMaint("Aceite", "90000"), repairs, "v1");
+    expect(res.km).toBe("90000");
+    expect(res.source).toBe("manual");
+  });
+
+  it("vacío si no hay nada", () => {
+    const res = effectiveLastKm(mkMaint("Aceite"), [], "v1");
+    expect(res.km).toBe("");
+    expect(res.source).toBe("none");
   });
 });

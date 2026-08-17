@@ -245,6 +245,58 @@ export function revisionStatusLabel(s: RevisionStatus): string {
 
 // --- Mantenimiento ---
 
+function normalize(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+export function maintenanceMatchesRepair(name: string, description: string): boolean {
+  const n = normalize(name);
+  const d = normalize(description);
+  if (!n || !d) return false;
+  if (d.includes(n)) return true;
+  const words = n.split(/\s+/);
+  const first = words[0];
+  const last = words[words.length - 1];
+  if (first && d.includes(first)) return true;
+  if (last && last !== first && d.includes(last)) return true;
+  return false;
+}
+
+export function latestMatchingRepair(
+  repairs: Repair[],
+  vehicleId: string,
+  name: string
+): Repair | null {
+  let best: Repair | null = null;
+  for (const r of repairs) {
+    if (r.vehicleId !== vehicleId) continue;
+    if (!r.km) continue;
+    if (!maintenanceMatchesRepair(name, r.description)) continue;
+    if (!best || r.date > best.date) best = r;
+  }
+  return best;
+}
+
+export type LastKmInfo = {
+  km: string;
+  source: "auto" | "manual" | "none";
+  repair: Repair | null;
+};
+
+export function effectiveLastKm(
+  item: MaintenanceItem,
+  repairs: Repair[],
+  vehicleId: string
+): LastKmInfo {
+  const auto = latestMatchingRepair(repairs, vehicleId, item.name);
+  if (auto) return { km: auto.km, source: "auto", repair: auto };
+  if (item.lastKm) return { km: item.lastKm, source: "manual", repair: null };
+  return { km: "", source: "none", repair: null };
+}
+
 export function maintenanceKmRemaining(item: MaintenanceItem, currentKm: string): number | null {
   const interval = Number.parseFloat(item.intervalKm);
   const cur = Number.parseFloat(currentKm);
