@@ -362,7 +362,16 @@ export default function Home() {
 
             {/* Expenses */}
             <section className={styles.card}>
-              <h2>Gastos</h2>
+              <h2 title={
+                (() => {
+                  const pendAll = activeData.expenses.filter((e) => !e.paid);
+                  const lines = [
+                    ...pendAll.map((e) => `${e.name}: ${currency.format(Number.parseFloat(e.amount) || 0)}`),
+                    ...(activeComida > 0 ? [`Comida: ${currency.format(activeComida)}`] : []),
+                  ];
+                  return lines.length ? `Gastos pendientes del mes:\n${lines.join("\n")}` : "Sin gastos pendientes este mes";
+                })()
+              }>Gastos</h2>
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
                   <thead><tr><th>Concepto</th><th>Importe</th><th>ING</th><th>Santander</th><th>Trade</th><th>Tipo</th><th>Hecho</th><th></th></tr></thead>
@@ -437,11 +446,17 @@ export default function Home() {
                       const saldo = Number.parseFloat(activeData.banks[id]) || 0;
                       const gastos = bankPendientes(id);
                       const rest = saldo - gastos;
+                      const pendItems = activeData.expenses.filter((e) => e.bank === id && !e.paid);
+                      const pendLines = [
+                        ...pendItems.map((e) => `${e.name}: ${currency.format(Number.parseFloat(e.amount) || 0)}`),
+                        ...(activeData.comidaBank === id && activeComida > 0 ? [`Comida: ${currency.format(activeComida)}`] : []),
+                      ];
+                      const bankTitle = pendLines.length ? `Pendientes en ${BANK_LABELS[id]}:\n${pendLines.join("\n")}` : `Sin pendientes en ${BANK_LABELS[id]}`;
                       return (
                         <tr key={id}>
                           <td className={styles.cellName}>{BANK_LABELS[id]}</td>
                           <td><input type="text" inputMode="decimal" value={activeData.banks[id]} onChange={(e) => setBank(id, e.target.value)} placeholder="0" className={styles.expenseInput} aria-label={`Saldo ${BANK_LABELS[id]}`} /></td>
-                          <td>{currency.format(gastos)}</td>
+                          <td title={bankTitle}>{currency.format(gastos)}</td>
                           <td className={rest >= 0 ? styles.inject : styles.negative}>{currency.format(rest)}</td>
                         </tr>
                       );
