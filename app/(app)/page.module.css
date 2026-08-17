@@ -113,19 +113,25 @@
   width: 3.5rem;
   margin-left: auto;
   box-sizing: border-box;
-  padding: 0.25rem 0.4rem;
+  padding: 0.25rem 0.25rem;
+  border: none;
+  background: transparent;
   border-radius: 6px;
-  border: 1px solid #cbd5e1;
-  background: #fff;
   color: #0f172a;
   font-size: 0.9rem;
   font-family: inherit;
   text-align: right;
+  transition: background 0.12s;
+}
+
+.targetInput:hover {
+  background: rgba(0, 0, 0, 0.03);
 }
 
 .targetInput:focus {
   outline: 2px solid #3b82f6;
   outline-offset: 1px;
+  background: rgba(0, 0, 0, 0.03);
 }
 
 .targetUnit {
@@ -211,18 +217,24 @@
 .settingRow input {
   width: 4rem;
   box-sizing: border-box;
-  padding: 0.4rem 0.5rem;
+  padding: 0.35rem 0.25rem;
+  border: none;
+  background: transparent;
   border-radius: 6px;
-  border: 1px solid #cbd5e1;
-  background: #fff;
   color: #0f172a;
   font-family: inherit;
   text-align: right;
+  transition: background 0.12s;
+}
+
+.settingRow input:hover {
+  background: rgba(0, 0, 0, 0.03);
 }
 
 .settingRow input:focus {
   outline: 2px solid #3b82f6;
   outline-offset: 1px;
+  background: rgba(0, 0, 0, 0.03);
 }
 
 .settingPct {
@@ -255,17 +267,23 @@
   flex: 1;
   min-width: 0;
   box-sizing: border-box;
-  padding: 0.5rem 0.6rem;
-  border-radius: 8px;
-  border: 1px solid #cbd5e1;
-  background: #fff;
+  padding: 0.45rem 0.25rem;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
   color: #0f172a;
   font-family: inherit;
+  transition: background 0.12s;
+}
+
+.addRow input:hover {
+  background: rgba(0, 0, 0, 0.03);
 }
 
 .addRow input:focus {
   outline: 2px solid #3b82f6;
   outline-offset: 1px;
+  background: rgba(0, 0, 0, 0.03);
 }
 
 .addRow .addTarget {
@@ -317,18 +335,24 @@
 .field input {
   width: 100%;
   box-sizing: border-box;
-  padding: 0.6rem 0.75rem;
-  border-radius: 8px;
-  border: 1px solid #cbd5e1;
-  background: #fff;
+  padding: 0.5rem 0.25rem;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
   color: #0f172a;
   font-size: 1rem;
   font-family: inherit;
+  transition: background 0.12s;
+}
+
+.field input:hover {
+  background: rgba(0, 0, 0, 0.03);
 }
 
 .field input:focus {
   outline: 2px solid #3b82f6;
   outline-offset: 1px;
+  background: rgba(0, 0, 0, 0.03);
 }
 
 .dot {
@@ -460,33 +484,45 @@
 .expenseInput {
   width: 100%;
   box-sizing: border-box;
-  padding: 0.4rem 0.5rem;
+  padding: 0.35rem 0.25rem;
+  border: none;
+  background: transparent;
   border-radius: 6px;
-  border: 1px solid #cbd5e1;
-  background: #fff;
   color: #0f172a;
   font-size: 0.85rem;
   font-family: inherit;
+  transition: background 0.12s;
+}
+
+.expenseInput:hover {
+  background: rgba(0, 0, 0, 0.03);
 }
 
 .expenseInput:focus {
   outline: 2px solid #3b82f6;
   outline-offset: 1px;
+  background: rgba(0, 0, 0, 0.03);
 }
 
 .expenseSelect {
-  padding: 0.4rem 0.5rem;
+  padding: 0.35rem 0.25rem;
   border-radius: 6px;
-  border: 1px solid #cbd5e1;
-  background: #fff;
+  border: none;
+  background: transparent;
   color: #0f172a;
   font-size: 0.85rem;
   font-family: inherit;
+  transition: background 0.12s;
+}
+
+.expenseSelect:hover {
+  background: rgba(0, 0, 0, 0.03);
 }
 
 .expenseSelect:focus {
   outline: 2px solid #3b82f6;
   outline-offset: 1px;
+  background: rgba(0, 0, 0, 0.03);
 }
 
 .expenseAddRow td {
@@ -639,26 +675,19 @@
   cursor: pointer;
   padding: 0.35rem 0.5rem;
   border-radius: 6px;
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: #94a3b8;
-  transition: background 0.12s, color 0.12s;
+  transition: background 0.12s;
   user-select: none;
 }
 
 .bankCell:hover {
   background: #f1f5f9;
-  color: #475569;
 }
 
-.bankCellActive {
-  background: rgba(59, 130, 246, 0.12);
-  color: #3b82f6;
-  font-weight: 600;
-}
-
-.bankCellActive:hover {
-  background: rgba(59, 130, 246, 0.18);
+.bankDot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
 }
 
 .done {

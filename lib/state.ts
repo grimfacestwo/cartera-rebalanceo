@@ -20,6 +20,12 @@ export const BANK_LABELS: Record<BankId, string> = {
   trade: "Trade Republic",
 };
 
+export const BANK_COLORS: Record<BankId, string> = {
+  ing: "#3b82f6",
+  santander: "#ef4444",
+  trade: "#8b5cf6",
+};
+
 export const DEFAULT_BANKS: Record<BankId, string> = {
   ing: "",
   santander: "",

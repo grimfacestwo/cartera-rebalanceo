@@ -5,6 +5,7 @@ import { computePlan, type AssetDef, type Row } from "@/lib/rebalance";
 import {
   BANK_IDS,
   BANK_LABELS,
+  BANK_COLORS,
   DEFAULT_ASSETS,
   DEFAULT_VALUES,
   DEFAULT_BANKS,
@@ -381,7 +382,9 @@ export default function Home() {
                         <span className={styles.comidaCalc}>= {currency.format(activeComida)}</span>
                       </td>
                       {BANK_IDS.map((b) => (
-                        <td key={b} className={`${styles.bankCell} ${activeData.comidaBank === b ? styles.bankCellActive : ""}`} onClick={() => setComidaBank(activeData.comidaBank === b ? "" : b)}>{BANK_LABELS[b]}</td>
+                        <td key={b} className={styles.bankCell} onClick={() => setComidaBank(activeData.comidaBank === b ? "" : b)}>
+                          {activeData.comidaBank === b && <span className={styles.bankDot} style={{ background: BANK_COLORS[b] }} />}
+                        </td>
                       ))}
                       <td>Fijo</td>
                       <td className={styles.hechoCell}>—</td>
@@ -392,7 +395,9 @@ export default function Home() {
                         <td><input type="text" value={e.name} onChange={(ev) => setExpField(e.id, "name", ev.target.value)} className={styles.expenseInput} aria-label="Nombre del gasto" /></td>
                         <td><input type="text" inputMode="decimal" value={e.amount} onChange={(ev) => { const v = ev.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setExpField(e.id, "amount", v); }} className={styles.expenseInput} aria-label="Importe" style={{ width: 5 + "rem" }} /></td>
                         {BANK_IDS.map((b) => (
-                          <td key={b} className={`${styles.bankCell} ${e.bank === b ? styles.bankCellActive : ""}`} onClick={() => setExpField(e.id, "bank", e.bank === b ? "" : b)}>{BANK_LABELS[b]}</td>
+                          <td key={b} className={styles.bankCell} onClick={() => setExpField(e.id, "bank", e.bank === b ? "" : b)}>
+                            {e.bank === b && <span className={styles.bankDot} style={{ background: BANK_COLORS[b] }} />}
+                          </td>
                         ))}
                         <td><select value={e.type} onChange={(ev) => setExpField(e.id, "type", ev.target.value as "fijo" | "variable")} className={styles.expenseSelect} aria-label="Tipo de gasto"><option value="fijo">Fijo</option><option value="variable">Variable</option></select></td>
                         <td className={styles.hechoCell}><input type="checkbox" checked={e.paid} onChange={(ev) => setExpField(e.id, "paid", ev.target.checked)} aria-label="Hecho" /></td>
