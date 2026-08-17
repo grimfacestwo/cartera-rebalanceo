@@ -140,6 +140,11 @@ describe("parseExpenses", () => {
     expect(result[0].bank).toBe("ing");
   });
 
+  it("permite bank vacío (sin banco)", () => {
+    const result = parseExpenses([{ id: "e1", name: "Test", amount: "10", type: "fijo", bank: "", paid: false }]);
+    expect(result[0].bank).toBe("");
+  });
+
   it("parsea paid=true y defaults a false si falta", () => {
     const result = parseExpenses([
       { id: "e1", name: "A", amount: "10", type: "fijo", bank: "ing", paid: true },

@@ -7,7 +7,7 @@ export type Expense = {
   name: string;
   amount: string;
   type: "fijo" | "variable";
-  bank: BankId;
+  bank: BankId | "";
   paid: boolean;
 };
 
@@ -30,7 +30,7 @@ export type MonthData = {
   banks: Record<BankId, string>;
   expenses: Expense[];
   comidaDaily: string;
-  comidaBank: BankId;
+  comidaBank: BankId | "";
 };
 
 export type PortfolioState = {
@@ -176,8 +176,8 @@ export function parseExpenses(raw: unknown): Expense[] {
       const o = item as Record<string, unknown>;
       if (typeof o.id === "string" && typeof o.name === "string") {
         const t = o.type;
-        const b = typeof o.bank === "string" && BANK_IDS.includes(o.bank as BankId)
-          ? (o.bank as BankId)
+        const b = typeof o.bank === "string" && (BANK_IDS.includes(o.bank as BankId) || o.bank === "")
+          ? (o.bank as BankId | "")
           : "ing";
         out.push({
           id: o.id,
@@ -204,8 +204,8 @@ function parseMonthData(raw: unknown): MonthData | null {
       : typeof o.comidaDaily === "number"
         ? String(o.comidaDaily)
         : "40",
-    comidaBank: typeof o.comidaBank === "string" && ["ing", "santander", "trade"].includes(o.comidaBank)
-      ? (o.comidaBank as BankId)
+    comidaBank: typeof o.comidaBank === "string" && (BANK_IDS.includes(o.comidaBank as BankId) || o.comidaBank === "")
+      ? (o.comidaBank as BankId | "")
       : "ing",
   };
 }

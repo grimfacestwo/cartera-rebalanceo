@@ -1,7 +1,7 @@
 .page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
-  color: #e2e8f0;
+  background: #f8fafc;
+  color: #0f172a;
   font-family: var(--font-geist-sans), system-ui, sans-serif;
   padding: 3rem 1.5rem;
 }
@@ -23,15 +23,15 @@
   right: 0;
   background: none;
   border: none;
-  color: #94a3b8;
+  color: #64748b;
   cursor: pointer;
   padding: 0.25rem;
   border-radius: 8px;
 }
 
 .gear:hover {
-  color: #f1f5f9;
-  background: #1e293b;
+  color: #0f172a;
+  background: #f1f5f9;
 }
 
 .gear svg {
@@ -41,17 +41,17 @@
 .header h1 {
   font-size: 2rem;
   margin: 0 0 0.5rem;
-  color: #fff;
+  color: #0f172a;
   letter-spacing: -0.02em;
 }
 
 .subtitle {
-  color: #94a3b8;
+  color: #64748b;
   margin: 0;
 }
 
 .saveStatus {
-  color: #22c55e;
+  color: #16a34a;
   margin: 0.5rem 0 0;
   font-size: 0.8rem;
 }
@@ -73,17 +73,18 @@
 }
 
 .card {
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: #fff;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 1.25rem 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .card h2 {
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #94a3b8;
+  color: #64748b;
   margin: 0 0 1rem;
 }
 
@@ -103,7 +104,7 @@
 
 .fieldName em {
   font-style: normal;
-  color: #94a3b8;
+  color: #64748b;
   font-weight: 400;
   margin-left: auto;
 }
@@ -114,9 +115,9 @@
   box-sizing: border-box;
   padding: 0.25rem 0.4rem;
   border-radius: 6px;
-  border: 1px solid #334155;
-  background: #0f172a;
-  color: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #0f172a;
   font-size: 0.9rem;
   font-family: inherit;
   text-align: right;
@@ -128,13 +129,13 @@
 }
 
 .targetUnit {
-  color: #94a3b8;
+  color: #64748b;
   font-size: 0.85rem;
 }
 
 .note {
   margin: 0 0 0.9rem;
-  color: #f59e0b;
+  color: #d97706;
   font-size: 0.85rem;
 }
 
@@ -142,23 +143,23 @@
   margin-top: 0.5rem;
   padding: 0.4rem 0.75rem;
   border-radius: 8px;
-  border: 1px solid #334155;
+  border: 1px solid #cbd5e1;
   background: transparent;
-  color: #94a3b8;
+  color: #64748b;
   font-family: inherit;
   font-size: 0.85rem;
   cursor: pointer;
 }
 
 .reset:hover {
-  color: #f1f5f9;
-  border-color: #475569;
+  color: #0f172a;
+  border-color: #94a3b8;
 }
 
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(2, 6, 23, 0.6);
+  background: rgba(0, 0, 0, 0.3);
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -168,18 +169,18 @@
 }
 
 .modal {
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: #fff;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 1.5rem;
   width: 100%;
   max-width: 420px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
 }
 
 .modal h2 {
   font-size: 1.1rem;
-  color: #fff;
+  color: #0f172a;
   margin: 0 0 1rem;
 }
 
@@ -187,7 +188,7 @@
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #94a3b8;
+  color: #64748b;
   margin: 1.25rem 0 0.6rem;
 }
 
@@ -212,9 +213,9 @@
   box-sizing: border-box;
   padding: 0.4rem 0.5rem;
   border-radius: 6px;
-  border: 1px solid #334155;
-  background: #0f172a;
-  color: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #0f172a;
   font-family: inherit;
   text-align: right;
 }
@@ -225,14 +226,14 @@
 }
 
 .settingPct {
-  color: #94a3b8;
+  color: #64748b;
   font-size: 0.9rem;
 }
 
 .removeBtn {
   background: none;
   border: none;
-  color: #64748b;
+  color: #94a3b8;
   font-size: 1.2rem;
   line-height: 1;
   cursor: pointer;
@@ -241,8 +242,8 @@
 }
 
 .removeBtn:hover {
-  color: #f87171;
-  background: rgba(248, 113, 113, 0.1);
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
 }
 
 .addRow {
@@ -256,9 +257,9 @@
   box-sizing: border-box;
   padding: 0.5rem 0.6rem;
   border-radius: 8px;
-  border: 1px solid #334155;
-  background: #0f172a;
-  color: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #0f172a;
   font-family: inherit;
 }
 
@@ -276,15 +277,15 @@
   padding: 0.5rem 0.9rem;
   border-radius: 8px;
   border: 1px solid #22c55e;
-  background: rgba(34, 197, 94, 0.15);
-  color: #22c55e;
+  background: rgba(34, 197, 94, 0.08);
+  color: #16a34a;
   font-family: inherit;
   font-weight: 600;
   cursor: pointer;
 }
 
 .addBtn:hover {
-  background: rgba(34, 197, 94, 0.25);
+  background: rgba(34, 197, 94, 0.15);
 }
 
 .modalFooter {
@@ -302,15 +303,15 @@
 .closeBtn {
   padding: 0.5rem 0.9rem;
   border-radius: 8px;
-  border: 1px solid #334155;
+  border: 1px solid #cbd5e1;
   background: transparent;
-  color: #e2e8f0;
+  color: #475569;
   font-family: inherit;
   cursor: pointer;
 }
 
 .closeBtn:hover {
-  border-color: #475569;
+  border-color: #94a3b8;
 }
 
 .field input {
@@ -318,9 +319,9 @@
   box-sizing: border-box;
   padding: 0.6rem 0.75rem;
   border-radius: 8px;
-  border: 1px solid #334155;
-  background: #0f172a;
-  color: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #0f172a;
   font-size: 1rem;
   font-family: inherit;
 }
@@ -339,7 +340,7 @@
 }
 
 .empty {
-  color: #94a3b8;
+  color: #64748b;
   margin: 0.5rem 0;
 }
 
@@ -369,18 +370,27 @@
 
 .table th {
   text-align: left;
-  color: #94a3b8;
-  font-weight: 500;
+  background: #f1f5f9;
+  color: #475569;
+  font-weight: 600;
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  padding: 0.4rem 0.5rem;
-  border-bottom: 1px solid #334155;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.table th:first-child {
+  border-top-left-radius: 8px;
+}
+
+.table th:last-child {
+  border-top-right-radius: 8px;
 }
 
 .table td {
-  padding: 0.55rem 0.5rem;
-  border-bottom: 1px solid #1e293b;
+  padding: 0.55rem 0.6rem;
+  border-bottom: 1px solid #f1f5f9;
 }
 
 .cellName {
@@ -391,30 +401,30 @@
 }
 
 .totalRow td {
-  border-top: 2px solid #334155;
+  border-top: 2px solid #e2e8f0;
   font-weight: 700;
-  color: #f1f5f9;
+  color: #0f172a;
 }
 
 .inject {
-  color: #22c55e;
+  color: #16a34a;
   font-weight: 600;
   white-space: nowrap;
 }
 
 .plain {
-  color: #94a3b8;
+  color: #64748b;
 }
 
 .pending {
-  color: #f59e0b;
+  color: #d97706;
   font-weight: 600;
   white-space: nowrap;
 }
 
 .balanced {
   margin-top: 1rem;
-  color: #22c55e;
+  color: #16a34a;
   font-weight: 600;
   font-size: 0.9rem;
 }
@@ -424,8 +434,8 @@
   height: 28px;
   border-radius: 8px;
   overflow: hidden;
-  background: #0f172a;
-  border: 1px solid #334155;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
 }
 
 .barSeg {
@@ -438,7 +448,7 @@
   gap: 1rem;
   margin-top: 0.9rem;
   font-size: 0.85rem;
-  color: #cbd5e1;
+  color: #475569;
 }
 
 .legendItem {
@@ -452,9 +462,9 @@
   box-sizing: border-box;
   padding: 0.4rem 0.5rem;
   border-radius: 6px;
-  border: 1px solid #334155;
-  background: #0f172a;
-  color: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #0f172a;
   font-size: 0.85rem;
   font-family: inherit;
 }
@@ -467,9 +477,9 @@
 .expenseSelect {
   padding: 0.4rem 0.5rem;
   border-radius: 6px;
-  border: 1px solid #334155;
-  background: #0f172a;
-  color: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #0f172a;
   font-size: 0.85rem;
   font-family: inherit;
 }
@@ -493,8 +503,8 @@
   padding: 0.45rem 0.9rem;
   border-radius: 8px;
   border: 1px solid #f59e0b;
-  background: rgba(245, 158, 11, 0.15);
-  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.08);
+  color: #b45309;
   font-family: inherit;
   font-weight: 600;
   font-size: 0.85rem;
@@ -502,7 +512,7 @@
 }
 
 .newMonthBtn:hover {
-  background: rgba(245, 158, 11, 0.25);
+  background: rgba(245, 158, 11, 0.15);
 }
 
 .expenseSummary {
@@ -511,16 +521,16 @@
   gap: 1rem;
   margin-top: 0.75rem;
   padding-top: 0.75rem;
-  border-top: 1px solid #334155;
+  border-top: 1px solid #e2e8f0;
   font-size: 0.85rem;
-  color: #94a3b8;
+  color: #475569;
 }
 
 .card h3 {
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #94a3b8;
+  color: #64748b;
   margin: 1.25rem 0 0.6rem;
 }
 
@@ -531,7 +541,7 @@
 .tabs {
   display: flex;
   gap: 0;
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid #e2e8f0;
   margin-bottom: 1.5rem;
 }
 
@@ -541,7 +551,7 @@
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
-  color: #94a3b8;
+  color: #64748b;
   font-family: inherit;
   font-size: 0.9rem;
   font-weight: 600;
@@ -550,11 +560,11 @@
 }
 
 .tab:hover {
-  color: #e2e8f0;
+  color: #0f172a;
 }
 
 .tabActive {
-  color: #fff;
+  color: #0f172a;
   border-bottom-color: #3b82f6;
 }
 
@@ -569,9 +579,9 @@
 .monthTab {
   padding: 0.4rem 0.9rem;
   border-radius: 20px;
-  border: 1px solid #334155;
-  background: transparent;
-  color: #94a3b8;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #475569;
   font-family: inherit;
   font-size: 0.85rem;
   cursor: pointer;
@@ -579,8 +589,8 @@
 }
 
 .monthTab:hover {
-  color: #e2e8f0;
-  border-color: #475569;
+  color: #0f172a;
+  border-color: #cbd5e1;
 }
 
 .monthTabActive {
@@ -596,7 +606,7 @@
 }
 
 .comidaRow {
-  background: rgba(59, 130, 246, 0.06);
+  background: rgba(59, 130, 246, 0.04);
 }
 
 .comidaInputCell {
@@ -608,18 +618,65 @@
 
 .comidaUnit {
   font-size: 0.75rem;
-  color: #94a3b8;
+  color: #64748b;
   white-space: nowrap;
 }
 
 .comidaCalc {
   font-size: 0.75rem;
-  color: #94a3b8;
+  color: #64748b;
   white-space: nowrap;
 }
 
 .bankNote {
   margin: 0.5rem 0 0;
   font-size: 0.75rem;
+  color: #64748b;
+}
+
+.bankCell {
+  text-align: center;
+  cursor: pointer;
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
   color: #94a3b8;
+  transition: background 0.12s, color 0.12s;
+  user-select: none;
+}
+
+.bankCell:hover {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.bankCellActive {
+  background: rgba(59, 130, 246, 0.12);
+  color: #3b82f6;
+  font-weight: 600;
+}
+
+.bankCellActive:hover {
+  background: rgba(59, 130, 246, 0.18);
+}
+
+.done {
+  opacity: 0.45;
+}
+
+.done td {
+  text-decoration: line-through;
+  text-decoration-color: #cbd5e1;
+}
+
+.hechoCell {
+  text-align: center;
+}
+
+.hechoCell input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+  accent-color: #3b82f6;
 }

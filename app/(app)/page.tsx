@@ -66,7 +66,6 @@ export default function Home() {
   const [newExpName, setNewExpName] = useState("");
   const [newExpAmount, setNewExpAmount] = useState("");
   const [newExpType, setNewExpType] = useState<"fijo" | "variable">("variable");
-  const [newExpBank, setNewExpBank] = useState<BankId>("ing");
   const skipOnce = useRef(true);
 
   // --- Load ---
@@ -206,9 +205,9 @@ export default function Home() {
     if (!name || newExpAmount === "") return;
     updateMonth((m) => ({
       ...m,
-      expenses: [...m.expenses, { id: newId(), name, amount: newExpAmount, type: newExpType, bank: newExpBank, paid: false }],
+      expenses: [...m.expenses, { id: newId(), name, amount: newExpAmount, type: newExpType, bank: "ing", paid: false }],
     }));
-    setNewExpName(""); setNewExpAmount(""); setNewExpType("variable"); setNewExpBank("ing");
+    setNewExpName(""); setNewExpAmount(""); setNewExpType("variable");
   };
 
   const removeExpense = (id: string) => {
@@ -239,7 +238,7 @@ export default function Home() {
     }
   };
 
-  const setComidaBank = (v: BankId) => {
+  const setComidaBank = (v: BankId | "") => {
     updateMonth((m) => ({ ...m, comidaBank: v }));
   };
 
@@ -248,6 +247,7 @@ export default function Home() {
   const totalFijos = activeExpenses.filter((e) => e.type === "fijo").reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
   const pagados = activeExpenses.filter((e) => e.paid).length;
   const totalPendientes = activeExpenses.filter((e) => !e.paid).reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0) + activeComida;
+  const sortedExpenses = useMemo(() => [...activeExpenses].sort((a, b) => Number(a.paid) - Number(b.paid)), [activeExpenses]);
 
   return (
     <div className={styles.page}>
@@ -369,37 +369,42 @@ export default function Home() {
               <h2>Gastos</h2>
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
-                  <thead><tr><th>Gasto</th><th>Tipo</th><th>Banco</th><th>Importe</th><th>Pagado</th><th></th></tr></thead>
+                  <thead><tr><th>Concepto</th><th>Importe</th><th>ING</th><th>Santander</th><th>Trade</th><th>Tipo</th><th>Hecho</th><th></th></tr></thead>
                   <tbody>
                     <tr className={styles.comidaRow}>
-                      <td>Comida</td>
-                      <td>Fijo</td>
-                      <td><select value={activeData.comidaBank} onChange={(ev) => setComidaBank(ev.target.value as BankId)} className={styles.expenseSelect} aria-label="Banco Comida">{BANK_IDS.map((b) => <option key={b} value={b}>{BANK_LABELS[b]}</option>)}</select></td>
-                      <td className={styles.comidaInputCell}>
-                        <input type="text" inputMode="decimal" value={activeData.comidaDaily} onChange={(ev) => setComidaDaily(ev.target.value)} className={styles.expenseInput} aria-label="Comida por día" />
-                        <span className={styles.comidaUnit}>€/día</span>
-                        <span className={styles.comidaCalc}>= {activeDaysRemaining} días × {currency.format(Number.parseFloat(activeData.comidaDaily) || 0)} = {currency.format(activeComida)}</span>
+                      <td>
+                        <span style={{ fontWeight: 600 }}>Comida</span>
                       </td>
-                      <td>—</td>
+                      <td className={styles.comidaInputCell}>
+                        <input type="text" inputMode="decimal" value={activeData.comidaDaily} onChange={(ev) => setComidaDaily(ev.target.value)} className={styles.expenseInput} aria-label="Comida por día" style={{ width: 3.5 + "rem" }} />
+                        <span className={styles.comidaUnit}>€/día</span>
+                        <span className={styles.comidaCalc}>= {currency.format(activeComida)}</span>
+                      </td>
+                      {BANK_IDS.map((b) => (
+                        <td key={b} className={`${styles.bankCell} ${activeData.comidaBank === b ? styles.bankCellActive : ""}`} onClick={() => setComidaBank(activeData.comidaBank === b ? "" : b)}>{BANK_LABELS[b]}</td>
+                      ))}
+                      <td>Fijo</td>
+                      <td className={styles.hechoCell}>—</td>
                       <td />
                     </tr>
-                    {activeExpenses.map((e) => (
-                      <tr key={e.id}>
+                    {sortedExpenses.map((e) => (
+                      <tr key={e.id} className={e.paid ? styles.done : ""}>
                         <td><input type="text" value={e.name} onChange={(ev) => setExpField(e.id, "name", ev.target.value)} className={styles.expenseInput} aria-label="Nombre del gasto" /></td>
+                        <td><input type="text" inputMode="decimal" value={e.amount} onChange={(ev) => { const v = ev.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setExpField(e.id, "amount", v); }} className={styles.expenseInput} aria-label="Importe" style={{ width: 5 + "rem" }} /></td>
+                        {BANK_IDS.map((b) => (
+                          <td key={b} className={`${styles.bankCell} ${e.bank === b ? styles.bankCellActive : ""}`} onClick={() => setExpField(e.id, "bank", e.bank === b ? "" : b)}>{BANK_LABELS[b]}</td>
+                        ))}
                         <td><select value={e.type} onChange={(ev) => setExpField(e.id, "type", ev.target.value as "fijo" | "variable")} className={styles.expenseSelect} aria-label="Tipo de gasto"><option value="fijo">Fijo</option><option value="variable">Variable</option></select></td>
-                        <td><select value={e.bank} onChange={(ev) => setExpField(e.id, "bank", ev.target.value as BankId)} className={styles.expenseSelect} aria-label="Banco">{BANK_IDS.map((b) => <option key={b} value={b}>{BANK_LABELS[b]}</option>)}</select></td>
-                        <td><input type="text" inputMode="decimal" value={e.amount} onChange={(ev) => { const v = ev.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setExpField(e.id, "amount", v); }} className={styles.expenseInput} aria-label="Importe" /></td>
-                        <td><input type="checkbox" checked={e.paid} onChange={(ev) => setExpField(e.id, "paid", ev.target.checked)} aria-label="Pagado" /></td>
+                        <td className={styles.hechoCell}><input type="checkbox" checked={e.paid} onChange={(ev) => setExpField(e.id, "paid", ev.target.checked)} aria-label="Hecho" /></td>
                         <td><button type="button" className={styles.removeBtn} onClick={() => removeExpense(e.id)} aria-label={`Eliminar gasto ${e.name}`}>×</button></td>
                       </tr>
                     ))}
                     <tr className={styles.expenseAddRow}>
                       <td><input type="text" value={newExpName} onChange={(ev) => setNewExpName(ev.target.value)} placeholder="Nuevo gasto" className={styles.expenseInput} aria-label="Nombre del gasto" /></td>
+                      <td><input type="text" inputMode="decimal" value={newExpAmount} onChange={(ev) => { const v = ev.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setNewExpAmount(v); }} placeholder="0" className={styles.expenseInput} aria-label="Importe" style={{ width: 5 + "rem" }} /></td>
+                      <td colSpan={3} />
                       <td><select value={newExpType} onChange={(ev) => setNewExpType(ev.target.value as "fijo" | "variable")} className={styles.expenseSelect} aria-label="Tipo de gasto"><option value="fijo">Fijo</option><option value="variable">Variable</option></select></td>
-                      <td><select value={newExpBank} onChange={(ev) => setNewExpBank(ev.target.value as BankId)} className={styles.expenseSelect} aria-label="Banco">{BANK_IDS.map((b) => <option key={b} value={b}>{BANK_LABELS[b]}</option>)}</select></td>
-                      <td><input type="text" inputMode="decimal" value={newExpAmount} onChange={(ev) => { const v = ev.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setNewExpAmount(v); }} placeholder="0" className={styles.expenseInput} aria-label="Importe" /></td>
-                      <td />
-                      <td><button type="button" className={styles.addBtn} onClick={addExpense}>Añadir</button></td>
+                      <td colSpan={2}><button type="button" className={styles.addBtn} onClick={addExpense}>Añadir</button></td>
                     </tr>
                   </tbody>
                 </table>
@@ -443,9 +448,6 @@ export default function Home() {
                   </tbody>
                 </table>
               </div>
-              {activeComida > 0 && (
-                <p className={styles.bankNote}>Comida: {activeData.comidaDaily} €/día × {activeDaysRemaining} días = {currency.format(activeComida)} ({BANK_LABELS[activeData.comidaBank]})</p>
-              )}
             </section>
           </>
         )}
