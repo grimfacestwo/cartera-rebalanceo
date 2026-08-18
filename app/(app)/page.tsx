@@ -603,7 +603,7 @@ export default function Home() {
 
         <nav className={styles.tabs} role="tablist">
           <button type="button" role="tab" aria-selected={tab === "cartera"} className={`${styles.tab} ${tab === "cartera" ? styles.tabActive : ""}`} onClick={() => setTab("cartera")}>Cartera</button>
-          <button type="button" role="tab" aria-selected={tab === "hogar"} className={`${styles.tab} ${tab === "hogar" ? styles.tabActive : ""}`} onClick={() => setTab("hogar")}>Hogar</button>
+          <button type="button" role="tab" aria-selected={tab === "hogar"} className={`${styles.tab} ${tab === "hogar" ? styles.tabActive : ""}`} onClick={() => { setTab("hogar"); setActiveMonth(currentMonthKey()); }}>Hogar</button>
           <button type="button" role="tab" aria-selected={tab === "objetivos"} className={`${styles.tab} ${tab === "objetivos" ? styles.tabActive : ""}`} onClick={() => setTab("objetivos")}>Objetivos</button>
         </nav>
 
