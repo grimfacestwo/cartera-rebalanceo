@@ -18,8 +18,11 @@ import {
   comidaAmount,
   currentMonthKey,
   daysRemaining,
+  monthBankTotal,
   monthLabel,
+  netWorth,
   parseState,
+  projectGoal,
   sortMonthKeys,
   type BankId,
   type CategoryId,
@@ -83,6 +86,8 @@ export default function Home() {
   const [goalTarget, setGoalTarget] = useState("");
   const [goalCurrent, setGoalCurrent] = useState("");
   const [goalDeadline, setGoalDeadline] = useState("");
+  const [netWorthHistory, setNetWorthHistory] = useState<Record<string, number>>({});
+  const [monthlySavings, setMonthlySavings] = useState("");
   const skipOnce = useRef(true);
 
   // --- Load ---
@@ -100,6 +105,8 @@ export default function Home() {
           setContribution(state.contribution);
           setMonths(state.months);
           setGoals(state.goals);
+          setNetWorthHistory(state.netWorthHistory);
+          setMonthlySavings(state.monthlySavings);
           const keys = sortMonthKeys(Object.keys(state.months));
           if (keys.length > 0) setActiveMonth(keys[keys.length - 1]);
           else setActiveMonth(currentMonthKey());
@@ -114,23 +121,6 @@ export default function Home() {
     })();
     return () => { cancelled = true; };
   }, [reloadKey]);
-
-  // --- Save ---
-  useEffect(() => {
-    if (loading || loadError) return;
-    if (skipOnce.current) { skipOnce.current = false; return; }
-    const timer = setTimeout(() => {
-      setSaveStatus("saving");
-      fetch("/api/state", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assets, values, contribution, months, goals }),
-      })
-        .then((res) => setSaveStatus(res.ok ? "saved" : "error"))
-        .catch(() => setSaveStatus("error"));
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [assets, values, contribution, months, goals, loading, loadError]);
 
   const retryLoad = () => { setLoadError(false); setLoading(true); setReloadKey((k) => k + 1); };
 
@@ -185,7 +175,7 @@ export default function Home() {
     setMonths((prev) => ({ ...prev, [activeMonth]: patch(prev[activeMonth] ?? { ...EMPTY_MONTH }) }));
   };
 
-  const activeData: MonthData = months[activeMonth] ?? { ...EMPTY_MONTH };
+  const activeData: MonthData = useMemo(() => months[activeMonth] ?? { ...EMPTY_MONTH }, [months, activeMonth]);
 
   // Banks
   const setBank = (id: BankId, v: string) => {
@@ -206,6 +196,25 @@ export default function Home() {
   const totalExpenses = totalExpensesBank + activeComida;
   const totalPendientes = activeData.expenses.filter((e) => !e.paid).reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0) + activeComida;
   const remaining = bankTotal - totalPendientes;
+
+  // --- Save ---
+  useEffect(() => {
+    if (loading || loadError) return;
+    if (skipOnce.current) { skipOnce.current = false; return; }
+    const curNetWorth = netWorth(total, activeData);
+    const updatedHistory = { ...netWorthHistory, [activeMonth]: curNetWorth };
+    const timer = setTimeout(() => {
+      setSaveStatus("saving");
+      fetch("/api/state", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assets, values, contribution, months, goals, netWorthHistory: updatedHistory, monthlySavings }),
+      })
+        .then((res) => { if (res.ok) setNetWorthHistory(updatedHistory); setSaveStatus(res.ok ? "saved" : "error"); })
+        .catch(() => setSaveStatus("error"));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [assets, values, contribution, months, goals, monthlySavings, loading, loadError, total, activeData, activeMonth, netWorthHistory]);
 
   // Expenses
   const setExpField = (id: string, field: keyof Expense, val: unknown) => {
@@ -342,13 +351,8 @@ export default function Home() {
   }, [trendsData]);
 
   // Notifications
-  const [notifEnabled, setNotifEnabled] = useState(false);
+  const [notifEnabled, setNotifEnabled] = useState(() => typeof Notification !== "undefined" && Notification.permission === "granted");
   const notifSentRef = useRef(false);
-
-  useEffect(() => {
-    if (typeof Notification === "undefined") return;
-    setNotifEnabled(Notification.permission === "granted");
-  }, []);
 
   useEffect(() => {
     if (!notifEnabled || notifSentRef.current) return;
@@ -385,7 +389,7 @@ export default function Home() {
 
   // Export/Import
   const handleExport = () => {
-    const payload = { assets, values, contribution, months, goals };
+    const payload = { assets, values, contribution, months, goals, netWorthHistory, monthlySavings };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -412,6 +416,8 @@ export default function Home() {
           setContribution(state.contribution);
           setMonths(state.months);
           setGoals(state.goals);
+          setNetWorthHistory(state.netWorthHistory);
+          setMonthlySavings(state.monthlySavings);
           const keys = sortMonthKeys(Object.keys(state.months));
           if (keys.length > 0) setActiveMonth(keys[keys.length - 1]);
           else setActiveMonth(currentMonthKey());
@@ -467,6 +473,51 @@ export default function Home() {
           </section>
         ) : tab === "cartera" ? (
           <>
+            <section className={styles.card}>
+              <h2>Patrimonio</h2>
+              <div className={styles.netWorthBig}>{currency.format(netWorth(total, activeData))}</div>
+              <div className={styles.netWorthBreakdown}>
+                <span>Cartera: {currency.format(total)}</span>
+                <span>Bancos (mes {monthLabel(activeMonth)}): {currency.format(monthBankTotal(activeData))}</span>
+              </div>
+              {(() => {
+                const histKeys = sortMonthKeys(Object.keys(netWorthHistory));
+                if (histKeys.length < 1) return null;
+                const vals = histKeys.map((k) => netWorthHistory[k]!);
+                const mn = Math.min(...vals);
+                const mx = Math.max(...vals);
+                const range = mx - mn || 1;
+                const w = 280;
+                const h = 60;
+                const pts = vals.map((v, i) => `${(i / Math.max(1, vals.length - 1)) * w},${h - ((v - mn) / range) * (h - 4) - 2}`);
+                return (
+                  <div className={styles.netWorthChart}>
+                    <svg viewBox={`0 0 ${w} ${h}`} className={styles.netWorthSvg}>
+                      <polyline points={pts.join(" ")} fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinejoin="round" />
+                      {vals.map((v, i) => (
+                        <circle key={i} cx={(i / Math.max(1, vals.length - 1)) * w} cy={h - ((v - mn) / range) * (h - 4) - 2} r="2.5" fill="#3b82f6" />
+                      ))}
+                    </svg>
+                    <div className={styles.netWorthLabels}>
+                      <span>{histKeys[0]!.slice(5)}</span>
+                      <span>{histKeys[histKeys.length - 1]!.slice(5)}</span>
+                    </div>
+                  </div>
+                );
+              })()}
+              <label className={styles.field}>
+                <span className={styles.fieldName}>Ahorro mensual estimado (€)</span>
+                <input type="text" inputMode="decimal" value={monthlySavings} onChange={(e) => { if (e.target.value === "" || /^\d*\.?\d*$/.test(e.target.value)) setMonthlySavings(e.target.value); }} placeholder={total > 0 ? "Auto" : "0"} aria-label="Ahorro mensual" />
+              </label>
+              {monthlySavings === "" && netWorthHistory && (() => {
+                const histKeys = sortMonthKeys(Object.keys(netWorthHistory));
+                if (histKeys.length < 2) return null;
+                const last2 = histKeys.slice(-2);
+                const delta = (netWorthHistory[last2[1]!] ?? 0) - (netWorthHistory[last2[0]!] ?? 0);
+                return <p className={styles.note}>Derivado: {currency.format(delta)}/mes</p>;
+              })()}
+            </section>
+
             <p className={styles.subtitle}>Asignación objetivo: {assets.map((a) => `${a.name} ${pct.format(a.targetPct)}%`).join(" · ")}</p>
             <p className={styles.subtitle}>Estrategia: nunca vendas; inyecta nuevo capital en los activos desfasados.</p>
             <section className={styles.grid}>
@@ -787,6 +838,14 @@ export default function Home() {
                   const current = Number.parseFloat(g.current) || 0;
                   const pctVal = target > 0 ? Math.min(100, (current / target) * 100) : 0;
                   const barColor = pctVal >= 100 ? "#16a34a" : current > 0 ? "#3b82f6" : "#e2e8f0";
+                  const effSavings = monthlySavings !== "" ? (Number.parseFloat(monthlySavings) || 0) : (() => {
+                    const hk = sortMonthKeys(Object.keys(netWorthHistory));
+                    if (hk.length < 2) return 0;
+                    const last2 = hk.slice(-2);
+                    return (netWorthHistory[last2[1]!] ?? 0) - (netWorthHistory[last2[0]!] ?? 0);
+                  })();
+                  const proj = projectGoal(g, effSavings);
+                  const onTrack = proj && proj.monthsToGoal > 0 && g.deadline ? proj.projectedKey <= g.deadline : null;
                   return (
                     <div key={g.id} className={styles.goalRow}>
                       <div className={styles.goalFields}>
@@ -807,6 +866,11 @@ export default function Home() {
                           <div className={styles.progressFill} style={{ width: `${pctVal}%`, background: barColor }} />
                         </div>
                         <span className={styles.goalProgressText}>{currency.format(current)} / {currency.format(target)} ({pctVal.toFixed(0)}%)</span>
+                        {proj && proj.monthsToGoal > 0 && g.deadline && (
+                          <span className={`${styles.projBadge} ${onTrack ? styles.projOk : styles.projBad}`}>
+                            {onTrack ? `✓ ${monthLabel(proj.projectedKey)}` : `✗ ${monthLabel(proj.projectedKey)}`}
+                          </span>
+                        )}
                       </div>
                     </div>
                   );

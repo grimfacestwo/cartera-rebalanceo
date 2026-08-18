@@ -8,10 +8,13 @@ import {
   daysRemaining,
   DEFAULT_ASSETS,
   DEFAULT_VALUES,
+  monthBankTotal,
   monthLabel,
+  netWorth,
   parseExpenses,
   parseGoals,
   parseState,
+  projectGoal,
   sortMonthKeys,
 } from "./state";
 
@@ -298,5 +301,77 @@ describe("parseGoals", () => {
     });
     expect(state.goals).toHaveLength(1);
     expect(state.goals[0].target).toBe("100");
+  });
+
+  it("parseState incluye netWorthHistory y monthlySavings por defecto", () => {
+    const state = parseState({});
+    expect(state.netWorthHistory).toEqual({});
+    expect(state.monthlySavings).toBe("");
+  });
+
+  it("parseState parsea netWorthHistory y monthlySavings", () => {
+    const state = parseState({
+      netWorthHistory: { "2026-07": 15000, "2026-08": "16000" },
+      monthlySavings: "500",
+    });
+    expect(state.netWorthHistory).toEqual({ "2026-07": 15000, "2026-08": 16000 });
+    expect(state.monthlySavings).toBe("500");
+  });
+
+  it("parseState ignora netWorthHistory inválido", () => {
+    const state = parseState({ netWorthHistory: "no" });
+    expect(state.netWorthHistory).toEqual({});
+  });
+});
+
+describe("monthBankTotal", () => {
+  it("suma todos los saldos", () => {
+    const m = { banks: { ing: "1000", santander: "500", trade: "300" }, expenses: [], comidaDaily: "0", comidaBank: "" as const };
+    expect(monthBankTotal(m)).toBe(1800);
+  });
+
+  it("saldo vacío = 0", () => {
+    const m = { banks: { ing: "", santander: "", trade: "" }, expenses: [], comidaDaily: "0", comidaBank: "" as const };
+    expect(monthBankTotal(m)).toBe(0);
+  });
+});
+
+describe("netWorth", () => {
+  it("portfolio + banks", () => {
+    const m = { banks: { ing: "500", santander: "300", trade: "200" }, expenses: [], comidaDaily: "0", comidaBank: "" as const };
+    expect(netWorth(10000, m)).toBe(11000);
+  });
+
+  it("sin bancos = portfolio", () => {
+    const m = { banks: { ing: "", santander: "", trade: "" }, expenses: [], comidaDaily: "0", comidaBank: "" as const };
+    expect(netWorth(10000, m)).toBe(10000);
+  });
+});
+
+describe("projectGoal", () => {
+  const cur = currentMonthKey();
+
+  it("ya alcanzado = 0 meses", () => {
+    const g = { id: "g1", name: "A", target: "100", current: "100", deadline: "" };
+    const r = projectGoal(g, 50);
+    expect(r!.monthsToGoal).toBe(0);
+  });
+
+  it("calcula meses necesarios", () => {
+    const g = { id: "g1", name: "A", target: "1000", current: "0", deadline: "" };
+    const r = projectGoal(g, 200);
+    expect(r!.monthsToGoal).toBe(5);
+  });
+
+  it("ahorro 0 = null months", () => {
+    const g = { id: "g1", name: "A", target: "1000", current: "0", deadline: "" };
+    const r = projectGoal(g, 0);
+    expect(r!.monthsToGoal).toBe(0);
+  });
+
+  it("proyecta fecha correcta", () => {
+    const g = { id: "g1", name: "A", target: "1000", current: "0", deadline: "" };
+    const r = projectGoal(g, 200);
+    expect(r!.projectedKey).toBe(addMonth(addMonth(addMonth(addMonth(addMonth(cur))))));
   });
 });

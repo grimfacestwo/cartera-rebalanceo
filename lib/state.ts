@@ -91,6 +91,8 @@ export type PortfolioState = {
   contribution: string;
   months: Record<string, MonthData>;
   goals: Goal[];
+  netWorthHistory: Record<string, number>;
+  monthlySavings: string;
 };
 
 export const DEFAULT_ASSETS: AssetDef[] = [
@@ -111,6 +113,8 @@ export const DEFAULT_STATE: PortfolioState = {
   contribution: "",
   months: {},
   goals: [],
+  netWorthHistory: {},
+  monthlySavings: "",
 };
 
 export const PALETTE = [
@@ -150,6 +154,23 @@ export function monthLabel(key: string): string {
 
 export function sortMonthKeys(keys: string[]): string[] {
   return [...keys].sort();
+}
+
+export function monthBankTotal(month: MonthData): number {
+  return BANK_IDS.reduce((s, id) => s + (Number.parseFloat(month.banks[id]) || 0), 0);
+}
+
+export function netWorth(portfolioTotal: number, month: MonthData): number {
+  return portfolioTotal + monthBankTotal(month);
+}
+
+export function projectGoal(goal: Goal, monthlySavings: number): { monthsToGoal: number; projectedKey: string } | null {
+  const needed = (Number.parseFloat(goal.target) || 0) - (Number.parseFloat(goal.current) || 0);
+  if (needed <= 0 || monthlySavings <= 0) return { monthsToGoal: 0, projectedKey: currentMonthKey() };
+  const monthsToGoal = Math.ceil(needed / monthlySavings);
+  let key = currentMonthKey();
+  for (let i = 0; i < monthsToGoal; i++) key = addMonth(key);
+  return { monthsToGoal, projectedKey: key };
 }
 
 export function bankRemaining(month: MonthData, bankId: BankId): number {
@@ -298,6 +319,16 @@ function parseMonths(raw: unknown): Record<string, MonthData> {
   return out;
 }
 
+function parseNetWorthHistory(raw: unknown): Record<string, number> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof v === "number" && Number.isFinite(v)) out[k] = v;
+    else if (typeof v === "string") { const n = Number(v); if (Number.isFinite(n)) out[k] = n; }
+  }
+  return out;
+}
+
 export function parseState(raw: unknown): PortfolioState {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     return { ...DEFAULT_STATE, values: { ...DEFAULT_VALUES } };
@@ -335,5 +366,7 @@ export function parseState(raw: unknown): PortfolioState {
     contribution: typeof o.contribution === "string" ? o.contribution : "",
     months,
     goals: parseGoals(o.goals),
+    netWorthHistory: parseNetWorthHistory(o.netWorthHistory),
+    monthlySavings: typeof o.monthlySavings === "string" ? o.monthlySavings : "",
   };
 }
