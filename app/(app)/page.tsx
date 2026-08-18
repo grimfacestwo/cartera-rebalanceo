@@ -100,6 +100,7 @@ export default function Home() {
   const [goalCurrent, setGoalCurrent] = useState("");
   const [goalDeadline, setGoalDeadline] = useState("");
   const skipOnce = useRef(true);
+  const activeTabRef = useRef<HTMLButtonElement>(null);
 
   // --- Load ---
   useEffect(() => {
@@ -151,6 +152,11 @@ export default function Home() {
   }, [assets, values, contribution, months, goals, fixedExpenses, catRules, loading, loadError]);
 
   const retryLoad = () => { setLoadError(false); setLoading(true); setReloadKey((k) => k + 1); };
+
+  // Keep the active month tab visible in the scrollable strip
+  useEffect(() => {
+    activeTabRef.current?.scrollIntoView({ inline: "center", block: "nearest" });
+  }, [activeMonth]);
 
   // --- Cartera logic (unchanged) ---
   const plan = useMemo(() => {
@@ -682,9 +688,9 @@ export default function Home() {
             {/* Month selector */}
             <div className={styles.monthTabs}>
               {sortedMonthKeys.map((key) => (
-                <button key={key} type="button" className={`${styles.monthTab} ${key === activeMonth ? styles.monthTabActive : ""}`} onClick={() => setActiveMonth(key)}>
+                <button key={key} type="button" ref={key === activeMonth ? activeTabRef : undefined} className={`${styles.monthTab} ${key === activeMonth ? styles.monthTabActive : ""}`} onClick={() => setActiveMonth(key)}>
                   {monthLabel(key)}
-                  {key === activeMonth && <span className={styles.daysLeft}> · {activeDaysRemaining} días restantes</span>}
+                  {key === activeMonth && activeMonth === currentMonthKey() && <span className={styles.daysLeft}> · {activeDaysRemaining} días restantes</span>}
                 </button>
               ))}
               <button type="button" className={styles.newMonthBtn} onClick={newMonth}>+ Nuevo mes</button>
@@ -998,6 +1004,13 @@ export default function Home() {
           <>
             <section className={styles.card}>
               <h2>Objetivos del ahorro</h2>
+              <div className={styles.goalHeader}>
+                <span>Nombre</span>
+                <span>Objetivo</span>
+                <span>Ahorrado</span>
+                <span>Plazo</span>
+                <span />
+              </div>
               {goals.length === 0 ? (
                 <p className={styles.empty}>Sin objetivos. Crea el primero abajo.</p>
               ) : (

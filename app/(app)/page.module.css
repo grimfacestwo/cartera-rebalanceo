@@ -655,13 +655,18 @@
 
 .monthTabs {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  max-width: 100%;
+  scrollbar-width: thin;
   gap: 0.4rem;
   margin-bottom: 1rem;
   align-items: center;
+  padding-bottom: 0.2rem;
 }
 
 .monthTab {
+  flex: 0 0 auto;
   padding: 0.4rem 0.9rem;
   border-radius: 20px;
   border: 1px solid #e2e8f0;
@@ -784,6 +789,39 @@
   margin-bottom: 1rem;
   padding-bottom: 1rem;
   border-bottom: 1px solid #f1f5f9;
+}
+
+.goalHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.3rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #e2e8f0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #3b82f6;
+}
+
+.goalHeader span {
+  flex: 1;
+  min-width: 0;
+}
+
+.goalHeader span:first-child {
+  flex: 2;
+}
+
+.goalHeader span:last-child {
+  flex: 0 0 auto;
+  width: 2rem;
+}
+
+[data-theme="dark"] .goalHeader {
+  color: #60a5fa;
+  border-top-color: #334155;
 }
 
 .goalFields {
