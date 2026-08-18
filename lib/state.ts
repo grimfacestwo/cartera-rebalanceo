@@ -55,6 +55,7 @@ export type Goal = {
   target: string;
   current: string;
   deadline: string;
+  notes: string;
 };
 
 export type FixedExpense = {
@@ -342,6 +343,7 @@ export function parseGoals(raw: unknown): Goal[] {
           target: typeof o.target === "string" ? o.target : "",
           current: typeof o.current === "string" ? o.current : "",
           deadline: typeof o.deadline === "string" ? o.deadline : "",
+          notes: typeof o.notes === "string" ? o.notes : "",
         });
       }
     }

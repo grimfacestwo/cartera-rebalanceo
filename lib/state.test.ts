@@ -280,7 +280,7 @@ describe("parseGoals", () => {
   it("conserva strings y pone defaults para faltantes", () => {
     const raw = [{ id: "g1", name: "Fondo" }];
     const goals = parseGoals(raw);
-    expect(goals[0]).toEqual({ id: "g1", name: "Fondo", target: "", current: "", deadline: "" });
+    expect(goals[0]).toEqual({ id: "g1", name: "Fondo", target: "", current: "", deadline: "", notes: "" });
   });
 
   it("parsea goals válidos", () => {

@@ -61,6 +61,41 @@ function newId(): string {
     : `n${Date.now()}`;
 }
 
+function AutoTextarea({
+  value,
+  onChange,
+  placeholder,
+  ariaLabel,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  ariaLabel: string;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const resize = () => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  };
+  useEffect(() => {
+    resize();
+  }, [value]);
+  return (
+    <textarea
+      ref={ref}
+      value={value}
+      placeholder={placeholder}
+      aria-label={ariaLabel}
+      rows={1}
+      className={styles.goalNotes}
+      onChange={(e) => onChange(e.target.value)}
+      onInput={resize}
+    />
+  );
+}
+
 export default function Home() {
   const [assets, setAssets] = useState<AssetDef[]>(DEFAULT_ASSETS);
   const [values, setValues] = useState<PortfolioValues>(DEFAULT_VALUES);
@@ -357,7 +392,7 @@ export default function Home() {
   const addGoal = () => {
     const name = goalName.trim();
     if (!name) return;
-    setGoals([...goals, { id: newId(), name, target: goalTarget, current: goalCurrent, deadline: goalDeadline }]);
+    setGoals([...goals, { id: newId(), name, target: goalTarget, current: goalCurrent, deadline: goalDeadline, notes: "" }]);
     setGoalName(""); setGoalTarget(""); setGoalCurrent(""); setGoalDeadline("");
   };
 
@@ -1041,6 +1076,16 @@ export default function Home() {
                                   </div>
                                   <span className={styles.goalProgressText}>{currency.format(current)} / {currency.format(target)} ({pctVal.toFixed(0)}%)</span>
                                 </div>
+                              </td>
+                            </tr>
+                            <tr className={styles.goalNotesRow}>
+                              <td colSpan={5}>
+                                <AutoTextarea
+                                  value={g.notes}
+                                  onChange={(v) => setGoalField(g.id, "notes", v)}
+                                  placeholder="Notas…"
+                                  ariaLabel={`Notas del objetivo ${g.name}`}
+                                />
                               </td>
                             </tr>
                           </Fragment>

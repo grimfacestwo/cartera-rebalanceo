@@ -793,8 +793,37 @@
 .goalProgressRow td {
   border-top: 1px solid #f1f5f9;
   padding-top: 0.2rem;
+  padding-bottom: 0.2rem;
+}
+
+.goalNotesRow td {
+  padding-top: 0;
   padding-bottom: 1rem;
   border-bottom: 1px solid #f1f5f9;
+}
+
+.goalNotes {
+  width: 100%;
+  box-sizing: border-box;
+  display: block;
+  border: none;
+  background: transparent;
+  resize: none;
+  overflow: hidden;
+  font-family: inherit;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: #64748b;
+  padding: 0.2rem 0.4rem;
+}
+
+.goalNotes::placeholder {
+  color: #94a3b8;
+}
+
+.goalNotes:focus {
+  outline: none;
+  background: #f8fafc;
 }
 
 .goalAddRow td {
@@ -803,7 +832,18 @@
 
 [data-theme="dark"] .goalProgressRow td {
   border-top-color: #1e293b;
+}
+
+[data-theme="dark"] .goalNotesRow td {
   border-bottom-color: #1e293b;
+}
+
+[data-theme="dark"] .goalNotes {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .goalNotes:focus {
+  background: #1e293b;
 }
 
 .goalInput {
