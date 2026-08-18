@@ -15,15 +15,19 @@ import {
   PALETTE,
   addMonth,
   bankRemaining,
+  categoryTotals,
   comidaAmount,
   currentMonthKey,
+  daysInMonth,
   daysRemaining,
   DEFAULT_FIXED_EXPENSES,
+  matchCategory,
   monthLabel,
   parseState,
   sortMonthKeys,
   type BankId,
   type CategoryId,
+  type CategoryRule,
   type Expense,
   type FixedExpense,
   type Goal,
@@ -78,6 +82,9 @@ export default function Home() {
   const [newExpRecurring, setNewExpRecurring] = useState(false);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>(DEFAULT_FIXED_EXPENSES);
+  const [catRules, setCatRules] = useState<CategoryRule[]>([]);
+  const [newCatRuleMatch, setNewCatRuleMatch] = useState("");
+  const [newCatRuleCategory, setNewCatRuleCategory] = useState<CategoryId>("otros");
   const [newFixedName, setNewFixedName] = useState("");
   const [newFixedAmount, setNewFixedAmount] = useState("");
   const [newFixedCategory, setNewFixedCategory] = useState<CategoryId>("otros");
@@ -107,6 +114,7 @@ export default function Home() {
           setMonths(state.months);
           setGoals(state.goals);
           setFixedExpenses(state.fixedExpenses);
+          setCatRules(state.catRules);
           const keys = sortMonthKeys(Object.keys(state.months));
           if (keys.length > 0) setActiveMonth(keys[keys.length - 1]);
           else setActiveMonth(currentMonthKey());
@@ -131,13 +139,13 @@ export default function Home() {
       fetch("/api/state", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assets, values, contribution, months, goals, fixedExpenses }),
+        body: JSON.stringify({ assets, values, contribution, months, goals, fixedExpenses, catRules }),
       })
         .then((res) => setSaveStatus(res.ok ? "saved" : "error"))
         .catch(() => setSaveStatus("error"));
     }, 500);
     return () => clearTimeout(timer);
-  }, [assets, values, contribution, months, goals, fixedExpenses, loading, loadError]);
+  }, [assets, values, contribution, months, goals, fixedExpenses, catRules, loading, loadError]);
 
   const retryLoad = () => { setLoadError(false); setLoading(true); setReloadKey((k) => k + 1); };
 
@@ -329,14 +337,42 @@ export default function Home() {
 
   // Category stats
   const categoryStats = useMemo(() => {
-    const stats: Record<string, number> = {};
-    for (const e of allActiveExpenses) {
-      stats[e.category] = (stats[e.category] || 0) + (Number.parseFloat(e.amount) || 0);
-    }
+    const stats = categoryTotals(activeData);
     return Object.entries(stats)
       .sort((a, b) => b[1] - a[1])
       .map(([cat, total]) => ({ cat: cat as CategoryId, total }));
-  }, [allActiveExpenses]);
+  }, [activeData]);
+
+  // Month-over-month comparison (includes Comida in Alimentación)
+  const comidaFull = (m: MonthData | undefined, key: string) =>
+    m ? (Number.parseFloat(m.comidaDaily) || 0) * daysInMonth(key) : 0;
+
+  const comparison = useMemo(() => {
+    const idx = sortedMonthKeys.indexOf(activeMonth);
+    if (idx <= 0) return null;
+    const prevKey = sortedMonthKeys[idx - 1];
+    const cur = months[activeMonth];
+    const prev = months[prevKey];
+    const curTotals = categoryTotals(cur);
+    curTotals.alimentacion = (curTotals.alimentacion || 0) + comidaFull(cur, activeMonth);
+    const prevTotals = categoryTotals(prev);
+    prevTotals.alimentacion = (prevTotals.alimentacion || 0) + comidaFull(prev, prevKey);
+    const cats = new Set([...Object.keys(curTotals), ...Object.keys(prevTotals)]);
+    const rows = [...cats]
+      .map((cat) => {
+        const c = curTotals[cat] || 0;
+        const p = prevTotals[cat] || 0;
+        const delta = c - p;
+        const pctDelta = p > 0 ? (delta / p) * 100 : c > 0 ? 100 : 0;
+        return { cat: cat as CategoryId, cur: c, prev: p, delta, pctDelta };
+      })
+      .sort((a, b) => b.delta - a.delta);
+    const curTotal = Object.values(curTotals).reduce((s, v) => s + v, 0);
+    const prevTotal = Object.values(prevTotals).reduce((s, v) => s + v, 0);
+    return { prevKey, rows, curTotal, prevTotal, totalDelta: curTotal - prevTotal };
+  }, [sortedMonthKeys, activeMonth, months]);
+
+  const isAnomaly = (delta: number, pctDelta: number) => delta > 0 && delta >= 20 && pctDelta >= 50;
 
   // Expense trends per month
   const trendsData = useMemo(() => {
@@ -403,7 +439,7 @@ export default function Home() {
 
   // Export/Import
   const handleExport = () => {
-    const payload = { assets, values, contribution, months, goals, fixedExpenses };
+    const payload = { assets, values, contribution, months, goals, fixedExpenses, catRules };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -431,6 +467,7 @@ export default function Home() {
           setMonths(state.months);
           setGoals(state.goals);
           setFixedExpenses(state.fixedExpenses);
+          setCatRules(state.catRules);
           const keys = sortMonthKeys(Object.keys(state.months));
           if (keys.length > 0) setActiveMonth(keys[keys.length - 1]);
           else setActiveMonth(currentMonthKey());
@@ -455,6 +492,17 @@ export default function Home() {
   };
   const removeFixedTemplate = (id: string) => {
     setFixedExpenses((prev) => prev.filter((f) => f.id !== id));
+  };
+
+  // Category rules
+  const addCatRule = () => {
+    const match = newCatRuleMatch.trim();
+    if (!match) return;
+    setCatRules((prev) => [...prev, { id: newId(), match, category: newCatRuleCategory }]);
+    setNewCatRuleMatch(""); setNewCatRuleCategory("otros");
+  };
+  const removeCatRule = (id: string) => {
+    setCatRules((prev) => prev.filter((r) => r.id !== id));
   };
 
   return (
@@ -727,7 +775,12 @@ export default function Home() {
                       </tr>
                     ))}
                     <tr className={styles.expenseAddRow}>
-                      <td><input type="text" value={newExpName} onChange={(ev) => setNewExpName(ev.target.value)} placeholder="Nuevo gasto" className={styles.expenseInput} aria-label="Nombre del gasto" /></td>
+                      <td><input type="text" value={newExpName} onChange={(ev) => {
+                        const v = ev.target.value;
+                        setNewExpName(v);
+                        const m = matchCategory(v, catRules);
+                        if (m) setNewExpCategory(m);
+                      }} placeholder="Nuevo gasto" className={styles.expenseInput} aria-label="Nombre del gasto" /></td>
                       <td>
                         <div className={styles.amountCell}>
                           <input type="text" inputMode="decimal" value={newExpAmount} onChange={(ev) => { const v = ev.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setNewExpAmount(v); }} placeholder="0" className={styles.expenseInput} aria-label="Importe" style={{ width: 4 + "rem" }} />
@@ -837,6 +890,34 @@ export default function Home() {
                 </div>
               </section>
             )}
+
+            {comparison && (
+              <section className={styles.card}>
+                <h2>Comparativa con {monthLabel(comparison.prevKey)}</h2>
+                <p className={styles.note}>
+                  Este mes: {currency.format(comparison.curTotal)} € · Mes anterior: {currency.format(comparison.prevTotal)} € · {" "}
+                  <span className={comparison.totalDelta > 0 ? styles.negative : styles.inject}>
+                    Δ {comparison.totalDelta >= 0 ? "+" : ""}{currency.format(comparison.totalDelta)} €
+                  </span>
+                </p>
+                <div className={styles.tableWrap}>
+                  <table className={styles.table}>
+                    <thead><tr><th>Categoría</th><th>Este mes</th><th>Mes anterior</th><th>Δ</th><th>%</th></tr></thead>
+                    <tbody>
+                      {comparison.rows.map((r) => (
+                        <tr key={r.cat} className={isAnomaly(r.delta, r.pctDelta) ? styles.anomaly : ""}>
+                          <td className={styles.cellName}><span className={styles.dot} style={{ background: CATEGORY_COLORS[r.cat] }} />{CATEGORY_LABELS[r.cat]}</td>
+                          <td>{currency.format(r.cur)}</td>
+                          <td>{currency.format(r.prev)}</td>
+                          <td className={r.delta > 0 ? styles.negative : styles.inject}>{r.delta >= 0 ? "+" : ""}{currency.format(r.delta)}</td>
+                          <td className={r.delta > 0 ? styles.negative : styles.inject}>{r.pctDelta >= 0 ? "+" : ""}{pct.format(r.pctDelta)}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )}
           </>
         ) : null}
 
@@ -935,6 +1016,24 @@ export default function Home() {
                   {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
                 </select>
                 <button type="button" className={styles.addBtn} onClick={addFixedTemplate}>Añadir</button>
+              </div>
+              <h3>Reglas de categorización</h3>
+              <p className={styles.note}>Al escribir el nombre de un gasto nuevo, se asigna la categoría automáticamente si coincide con la palabra clave (sin distinguir mayúsculas).</p>
+              {catRules.length === 0 ? <p className={styles.empty}>Sin reglas.</p> : catRules.map((r) => (
+                <div key={r.id} className={styles.settingRow}>
+                  <input type="text" value={r.match} onChange={(e) => setCatRules((prev) => prev.map((x) => x.id === r.id ? { ...x, match: e.target.value } : x))} aria-label={`Palabra clave ${r.match}`} className={styles.settingInput} />
+                  <select value={r.category} onChange={(e) => setCatRules((prev) => prev.map((x) => x.id === r.id ? { ...x, category: e.target.value as CategoryId } : x))} aria-label={`Categoría de ${r.match}`} className={styles.expenseSelect}>
+                    {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
+                  </select>
+                  <button type="button" className={styles.removeBtn} onClick={() => removeCatRule(r.id)} aria-label={`Eliminar regla ${r.match}`} title={`Eliminar regla ${r.match}`}>×</button>
+                </div>
+              ))}
+              <div className={styles.addRow}>
+                <input type="text" value={newCatRuleMatch} onChange={(e) => setNewCatRuleMatch(e.target.value)} placeholder="Palabra clave (ej. netflix)" aria-label="Palabra clave" className={styles.settingInput} />
+                <select value={newCatRuleCategory} onChange={(e) => setNewCatRuleCategory(e.target.value as CategoryId)} aria-label="Categoría" className={styles.expenseSelect}>
+                  {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
+                </select>
+                <button type="button" className={styles.addBtn} onClick={addCatRule}>Añadir</button>
               </div>
               <h3>Añadir activo</h3>
               <div className={styles.addRow}>

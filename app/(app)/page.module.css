@@ -1290,3 +1290,11 @@
   border-color: #334155;
   color: #e2e8f0;
 }
+
+.anomaly td {
+  background: rgba(239, 68, 68, 0.12);
+}
+
+[data-theme="dark"] .anomaly td {
+  background: rgba(239, 68, 68, 0.18);
+}

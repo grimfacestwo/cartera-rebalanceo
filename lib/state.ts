@@ -65,6 +65,12 @@ export type FixedExpense = {
   category: CategoryId;
 };
 
+export type CategoryRule = {
+  id: string;
+  match: string;
+  category: CategoryId;
+};
+
 export const DEFAULT_FIXED_EXPENSES: FixedExpense[] = [
   { id: "hipoteca", name: "Hipoteca", amount: "672.80", bank: "", category: "vivienda" },
   { id: "digi", name: "Digi", amount: "28", bank: "", category: "suscripciones" },
@@ -115,6 +121,7 @@ export type PortfolioState = {
   months: Record<string, MonthData>;
   goals: Goal[];
   fixedExpenses: FixedExpense[];
+  catRules: CategoryRule[];
 };
 
 export const DEFAULT_ASSETS: AssetDef[] = [
@@ -136,6 +143,7 @@ export const DEFAULT_STATE: PortfolioState = {
   months: {},
   goals: [],
   fixedExpenses: DEFAULT_FIXED_EXPENSES,
+  catRules: [],
 };
 
 export const PALETTE = [
@@ -202,6 +210,27 @@ export function daysRemaining(key: string): number {
 export function comidaAmount(month: MonthData, key: string): number {
   const rate = Number.parseFloat(month.comidaDaily) || 0;
   return rate * daysRemaining(key);
+}
+
+export function matchCategory(name: string, rules: CategoryRule[]): CategoryId | undefined {
+  const n = name.trim().toLowerCase();
+  if (!n) return undefined;
+  for (const r of rules) {
+    const m = r.match.trim().toLowerCase();
+    if (m && n.includes(m) && CATEGORIES.includes(r.category as CategoryId)) {
+      return r.category;
+    }
+  }
+  return undefined;
+}
+
+export function categoryTotals(month: MonthData | undefined): Record<string, number> {
+  const stats: Record<string, number> = {};
+  if (!month) return stats;
+  for (const e of [...month.fixed, ...month.expenses]) {
+    stats[e.category] = (stats[e.category] || 0) + (Number.parseFloat(e.amount) || 0);
+  }
+  return stats;
 }
 
 // --- Parsers ---
@@ -320,6 +349,24 @@ export function parseGoals(raw: unknown): Goal[] {
   return out;
 }
 
+export function parseCatRules(raw: unknown): CategoryRule[] {
+  if (!Array.isArray(raw)) return [];
+  const out: CategoryRule[] = [];
+  for (const item of raw) {
+    if (item && typeof item === "object") {
+      const o = item as Record<string, unknown>;
+      if (
+        typeof o.id === "string" &&
+        typeof o.match === "string" &&
+        CATEGORIES.includes(o.category as CategoryId)
+      ) {
+        out.push({ id: o.id, match: o.match, category: o.category as CategoryId });
+      }
+    }
+  }
+  return out;
+}
+
 function parseMonthData(raw: unknown): MonthData | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const o = raw as Record<string, unknown>;
@@ -402,5 +449,6 @@ export function parseState(raw: unknown): PortfolioState {
     months,
     goals: parseGoals(o.goals),
     fixedExpenses,
+    catRules: parseCatRules(o.catRules),
   };
 }

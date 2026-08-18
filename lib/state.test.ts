@@ -2,18 +2,22 @@ import { describe, expect, it } from "vitest";
 import {
   addMonth,
   bankRemaining,
+  categoryTotals,
   comidaAmount,
   currentMonthKey,
   daysInMonth,
   daysRemaining,
   DEFAULT_ASSETS,
   DEFAULT_VALUES,
+  matchCategory,
   monthLabel,
+  parseCatRules,
   parseExpenses,
   parseFixedExpenses,
   parseGoals,
   parseState,
   sortMonthKeys,
+  type MonthData,
 } from "./state";
 
 describe("parseState", () => {
@@ -350,5 +354,64 @@ describe("parseState + gastos fijos", () => {
     });
     expect(state.months["2026-08"].fixed).toHaveLength(1);
     expect(state.months["2026-08"].fixed[0].amount).toBe("99");
+  });
+});
+
+describe("categoryTotals", () => {
+  it("suma fijos y variables por categoría", () => {
+    const month: MonthData = {
+      banks: { ing: "0", santander: "0", trade: "0" },
+      expenses: [{ id: "e1", name: "X", amount: "30", type: "variable", bank: "", paid: false, category: "ocio", recurring: false }],
+      fixed: [{ id: "f1", name: "Luz", amount: "50", type: "fijo", bank: "", paid: false, category: "vivienda", recurring: true }],
+      comidaDaily: "40",
+      comidaBank: "ing",
+    };
+    const totals = categoryTotals(month);
+    expect(totals.ocio).toBe(30);
+    expect(totals.vivienda).toBe(50);
+  });
+
+  it("devuelve {} para mes undefined", () => {
+    expect(categoryTotals(undefined)).toEqual({});
+  });
+});
+
+describe("matchCategory", () => {
+  const rules = [
+    { id: "r1", match: "netflix", category: "suscripciones" as const },
+    { id: "r2", match: "Luz", category: "vivienda" as const },
+  ];
+
+  it("encuentra coincidencia sin distinguir mayúsculas", () => {
+    expect(matchCategory("Netflix mensual", rules)).toBe("suscripciones");
+  });
+
+  it("devuelve undefined si no hay coincidencia", () => {
+    expect(matchCategory("Café", rules)).toBeUndefined();
+  });
+
+  it("devuelve undefined para nombre vacío", () => {
+    expect(matchCategory("   ", rules)).toBeUndefined();
+  });
+});
+
+describe("parseCatRules", () => {
+  it("filtra reglas inválidas y respeta categorías", () => {
+    const raw = [
+      { id: "r1", match: "netflix", category: "suscripciones" },
+      { id: "r2", match: "x", category: "noexiste" },
+      { match: "sinid", category: "ocio" },
+    ];
+    const out = parseCatRules(raw);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toEqual({ id: "r1", match: "netflix", category: "suscripciones" });
+  });
+
+  it("parseState round-trips catRules", () => {
+    const state = parseState({
+      catRules: [{ id: "r1", match: "netflix", category: "suscripciones" }],
+    });
+    expect(state.catRules).toHaveLength(1);
+    expect(state.catRules[0].match).toBe("netflix");
   });
 });
