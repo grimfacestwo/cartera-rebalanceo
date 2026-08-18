@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { computePlan, type AssetDef, type Row } from "@/lib/rebalance";
 import {
   BANK_IDS,
@@ -1003,61 +1003,59 @@ export default function Home() {
         {tab === "objetivos" && !loading && !loadError && (
           <>
             <section className={styles.card}>
-              <div className={styles.goalsWrap}>
               <h2>Objetivos del ahorro</h2>
-              <div className={styles.goalHeader}>
-                <span>Nombre</span>
-                <span>Objetivo</span>
-                <span>Ahorrado</span>
-                <span>Plazo</span>
-                <span />
-              </div>
-              {goals.length === 0 ? (
-                <p className={styles.empty}>Sin objetivos. Crea el primero abajo.</p>
-              ) : (
-                goals.map((g) => {
-                  const target = Number.parseFloat(g.target) || 0;
-                  const current = Number.parseFloat(g.current) || 0;
-                  const pctVal = target > 0 ? Math.min(100, (current / target) * 100) : 0;
-                  const barColor = pctVal >= 100 ? "#16a34a" : current > 0 ? "#3b82f6" : "#e2e8f0";
-                  return (
-                    <div key={g.id} className={styles.goalRow}>
-                      <div className={styles.goalFields}>
-                        <input type="text" value={g.name} onChange={(e) => setGoalField(g.id, "name", e.target.value)} className={styles.goalInput} style={{ flex: 2 }} aria-label="Nombre del objetivo" />
-                        <div className={styles.amountCell}>
-                          <input type="text" inputMode="decimal" value={g.target} onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setGoalField(g.id, "target", v); }} className={styles.goalInput} placeholder="Objetivo" aria-label="Importe objetivo" style={{ flex: 1 }} />
-                          <span className={styles.amountUnit}>€</span>
-                        </div>
-                        <div className={styles.amountCell}>
-                          <input type="text" inputMode="decimal" value={g.current} onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setGoalField(g.id, "current", v); }} className={styles.goalInput} placeholder="Ahorrado" aria-label="Ahorrado" style={{ flex: 1 }} />
-                          <span className={styles.amountUnit}>€</span>
-                        </div>
-                        <input type="text" value={g.deadline} onChange={(e) => setGoalField(g.id, "deadline", e.target.value)} className={styles.goalInput} placeholder="YYYY-MM" aria-label="Plazo" style={{ flex: 1 }} />
-                        <button type="button" className={styles.removeBtn} onClick={() => removeGoal(g.id)} aria-label={`Eliminar objetivo ${g.name}`}>×</button>
-                      </div>
-                      <div className={styles.goalProgress}>
-                        <div className={styles.progressBar}>
-                          <div className={styles.progressFill} style={{ width: `${pctVal}%`, background: barColor }} />
-                        </div>
-                        <span className={styles.goalProgressText}>{currency.format(current)} / {currency.format(target)} ({pctVal.toFixed(0)}%)</span>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-              <div className={styles.addRow}>
-                <input type="text" value={goalName} onChange={(e) => setGoalName(e.target.value)} placeholder="Nombre" className={styles.goalInput} aria-label="Nombre del objetivo" style={{ flex: 2 }} />
-                <div className={styles.amountCell}>
-                  <input type="text" inputMode="decimal" value={goalTarget} onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setGoalTarget(v); }} className={styles.goalInput} placeholder="Objetivo" aria-label="Importe objetivo" style={{ flex: 1 }} />
-                  <span className={styles.amountUnit}>€</span>
-                </div>
-                <div className={styles.amountCell}>
-                  <input type="text" inputMode="decimal" value={goalCurrent} onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setGoalCurrent(v); }} className={styles.goalInput} placeholder="Ahorrado" aria-label="Ahorrado" style={{ flex: 1 }} />
-                  <span className={styles.amountUnit}>€</span>
-                </div>
-                <input type="text" value={goalDeadline} onChange={(e) => setGoalDeadline(e.target.value)} className={styles.goalInput} placeholder="YYYY-MM" aria-label="Plazo" style={{ flex: 1 }} />
-                <button type="button" className={styles.addBtn} onClick={addGoal}>Añadir</button>
-              </div>
+              <div className={styles.tableWrap}>
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th>Nombre</th>
+                      <th>Objetivo</th>
+                      <th>Ahorrado</th>
+                      <th>Plazo</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {goals.length === 0 ? (
+                      <tr><td colSpan={5} className={styles.empty}>Sin objetivos. Crea el primero abajo.</td></tr>
+                    ) : (
+                      goals.map((g) => {
+                        const target = Number.parseFloat(g.target) || 0;
+                        const current = Number.parseFloat(g.current) || 0;
+                        const pctVal = target > 0 ? Math.min(100, (current / target) * 100) : 0;
+                        const barColor = pctVal >= 100 ? "#16a34a" : current > 0 ? "#3b82f6" : "#e2e8f0";
+                        return (
+                          <Fragment key={g.id}>
+                            <tr className={styles.goalRow}>
+                              <td><input type="text" value={g.name} onChange={(e) => setGoalField(g.id, "name", e.target.value)} className={styles.goalInput} aria-label="Nombre del objetivo" /></td>
+                              <td><div className={styles.amountCell}><input type="text" inputMode="decimal" value={g.target} onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setGoalField(g.id, "target", v); }} className={styles.goalInput} placeholder="Objetivo" aria-label="Importe objetivo" /><span className={styles.amountUnit}>€</span></div></td>
+                              <td><div className={styles.amountCell}><input type="text" inputMode="decimal" value={g.current} onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setGoalField(g.id, "current", v); }} className={styles.goalInput} placeholder="Ahorrado" aria-label="Ahorrado" /><span className={styles.amountUnit}>€</span></div></td>
+                              <td><input type="text" value={g.deadline} onChange={(e) => setGoalField(g.id, "deadline", e.target.value)} className={styles.goalInput} placeholder="YYYY-MM" aria-label="Plazo" /></td>
+                              <td><button type="button" className={styles.removeBtn} onClick={() => removeGoal(g.id)} aria-label={`Eliminar objetivo ${g.name}`}>×</button></td>
+                            </tr>
+                            <tr className={styles.goalProgressRow}>
+                              <td colSpan={5}>
+                                <div className={styles.goalProgress}>
+                                  <div className={styles.progressBar}>
+                                    <div className={styles.progressFill} style={{ width: `${pctVal}%`, background: barColor }} />
+                                  </div>
+                                  <span className={styles.goalProgressText}>{currency.format(current)} / {currency.format(target)} ({pctVal.toFixed(0)}%)</span>
+                                </div>
+                              </td>
+                            </tr>
+                          </Fragment>
+                        );
+                      })
+                    )}
+                    <tr className={styles.goalAddRow}>
+                      <td><input type="text" value={goalName} onChange={(e) => setGoalName(e.target.value)} placeholder="Nombre" className={styles.goalInput} aria-label="Nombre del objetivo" /></td>
+                      <td><div className={styles.amountCell}><input type="text" inputMode="decimal" value={goalTarget} onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setGoalTarget(v); }} className={styles.goalInput} placeholder="Objetivo" aria-label="Importe objetivo" /><span className={styles.amountUnit}>€</span></div></td>
+                      <td><div className={styles.amountCell}><input type="text" inputMode="decimal" value={goalCurrent} onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setGoalCurrent(v); }} className={styles.goalInput} placeholder="Ahorrado" aria-label="Ahorrado" /><span className={styles.amountUnit}>€</span></div></td>
+                      <td><input type="text" value={goalDeadline} onChange={(e) => setGoalDeadline(e.target.value)} className={styles.goalInput} placeholder="YYYY-MM" aria-label="Plazo" /></td>
+                      <td><button type="button" className={styles.addBtn} onClick={addGoal}>Añadir</button></td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </section>
             <section className={styles.card}>

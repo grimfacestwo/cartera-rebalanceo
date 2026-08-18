@@ -785,86 +785,25 @@
   accent-color: #3b82f6;
 }
 
-.goalRow {
-  margin-bottom: 1rem;
+.goalRow td {
+  border-bottom: none;
+  padding-bottom: 0.2rem;
+}
+
+.goalProgressRow td {
+  border-top: 1px solid #f1f5f9;
+  padding-top: 0.2rem;
   padding-bottom: 1rem;
   border-bottom: 1px solid #f1f5f9;
 }
 
-.goalHeader {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0;
-  padding: 0.5rem 0.6rem;
-  background: #f1f5f9;
-  border-bottom: 2px solid #e2e8f0;
-  border-radius: 8px 8px 0 0;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #475569;
+.goalAddRow td {
+  border-bottom: none;
 }
 
-.goalHeader span {
-  flex: 1;
-  min-width: 0;
-}
-
-.goalHeader span:first-child {
-  flex: 2;
-}
-
-.goalHeader span:last-child {
-  flex: 0 0 auto;
-  width: 2rem;
-}
-
-[data-theme="dark"] .goalHeader {
-  background: #1a2332;
-  color: #94a3b8;
-  border-bottom-color: #334155;
-}
-
-.goalsWrap {
-  max-width: 600px;
-  margin: 0 auto;
-  text-align: center;
-}
-
-.goalsWrap .goalHeader span {
-  text-align: center;
-}
-
-.goalsWrap .goalInput {
-  text-align: center;
-}
-
-.goalsWrap .goalFields .amountCell {
-  justify-content: center;
-}
-
-.goalsWrap .goalProgress {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.35rem;
-}
-
-.goalsWrap .progressBar {
-  flex: 0 0 auto;
-  width: 100%;
-}
-
-.goalsWrap .goalProgressText {
-  text-align: center;
-}
-
-.goalFields {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.4rem;
+[data-theme="dark"] .goalProgressRow td {
+  border-top-color: #1e293b;
+  border-bottom-color: #1e293b;
 }
 
 .goalInput {
@@ -874,6 +813,8 @@
   font-size: 0.85rem;
   color: #0f172a;
   border-radius: 6px;
+  width: 100%;
+  box-sizing: border-box;
   transition: background 0.12s;
 }
 
