@@ -656,6 +656,7 @@ export default function Home() {
                         <span className={styles.comidaUnit}>€/día</span>
                         <span className={styles.comidaCalc}>= {currency.format(activeComida)}</span>
                       </td>
+                      <td className={styles.plain}>—</td>
                       {BANK_IDS.map((b) => (
                         <td key={b} className={styles.bankCell} onClick={() => setComidaBank(activeData.comidaBank === b ? "" : b)}>
                           {activeData.comidaBank === b && <span className={styles.bankDot} style={{ background: BANK_COLORS[b] }} />}
@@ -663,6 +664,7 @@ export default function Home() {
                       ))}
                       <td>Fijo</td>
                       <td className={styles.hechoCell}>—</td>
+                      <td />
                       <td />
                     </tr>
                     {activeFixed.length > 0 && (
