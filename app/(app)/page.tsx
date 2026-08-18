@@ -1003,6 +1003,7 @@ export default function Home() {
         {tab === "objetivos" && !loading && !loadError && (
           <>
             <section className={styles.card}>
+              <div className={styles.goalsWrap}>
               <h2>Objetivos del ahorro</h2>
               <div className={styles.goalHeader}>
                 <span>Nombre</span>
@@ -1056,6 +1057,7 @@ export default function Home() {
                 </div>
                 <input type="text" value={goalDeadline} onChange={(e) => setGoalDeadline(e.target.value)} className={styles.goalInput} placeholder="YYYY-MM" aria-label="Plazo" style={{ flex: 1 }} />
                 <button type="button" className={styles.addBtn} onClick={addGoal}>Añadir</button>
+              </div>
               </div>
             </section>
             <section className={styles.card}>

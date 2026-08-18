@@ -827,6 +827,39 @@
   border-bottom-color: #334155;
 }
 
+.goalsWrap {
+  max-width: 600px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.goalsWrap .goalHeader span {
+  text-align: center;
+}
+
+.goalsWrap .goalInput {
+  text-align: center;
+}
+
+.goalsWrap .goalFields .amountCell {
+  justify-content: center;
+}
+
+.goalsWrap .goalProgress {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
+}
+
+.goalsWrap .progressBar {
+  flex: 0 0 auto;
+  width: 100%;
+}
+
+.goalsWrap .goalProgressText {
+  text-align: center;
+}
+
 .goalFields {
   display: flex;
   align-items: center;
