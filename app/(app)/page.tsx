@@ -92,6 +92,7 @@ export default function Home() {
   const [expSort, setExpSort] = useState<"paid" | "amount" | "name" | "category">("paid");
   const [expCategoryFilter, setExpCategoryFilter] = useState<CategoryId | "all">("all");
   const [expRecurringFilter, setExpRecurringFilter] = useState<"all" | "recurring" | "onetime">("all");
+  const [paidOpen, setPaidOpen] = useState(false);
   const [goalName, setGoalName] = useState("");
   const [goalTarget, setGoalTarget] = useState("");
   const [goalCurrent, setGoalCurrent] = useState("");
@@ -293,11 +294,15 @@ export default function Home() {
   const sortedMonthKeys = sortMonthKeys(Object.keys(months));
   const activeExpenses = activeData.expenses;
   const activeFixed = activeData.fixed;
+  const unpaidFixed = activeFixed.filter((e) => !e.paid);
+  const paidFixed = activeFixed.filter((e) => e.paid);
+  const paidVariable = activeExpenses.filter((e) => e.paid);
+  const paidCount = paidFixed.length + paidVariable.length;
   const totalFijos = allActiveExpenses.filter((e) => e.type === "fijo").reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
   const totalRecurring = allActiveExpenses.filter((e) => e.recurring).reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
   const pagados = allActiveExpenses.filter((e) => e.paid).length;
   const sortedExpenses = useMemo(() => {
-    let list = [...activeExpenses];
+    let list = activeExpenses.filter((e) => !e.paid);
     if (expSearch) {
       const q = expSearch.toLowerCase();
       list = list.filter((e) => e.name.toLowerCase().includes(q));
@@ -719,12 +724,12 @@ export default function Home() {
                       <td />
                       <td />
                     </tr>
-                    {activeFixed.length > 0 && (
+                    {unpaidFixed.length > 0 && (
                       <tr className={styles.fixedHeaderRow}>
                         <td colSpan={10}>Gastos fijos</td>
                       </tr>
                     )}
-                    {activeFixed.map((e) => (
+                    {unpaidFixed.map((e) => (
                       <tr key={e.id} className={`${styles.fixedRow} ${e.paid ? styles.done : ""}`}>
                         <td><span className={styles.fixedName}>{e.name}</span></td>
                         <td>
@@ -797,6 +802,35 @@ export default function Home() {
                       <td className={styles.hechoCell}><input type="checkbox" checked={newExpRecurring} onChange={(ev) => setNewExpRecurring(ev.target.checked)} aria-label="Recurrente" title="Recurrente" /></td>
                       <td><button type="button" className={styles.addBtn} onClick={addExpense}>Añadir</button></td>
                     </tr>
+                    {paidCount > 0 && (
+                      <tr className={styles.paidHeaderRow} onClick={() => setPaidOpen((v) => !v)} role="button" aria-expanded={paidOpen} tabIndex={0} onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); setPaidOpen((v) => !v); } }}>
+                        <td colSpan={10}>Pagados ({paidCount}) <span className={styles.chevron}>{paidOpen ? "▼" : "▶"}</span></td>
+                      </tr>
+                    )}
+                    {paidOpen && paidFixed.map((e) => (
+                      <tr key={e.id} className={styles.fixedRow}>
+                        <td><span className={styles.fixedName}>{e.name}</span></td>
+                        <td><div className={styles.amountCell}><input type="text" inputMode="decimal" value={e.amount} onChange={(ev) => { const v = ev.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setFixedField(e.id, "amount", v); }} className={styles.expenseInput} aria-label={`Importe de ${e.name}`} style={{ width: 4 + "rem" }} /><span className={styles.amountUnit}>€</span></div></td>
+                        <td><select value={e.category} onChange={(ev) => setFixedField(e.id, "category", ev.target.value as CategoryId)} className={styles.expenseSelect} aria-label={`Categoría de ${e.name}`} style={{ fontSize: "0.8rem" }}>{CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}</select></td>
+                        {BANK_IDS.map((b) => (<td key={b} className={styles.bankCell} onClick={() => setFixedField(e.id, "bank", e.bank === b ? "" : b)}>{e.bank === b && <span className={styles.bankDot} style={{ background: BANK_COLORS[b] }} />}</td>))}
+                        <td>Fijo</td>
+                        <td className={styles.hechoCell}><input type="checkbox" checked={e.paid} onChange={(ev) => setFixedField(e.id, "paid", ev.target.checked)} aria-label={`Hecho ${e.name}`} /></td>
+                        <td />
+                        <td><button type="button" className={styles.removeBtn} onClick={() => removeFixed(e.id)} aria-label={`Eliminar gasto fijo ${e.name}`}>×</button></td>
+                      </tr>
+                    ))}
+                    {paidOpen && paidVariable.map((e) => (
+                      <tr key={e.id}>
+                        <td><input type="text" value={e.name} onChange={(ev) => setExpField(e.id, "name", ev.target.value)} className={styles.expenseInput} aria-label="Nombre del gasto" /></td>
+                        <td><div className={styles.amountCell}><input type="text" inputMode="decimal" value={e.amount} onChange={(ev) => { const v = ev.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setExpField(e.id, "amount", v); }} className={styles.expenseInput} aria-label="Importe" style={{ width: 4 + "rem" }} /><span className={styles.amountUnit}>€</span></div></td>
+                        <td><select value={e.category} onChange={(ev) => setExpField(e.id, "category", ev.target.value as CategoryId)} className={styles.expenseSelect} aria-label="Categoría" style={{ fontSize: "0.8rem" }}>{CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}</select></td>
+                        {BANK_IDS.map((b) => (<td key={b} className={styles.bankCell} onClick={() => setExpField(e.id, "bank", e.bank === b ? "" : b)}>{e.bank === b && <span className={styles.bankDot} style={{ background: BANK_COLORS[b] }} />}</td>))}
+                        <td><select value={e.type} onChange={(ev) => setExpField(e.id, "type", ev.target.value as "fijo" | "variable")} className={styles.expenseSelect} aria-label="Tipo de gasto"><option value="fijo">Fijo</option><option value="variable">Variable</option></select></td>
+                        <td className={styles.hechoCell}><input type="checkbox" checked={e.paid} onChange={(ev) => setExpField(e.id, "paid", ev.target.checked)} aria-label="Hecho" /></td>
+                        <td>{e.recurring && <span className={styles.recurringBadge} title="Gasto recurrente">↻</span>}</td>
+                        <td><button type="button" className={styles.removeBtn} onClick={() => removeExpense(e.id)} aria-label={`Eliminar gasto ${e.name}`}>×</button></td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -804,7 +838,7 @@ export default function Home() {
                 <span>Total: {currency.format(totalExpenses)}</span>
                 {activeExpenses.length > 0 && <span>Fijos: {currency.format(totalFijos)}</span>}
                 {totalRecurring > 0 && <span>Recurrencia: {currency.format(totalRecurring)}</span>}
-                {activeExpenses.length > 0 && <span>Pagados: {pagados}/{activeExpenses.length}</span>}
+                {allActiveExpenses.length > 0 && <span>Pagados: {pagados}/{allActiveExpenses.length}</span>}
               </div>
               {categoryStats.length > 0 && (
                 <div className={styles.categoryStats}>

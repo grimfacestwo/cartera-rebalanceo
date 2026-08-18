@@ -1249,6 +1249,36 @@
   border-top-color: #334155;
 }
 
+.paidHeaderRow td {
+  padding: 0.5rem 0.4rem 0.2rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  border-top: 1px solid #e2e8f0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.paidHeaderRow td:hover {
+  color: #475569;
+}
+
+.paidHeaderRow .chevron {
+  margin-left: 0.4rem;
+  font-size: 0.7rem;
+}
+
+[data-theme="dark"] .paidHeaderRow td {
+  color: #94a3b8;
+  border-top-color: #334155;
+}
+
+[data-theme="dark"] .paidHeaderRow td:hover {
+  color: #cbd5e1;
+}
+
 .fixedRow td {
   background: rgba(59, 130, 246, 0.04);
 }
