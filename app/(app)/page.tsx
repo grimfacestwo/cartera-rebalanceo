@@ -93,6 +93,8 @@ export default function Home() {
   const [expCategoryFilter, setExpCategoryFilter] = useState<CategoryId | "all">("all");
   const [expRecurringFilter, setExpRecurringFilter] = useState<"all" | "recurring" | "onetime">("all");
   const [paidOpen, setPaidOpen] = useState(false);
+  const [copySource, setCopySource] = useState<Expense | null>(null);
+  const [copyTarget, setCopyTarget] = useState<string>("");
   const [goalName, setGoalName] = useState("");
   const [goalTarget, setGoalTarget] = useState("");
   const [goalCurrent, setGoalCurrent] = useState("");
@@ -247,6 +249,25 @@ export default function Home() {
     updateMonth((m) => ({ ...m, expenses: m.expenses.filter((e) => e.id !== id) }));
   };
 
+  const startCopy = (e: Expense) => {
+    setCopySource(e);
+    setCopyTarget("");
+  };
+
+  const confirmCopy = () => {
+    if (!copySource || !copyTarget) return;
+    const src = copySource;
+    setMonths((prev) => {
+      const t = prev[copyTarget];
+      if (!t) return prev;
+      const copy: Expense = { ...src, id: newId(), paid: false };
+      return { ...prev, [copyTarget]: { ...t, expenses: [...t.expenses, copy] } };
+    });
+    setCopySource(null);
+  };
+
+  const cancelCopy = () => setCopySource(null);
+
   const removeFixed = (id: string) => {
     updateMonth((m) => ({ ...m, fixed: m.fixed.filter((e) => e.id !== id) }));
   };
@@ -292,6 +313,7 @@ export default function Home() {
   };
 
   const sortedMonthKeys = sortMonthKeys(Object.keys(months));
+  const otherMonths = sortedMonthKeys.filter((k) => k !== activeMonth);
   const activeExpenses = activeData.expenses;
   const activeFixed = activeData.fixed;
   const unpaidFixed = activeFixed.filter((e) => !e.paid);
@@ -680,6 +702,17 @@ export default function Home() {
                   return lines.length ? `Gastos pendientes del mes:\n${lines.join("\n")}` : "Sin gastos pendientes este mes";
                 })()
               }>Gastos</h2>
+              {copySource && (
+                <div className={styles.copyBar}>
+                  <span>Copiar «{copySource.name}» a:</span>
+                  <select value={copyTarget} onChange={(e) => setCopyTarget(e.target.value)} aria-label="Mes de destino" className={styles.expenseSelect}>
+                    <option value="">Selecciona mes…</option>
+                    {otherMonths.map((k) => <option key={k} value={k}>{monthLabel(k)}</option>)}
+                  </select>
+                  <button type="button" className={styles.addBtn} onClick={confirmCopy} disabled={!copyTarget}>Copiar</button>
+                  <button type="button" className={styles.removeBtn} onClick={cancelCopy} aria-label="Cancelar copia">✕</button>
+                </div>
+              )}
               {activeExpenses.length > 0 && (
                 <div className={styles.filterBar}>
                   <input type="text" value={expSearch} onChange={(ev) => setExpSearch(ev.target.value)} placeholder="Buscar gasto…" className={styles.expenseInput} aria-label="Buscar gasto" style={{ maxWidth: 200 }} />
@@ -776,7 +809,10 @@ export default function Home() {
                         <td><select value={e.type} onChange={(ev) => setExpField(e.id, "type", ev.target.value as "fijo" | "variable")} className={styles.expenseSelect} aria-label="Tipo de gasto"><option value="fijo">Fijo</option><option value="variable">Variable</option></select></td>
                         <td className={styles.hechoCell}><input type="checkbox" checked={e.paid} onChange={(ev) => setExpField(e.id, "paid", ev.target.checked)} aria-label="Hecho" /></td>
                         <td>{e.recurring && <span className={styles.recurringBadge} title="Gasto recurrente">↻</span>}</td>
-                        <td><button type="button" className={styles.removeBtn} onClick={() => removeExpense(e.id)} aria-label={`Eliminar gasto ${e.name}`}>×</button></td>
+                        <td>
+                          <button type="button" className={styles.copyBtn} onClick={() => startCopy(e)} disabled={otherMonths.length === 0} aria-label={`Copiar gasto ${e.name} a otro mes`} title="Copiar a otro mes">⧉</button>
+                          <button type="button" className={styles.removeBtn} onClick={() => removeExpense(e.id)} aria-label={`Eliminar gasto ${e.name}`}>×</button>
+                        </td>
                       </tr>
                     ))}
                     <tr className={styles.expenseAddRow}>
@@ -828,7 +864,10 @@ export default function Home() {
                         <td><select value={e.type} onChange={(ev) => setExpField(e.id, "type", ev.target.value as "fijo" | "variable")} className={styles.expenseSelect} aria-label="Tipo de gasto"><option value="fijo">Fijo</option><option value="variable">Variable</option></select></td>
                         <td className={styles.hechoCell}><input type="checkbox" checked={e.paid} onChange={(ev) => setExpField(e.id, "paid", ev.target.checked)} aria-label="Hecho" /></td>
                         <td>{e.recurring && <span className={styles.recurringBadge} title="Gasto recurrente">↻</span>}</td>
-                        <td><button type="button" className={styles.removeBtn} onClick={() => removeExpense(e.id)} aria-label={`Eliminar gasto ${e.name}`}>×</button></td>
+                        <td>
+                          <button type="button" className={styles.copyBtn} onClick={() => startCopy(e)} disabled={otherMonths.length === 0} aria-label={`Copiar gasto ${e.name} a otro mes`} title="Copiar a otro mes">⧉</button>
+                          <button type="button" className={styles.removeBtn} onClick={() => removeExpense(e.id)} aria-label={`Eliminar gasto ${e.name}`}>×</button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

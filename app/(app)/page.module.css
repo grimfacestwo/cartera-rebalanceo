@@ -263,6 +263,44 @@
   background: rgba(239, 68, 68, 0.08);
 }
 
+.copyBtn {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.25rem 0.35rem;
+  border-radius: 6px;
+}
+
+.copyBtn:hover:not(:disabled) {
+  color: #3b82f6;
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.copyBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.copyBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.6rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  background: rgba(59, 130, 246, 0.04);
+}
+
+[data-theme="dark"] .copyBar {
+  border-color: #334155;
+  background: rgba(59, 130, 246, 0.08);
+}
+
 .addRow {
   display: flex;
   gap: 0.5rem;
