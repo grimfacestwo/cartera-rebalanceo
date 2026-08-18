@@ -114,8 +114,8 @@ describe("parseExpenses", () => {
     ];
     const result = parseExpenses(data);
     expect(result).toHaveLength(2);
-    expect(result[0]).toEqual({ id: "e1", name: "Alquiler", amount: "800", type: "fijo", bank: "santander", paid: true, category: "otros" });
-    expect(result[1]).toEqual({ id: "e2", name: "Gasolina", amount: "50", type: "variable", bank: "trade", paid: false, category: "otros" });
+    expect(result[0]).toEqual({ id: "e1", name: "Alquiler", amount: "800", type: "fijo", bank: "santander", paid: true, category: "otros", recurring: false });
+    expect(result[1]).toEqual({ id: "e2", name: "Gasolina", amount: "50", type: "variable", bank: "trade", paid: false, category: "otros", recurring: false });
   });
 
   it("devuelve [] para datos inválidos", () => {
@@ -176,9 +176,9 @@ describe("month helpers", () => {
     const month = {
       banks: { ing: "1000", santander: "500", trade: "300" },
       expenses: [
-        { id: "e1", name: "A", amount: "200", type: "fijo" as const, bank: "ing" as const, paid: false, category: "otros" as const },
-        { id: "e2", name: "B", amount: "100", type: "variable" as const, bank: "ing" as const, paid: false, category: "otros" as const },
-        { id: "e3", name: "C", amount: "50", type: "variable" as const, bank: "santander" as const, paid: true, category: "otros" as const },
+        { id: "e1", name: "A", amount: "200", type: "fijo" as const, bank: "ing" as const, paid: false, category: "otros" as const, recurring: false },
+        { id: "e2", name: "B", amount: "100", type: "variable" as const, bank: "ing" as const, paid: false, category: "otros" as const, recurring: false },
+        { id: "e3", name: "C", amount: "50", type: "variable" as const, bank: "santander" as const, paid: true, category: "otros" as const, recurring: false },
       ],
       comidaDaily: "40",
       comidaBank: "ing" as const,

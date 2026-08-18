@@ -73,10 +73,12 @@ export default function Home() {
   const [newExpAmount, setNewExpAmount] = useState("");
   const [newExpType, setNewExpType] = useState<"fijo" | "variable">("variable");
   const [newExpCategory, setNewExpCategory] = useState<CategoryId>("otros");
+  const [newExpRecurring, setNewExpRecurring] = useState(false);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [expSearch, setExpSearch] = useState("");
   const [expSort, setExpSort] = useState<"paid" | "amount" | "name" | "category">("paid");
   const [expCategoryFilter, setExpCategoryFilter] = useState<CategoryId | "all">("all");
+  const [expRecurringFilter, setExpRecurringFilter] = useState<"all" | "recurring" | "onetime">("all");
   const [goalName, setGoalName] = useState("");
   const [goalTarget, setGoalTarget] = useState("");
   const [goalCurrent, setGoalCurrent] = useState("");
@@ -218,9 +220,9 @@ export default function Home() {
     if (!name || newExpAmount === "") return;
     updateMonth((m) => ({
       ...m,
-      expenses: [...m.expenses, { id: newId(), name, amount: newExpAmount, type: newExpType, bank: "ing", paid: false, category: newExpCategory }],
+      expenses: [...m.expenses, { id: newId(), name, amount: newExpAmount, type: newExpType, bank: "ing", paid: false, category: newExpCategory, recurring: newExpRecurring }],
     }));
-    setNewExpName(""); setNewExpAmount(""); setNewExpType("variable"); setNewExpCategory("otros");
+    setNewExpName(""); setNewExpAmount(""); setNewExpType("variable"); setNewExpCategory("otros"); setNewExpRecurring(false);
   };
 
   const removeExpense = (id: string) => {
@@ -238,9 +240,12 @@ export default function Home() {
       const r = bankRemaining(prev, id);
       banks[id] = r > 0 ? String(r) : "";
     }
+    const carriedExpenses = prev.expenses
+      .filter((e) => e.recurring)
+      .map((e) => ({ ...e, id: newId(), paid: false }));
     setMonths((p) => {
       const prevMonth = lastKey ? p[lastKey] : undefined;
-      return { ...p, [nextKey]: { banks, expenses: [], comidaDaily: prevMonth?.comidaDaily ?? "40", comidaBank: prevMonth?.comidaBank ?? "ing" } };
+      return { ...p, [nextKey]: { banks, expenses: carriedExpenses, comidaDaily: prevMonth?.comidaDaily ?? "40", comidaBank: prevMonth?.comidaBank ?? "ing" } };
     });
     setActiveMonth(nextKey);
   };
@@ -258,6 +263,7 @@ export default function Home() {
   const sortedMonthKeys = sortMonthKeys(Object.keys(months));
   const activeExpenses = activeData.expenses;
   const totalFijos = activeExpenses.filter((e) => e.type === "fijo").reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
+  const totalRecurring = activeExpenses.filter((e) => e.recurring).reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
   const pagados = activeExpenses.filter((e) => e.paid).length;
   const sortedExpenses = useMemo(() => {
     let list = [...activeExpenses];
@@ -268,6 +274,8 @@ export default function Home() {
     if (expCategoryFilter !== "all") {
       list = list.filter((e) => e.category === expCategoryFilter);
     }
+    if (expRecurringFilter === "recurring") list = list.filter((e) => e.recurring);
+    if (expRecurringFilter === "onetime") list = list.filter((e) => !e.recurring);
     switch (expSort) {
       case "amount": list.sort((a, b) => (Number.parseFloat(a.amount) || 0) - (Number.parseFloat(b.amount) || 0)); break;
       case "name": list.sort((a, b) => a.name.localeCompare(b.name, "es")); break;
@@ -275,7 +283,7 @@ export default function Home() {
       default: list.sort((a, b) => Number(a.paid) - Number(b.paid)); break;
     }
     return list;
-  }, [activeExpenses, expSearch, expSort, expCategoryFilter]);
+  }, [activeExpenses, expSearch, expSort, expCategoryFilter, expRecurringFilter]);
 
   // Goals helpers
   const setGoalField = (id: string, field: keyof Goal, val: string) => {
@@ -306,6 +314,74 @@ export default function Home() {
       .sort((a, b) => b[1] - a[1])
       .map(([cat, total]) => ({ cat: cat as CategoryId, total }));
   }, [activeExpenses]);
+
+  // Expense trends per month
+  const trendsData = useMemo(() => {
+    const keys = sortMonthKeys(Object.keys(months));
+    if (keys.length === 0) return [];
+    const last12 = keys.slice(-12);
+    return last12.map((key) => {
+      const m = months[key];
+      const cats: Record<string, number> = {};
+      if (m) {
+        for (const e of m.expenses) {
+          cats[e.category] = (cats[e.category] || 0) + (Number.parseFloat(e.amount) || 0);
+        }
+      }
+      return { key, label: monthLabel(key), cats };
+    });
+  }, [months]);
+
+  const trendsMax = useMemo(() => {
+    let mx = 0;
+    for (const d of trendsData) {
+      const total = Object.values(d.cats).reduce((s, v) => s + v, 0);
+      if (total > mx) mx = total;
+    }
+    return mx || 1;
+  }, [trendsData]);
+
+  // Notifications
+  const [notifEnabled, setNotifEnabled] = useState(false);
+  const notifSentRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof Notification === "undefined") return;
+    setNotifEnabled(Notification.permission === "granted");
+  }, []);
+
+  useEffect(() => {
+    if (!notifEnabled || notifSentRef.current) return;
+    if (typeof Notification === "undefined") return;
+    const msgs: string[] = [];
+    const now = currentMonthKey();
+    for (const g of goals) {
+      if (g.deadline) {
+        const dl = g.deadline;
+        if (dl < now) {
+          msgs.push(`Objetivo "${g.name}" superó su plazo (${dl})`);
+        } else if (dl === now) {
+          msgs.push(`Objetivo "${g.name}" vence este mes`);
+        }
+      }
+    }
+    if (remaining < 0) {
+      msgs.push(`Disponible negativo: ${currency.format(remaining)}`);
+    }
+    if (msgs.length > 0) {
+      new Notification("Cartera Rebalanceo", { body: msgs.join("\n") });
+      notifSentRef.current = true;
+    }
+  }, [notifEnabled, goals, remaining]);
+
+  const requestNotifications = async () => {
+    if (typeof Notification === "undefined") return;
+    const perm = await Notification.requestPermission();
+    if (perm === "granted") {
+      setNotifEnabled(true);
+      notifSentRef.current = false;
+    }
+  };
 
   // Export/Import
   const handleExport = () => {
@@ -365,6 +441,14 @@ export default function Home() {
             <p className={styles.saveStatus} role="status">
               {saveStatus === "saving" ? "Guardando…" : saveStatus === "saved" ? "Guardado" : "Error al guardar"}
             </p>
+          )}
+          {!notifEnabled && typeof Notification !== "undefined" && Notification.permission !== "denied" && (
+            <button type="button" className={styles.notifBtn} onClick={requestNotifications} title="Activar notificaciones">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              </svg>
+              Notificaciones
+            </button>
           )}
         </header>
 
@@ -523,11 +607,16 @@ export default function Home() {
                     <option value="name">Por nombre</option>
                     <option value="category">Por categoría</option>
                   </select>
+                  <select value={expRecurringFilter} onChange={(ev) => setExpRecurringFilter(ev.target.value as "all" | "recurring" | "onetime")} className={styles.expenseSelect} aria-label="Filtrar recurrentes">
+                    <option value="all">Todos</option>
+                    <option value="recurring">Recurrentes</option>
+                    <option value="onetime">Puntuales</option>
+                  </select>
                 </div>
               )}
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
-                  <thead><tr><th>Concepto</th><th>Importe</th><th>Categoría</th><th>ING</th><th>Santander</th><th>Trade</th><th>Tipo</th><th>Hecho</th><th></th></tr></thead>
+                  <thead><tr><th>Concepto</th><th>Importe</th><th>Categoría</th><th>ING</th><th>Santander</th><th>Trade</th><th>Tipo</th><th>Hecho</th><th>Rec</th><th></th></tr></thead>
                   <tbody>
                     <tr className={styles.comidaRow}>
                       <td>
@@ -568,6 +657,7 @@ export default function Home() {
                         ))}
                         <td><select value={e.type} onChange={(ev) => setExpField(e.id, "type", ev.target.value as "fijo" | "variable")} className={styles.expenseSelect} aria-label="Tipo de gasto"><option value="fijo">Fijo</option><option value="variable">Variable</option></select></td>
                         <td className={styles.hechoCell}><input type="checkbox" checked={e.paid} onChange={(ev) => setExpField(e.id, "paid", ev.target.checked)} aria-label="Hecho" /></td>
+                        <td>{e.recurring && <span className={styles.recurringBadge} title="Gasto recurrente">↻</span>}</td>
                         <td><button type="button" className={styles.removeBtn} onClick={() => removeExpense(e.id)} aria-label={`Eliminar gasto ${e.name}`}>×</button></td>
                       </tr>
                     ))}
@@ -586,7 +676,8 @@ export default function Home() {
                       </td>
                       <td colSpan={3} />
                       <td><select value={newExpType} onChange={(ev) => setNewExpType(ev.target.value as "fijo" | "variable")} className={styles.expenseSelect} aria-label="Tipo de gasto"><option value="fijo">Fijo</option><option value="variable">Variable</option></select></td>
-                      <td colSpan={2}><button type="button" className={styles.addBtn} onClick={addExpense}>Añadir</button></td>
+                      <td className={styles.hechoCell}><input type="checkbox" checked={newExpRecurring} onChange={(ev) => setNewExpRecurring(ev.target.checked)} aria-label="Recurrente" title="Recurrente" /></td>
+                      <td><button type="button" className={styles.addBtn} onClick={addExpense}>Añadir</button></td>
                     </tr>
                   </tbody>
                 </table>
@@ -594,6 +685,7 @@ export default function Home() {
               <div className={styles.expenseSummary}>
                 <span>Total: {currency.format(totalExpenses)}</span>
                 {activeExpenses.length > 0 && <span>Fijos: {currency.format(totalFijos)}</span>}
+                {totalRecurring > 0 && <span>Recurrencia: {currency.format(totalRecurring)}</span>}
                 {activeExpenses.length > 0 && <span>Pagados: {pagados}/{activeExpenses.length}</span>}
               </div>
               {categoryStats.length > 0 && (
@@ -645,6 +737,41 @@ export default function Home() {
               </div>
               <p className={`${styles.disponibleTotal} ${remaining >= 0 ? styles.inject : styles.negative}`}>Disponible total: {currency.format(remaining)} €</p>
             </section>
+
+            {trendsData.length > 1 && (
+              <section className={styles.card}>
+                <h2>Tendencia de gastos</h2>
+                <div className={styles.trendsChart}>
+                  {trendsData.map((d) => {
+                    const cats = Object.entries(d.cats);
+                    const total = cats.reduce((s, [, v]) => s + v, 0);
+                    const barH = (total / trendsMax) * 100;
+                    let cumY = 0;
+                    return (
+                      <div key={d.key} className={styles.trendBar}>
+                        <div className={styles.trendBarInner} style={{ height: `${barH}%` }}>
+                          {cats.map(([cat, val]) => {
+                            const h = total > 0 ? (val / total) * 100 : 0;
+                            const y = cumY;
+                            cumY += h;
+                            return <div key={cat} className={styles.trendSeg} style={{ bottom: `${y}%`, height: `${h}%`, background: CATEGORY_COLORS[cat as CategoryId] }} title={`${CATEGORY_LABELS[cat as CategoryId]}: ${currency.format(val)}`} />;
+                          })}
+                        </div>
+                        <span className={styles.trendLabel}>{d.key.slice(5)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className={styles.legend}>
+                  {CATEGORIES.filter((c) => trendsData.some((d) => d.cats[c] > 0)).map((c) => (
+                    <span key={c} className={styles.legendItem}>
+                      <span className={styles.dot} style={{ background: CATEGORY_COLORS[c] }} />
+                      {CATEGORY_LABELS[c]}
+                    </span>
+                  ))}
+                </div>
+              </section>
+            )}
           </>
         ) : null}
 

@@ -46,6 +46,7 @@ export type Expense = {
   bank: BankId | "";
   paid: boolean;
   category: CategoryId;
+  recurring: boolean;
 };
 
 export type Goal = {
@@ -242,6 +243,7 @@ export function parseExpenses(raw: unknown): Expense[] {
           category: CATEGORIES.includes(o.category as CategoryId)
             ? (o.category as CategoryId)
             : "otros",
+          recurring: o.recurring === true,
         });
       }
     }
