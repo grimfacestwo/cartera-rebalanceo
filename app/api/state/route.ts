@@ -25,16 +25,12 @@ async function ensureTable() {
     expenses jsonb NOT NULL DEFAULT '[]'::jsonb,
     months jsonb NOT NULL DEFAULT '{}'::jsonb,
     goals jsonb NOT NULL DEFAULT '[]'::jsonb,
-    net_worth_history jsonb NOT NULL DEFAULT '{}'::jsonb,
-    monthly_savings text NOT NULL DEFAULT '',
     updated_at timestamptz NOT NULL DEFAULT now()
   )`;
   await sql`ALTER TABLE portfolio_state ADD COLUMN IF NOT EXISTS banks jsonb NOT NULL DEFAULT '{}'::jsonb`;
   await sql`ALTER TABLE portfolio_state ADD COLUMN IF NOT EXISTS expenses jsonb NOT NULL DEFAULT '[]'::jsonb`;
   await sql`ALTER TABLE portfolio_state ADD COLUMN IF NOT EXISTS months jsonb NOT NULL DEFAULT '{}'::jsonb`;
   await sql`ALTER TABLE portfolio_state ADD COLUMN IF NOT EXISTS goals jsonb NOT NULL DEFAULT '[]'::jsonb`;
-  await sql`ALTER TABLE portfolio_state ADD COLUMN IF NOT EXISTS net_worth_history jsonb NOT NULL DEFAULT '{}'::jsonb`;
-  await sql`ALTER TABLE portfolio_state ADD COLUMN IF NOT EXISTS monthly_savings text NOT NULL DEFAULT ''`;
   ensured = true;
 }
 
@@ -52,9 +48,7 @@ export async function GET() {
       expenses: unknown;
       months: unknown;
       goals: unknown;
-      net_worth_history: unknown;
-      monthly_savings: string;
-    }>`SELECT assets, values, contribution, banks, expenses, months, goals, net_worth_history, monthly_savings FROM portfolio_state WHERE id = 1`;
+    }>`SELECT assets, values, contribution, banks, expenses, months, goals FROM portfolio_state WHERE id = 1`;
     if (rows.length === 0) {
       return NextResponse.json({ state: DEFAULT_STATE });
     }
@@ -89,7 +83,7 @@ export async function PUT(request: Request) {
   try {
     await ensureTable();
     await sql`
-      INSERT INTO portfolio_state (id, assets, values, contribution, months, goals, net_worth_history, monthly_savings, updated_at)
+      INSERT INTO portfolio_state (id, assets, values, contribution, months, goals, updated_at)
       VALUES (
         1,
         ${JSON.stringify(state.assets)}::jsonb,
@@ -97,8 +91,6 @@ export async function PUT(request: Request) {
         ${state.contribution},
         ${JSON.stringify(state.months)}::jsonb,
         ${JSON.stringify(state.goals)}::jsonb,
-        ${JSON.stringify(state.netWorthHistory)}::jsonb,
-        ${state.monthlySavings},
         now()
       )
       ON CONFLICT (id) DO UPDATE SET
@@ -107,8 +99,6 @@ export async function PUT(request: Request) {
         contribution = EXCLUDED.contribution,
         months = EXCLUDED.months,
         goals = EXCLUDED.goals,
-        net_worth_history = EXCLUDED.net_worth_history,
-        monthly_savings = EXCLUDED.monthly_savings,
         updated_at = now()
     `;
     return NextResponse.json({ ok: true });
