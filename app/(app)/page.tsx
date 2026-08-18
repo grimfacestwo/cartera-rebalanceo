@@ -238,6 +238,10 @@ export default function Home() {
     updateMonth((m) => ({ ...m, expenses: m.expenses.filter((e) => e.id !== id) }));
   };
 
+  const removeFixed = (id: string) => {
+    updateMonth((m) => ({ ...m, fixed: m.fixed.filter((e) => e.id !== id) }));
+  };
+
   const setFixedField = (id: string, field: keyof Expense, val: unknown) => {
     updateMonth((m) => ({
       ...m,
@@ -694,6 +698,7 @@ export default function Home() {
                         <td>Fijo</td>
                         <td className={styles.hechoCell}><input type="checkbox" checked={e.paid} onChange={(ev) => setFixedField(e.id, "paid", ev.target.checked)} aria-label={`Hecho ${e.name}`} /></td>
                         <td />
+                        <td><button type="button" className={styles.removeBtn} onClick={() => removeFixed(e.id)} aria-label={`Eliminar gasto fijo ${e.name}`}>×</button></td>
                       </tr>
                     ))}
                     {sortedExpenses.map((e) => (
