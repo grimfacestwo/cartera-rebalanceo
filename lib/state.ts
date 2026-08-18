@@ -54,7 +54,8 @@ export type Goal = {
   name: string;
   target: string;
   current: string;
-  deadline: string;
+  bank: BankId | "";
+  rate: string;
   notes: string;
 };
 
@@ -342,7 +343,10 @@ export function parseGoals(raw: unknown): Goal[] {
           name: o.name,
           target: typeof o.target === "string" ? o.target : "",
           current: typeof o.current === "string" ? o.current : "",
-          deadline: typeof o.deadline === "string" ? o.deadline : "",
+          bank: typeof o.bank === "string" && (BANK_IDS.includes(o.bank as BankId) || o.bank === "")
+            ? (o.bank as BankId | "")
+            : "",
+          rate: typeof o.rate === "string" ? o.rate : "",
           notes: typeof o.notes === "string" ? o.notes : "",
         });
       }

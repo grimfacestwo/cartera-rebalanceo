@@ -133,7 +133,8 @@ export default function Home() {
   const [goalName, setGoalName] = useState("");
   const [goalTarget, setGoalTarget] = useState("");
   const [goalCurrent, setGoalCurrent] = useState("");
-  const [goalDeadline, setGoalDeadline] = useState("");
+  const [goalBank, setGoalBank] = useState<BankId | "">("");
+  const [goalRate, setGoalRate] = useState("");
   const skipOnce = useRef(true);
   const activeTabRef = useRef<HTMLButtonElement>(null);
 
@@ -392,8 +393,12 @@ export default function Home() {
   const addGoal = () => {
     const name = goalName.trim();
     if (!name) return;
-    setGoals([...goals, { id: newId(), name, target: goalTarget, current: goalCurrent, deadline: goalDeadline, notes: "" }]);
-    setGoalName(""); setGoalTarget(""); setGoalCurrent(""); setGoalDeadline("");
+    setGoals([...goals, { id: newId(), name, target: goalTarget, current: goalCurrent, bank: goalBank, rate: goalRate, notes: "" }]);
+    setGoalName("");
+    setGoalTarget("");
+    setGoalCurrent("");
+    setGoalBank("");
+    setGoalRate("");
   };
 
   const removeGoal = (id: string) => {
@@ -476,17 +481,6 @@ export default function Home() {
     if (!notifEnabled || notifSentRef.current) return;
     if (typeof Notification === "undefined") return;
     const msgs: string[] = [];
-    const now = currentMonthKey();
-    for (const g of goals) {
-      if (g.deadline) {
-        const dl = g.deadline;
-        if (dl < now) {
-          msgs.push(`Objetivo "${g.name}" superó su plazo (${dl})`);
-        } else if (dl === now) {
-          msgs.push(`Objetivo "${g.name}" vence este mes`);
-        }
-      }
-    }
     if (remaining < 0) {
       msgs.push(`Disponible negativo: ${currency.format(remaining)}`);
     }
@@ -1046,13 +1040,14 @@ export default function Home() {
                       <th>Nombre</th>
                       <th>Objetivo</th>
                       <th>Ahorrado</th>
-                      <th>Plazo</th>
+                      <th>Banco</th>
+                      <th>Rentabilidad</th>
                       <th />
                     </tr>
                   </thead>
                   <tbody>
                     {goals.length === 0 ? (
-                      <tr><td colSpan={5} className={styles.empty}>Sin objetivos. Crea el primero abajo.</td></tr>
+                      <tr><td colSpan={6} className={styles.empty}>Sin objetivos. Crea el primero abajo.</td></tr>
                     ) : (
                       goals.map((g) => {
                         const target = Number.parseFloat(g.target) || 0;
@@ -1065,11 +1060,19 @@ export default function Home() {
                               <td><input type="text" value={g.name} onChange={(e) => setGoalField(g.id, "name", e.target.value)} className={styles.goalInput} aria-label="Nombre del objetivo" /></td>
                               <td><div className={styles.amountCell}><input type="text" inputMode="decimal" value={g.target} onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setGoalField(g.id, "target", v); }} className={styles.goalInput} placeholder="Objetivo" aria-label="Importe objetivo" /><span className={styles.amountUnit}>€</span></div></td>
                               <td><div className={styles.amountCell}><input type="text" inputMode="decimal" value={g.current} onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setGoalField(g.id, "current", v); }} className={styles.goalInput} placeholder="Ahorrado" aria-label="Ahorrado" /><span className={styles.amountUnit}>€</span></div></td>
-                              <td><input type="text" value={g.deadline} onChange={(e) => setGoalField(g.id, "deadline", e.target.value)} className={styles.goalInput} placeholder="YYYY-MM" aria-label="Plazo" /></td>
+                              <td>
+                                <select value={g.bank} onChange={(e) => setGoalField(g.id, "bank", e.target.value)} className={`${styles.goalInput} ${styles.goalSelect}`} aria-label="Banco del objetivo">
+                                  <option value="">—</option>
+                                  {BANK_IDS.map((b) => (
+                                    <option key={b} value={b}>{BANK_LABELS[b]}</option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td><div className={styles.amountCell}><input type="text" inputMode="decimal" value={g.rate} onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setGoalField(g.id, "rate", v); }} className={styles.goalInput} placeholder="0" aria-label="Rentabilidad" /><span className={styles.amountUnit}>%</span></div></td>
                               <td><button type="button" className={styles.removeBtn} onClick={() => removeGoal(g.id)} aria-label={`Eliminar objetivo ${g.name}`}>×</button></td>
                             </tr>
                             <tr className={styles.goalProgressRow}>
-                              <td colSpan={5}>
+                              <td colSpan={6}>
                                 <div className={styles.goalProgress}>
                                   <div className={styles.progressBar}>
                                     <div className={styles.progressFill} style={{ width: `${pctVal}%`, background: barColor }} />
@@ -1079,7 +1082,7 @@ export default function Home() {
                               </td>
                             </tr>
                             <tr className={styles.goalNotesRow}>
-                              <td colSpan={5}>
+                              <td colSpan={6}>
                                 <AutoTextarea
                                   value={g.notes}
                                   onChange={(v) => setGoalField(g.id, "notes", v)}
@@ -1096,7 +1099,15 @@ export default function Home() {
                       <td><input type="text" value={goalName} onChange={(e) => setGoalName(e.target.value)} placeholder="Nombre" className={styles.goalInput} aria-label="Nombre del objetivo" /></td>
                       <td><div className={styles.amountCell}><input type="text" inputMode="decimal" value={goalTarget} onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setGoalTarget(v); }} className={styles.goalInput} placeholder="Objetivo" aria-label="Importe objetivo" /><span className={styles.amountUnit}>€</span></div></td>
                       <td><div className={styles.amountCell}><input type="text" inputMode="decimal" value={goalCurrent} onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setGoalCurrent(v); }} className={styles.goalInput} placeholder="Ahorrado" aria-label="Ahorrado" /><span className={styles.amountUnit}>€</span></div></td>
-                      <td><input type="text" value={goalDeadline} onChange={(e) => setGoalDeadline(e.target.value)} className={styles.goalInput} placeholder="YYYY-MM" aria-label="Plazo" /></td>
+                      <td>
+                        <select value={goalBank} onChange={(e) => setGoalBank(e.target.value as BankId | "")} className={`${styles.goalInput} ${styles.goalSelect}`} aria-label="Banco del objetivo">
+                          <option value="">—</option>
+                          {BANK_IDS.map((b) => (
+                            <option key={b} value={b}>{BANK_LABELS[b]}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td><div className={styles.amountCell}><input type="text" inputMode="decimal" value={goalRate} onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setGoalRate(v); }} className={styles.goalInput} placeholder="0" aria-label="Rentabilidad" /><span className={styles.amountUnit}>%</span></div></td>
                       <td><button type="button" className={styles.addBtn} onClick={addGoal}>Añadir</button></td>
                     </tr>
                   </tbody>

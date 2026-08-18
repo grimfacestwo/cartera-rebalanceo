@@ -267,7 +267,7 @@ describe("parseGoals", () => {
 
   it("filtra items sin id o name", () => {
     const raw = [
-      { id: "g1", name: "Viaje", target: "5000", current: "2000", deadline: "2026-12" },
+      { id: "g1", name: "Viaje", target: "5000", current: "2000", bank: "ing", rate: "3.5" },
       { id: "g2" },
       { name: "Sin id" },
       { id: 123, name: "Id numérico" },
@@ -280,18 +280,19 @@ describe("parseGoals", () => {
   it("conserva strings y pone defaults para faltantes", () => {
     const raw = [{ id: "g1", name: "Fondo" }];
     const goals = parseGoals(raw);
-    expect(goals[0]).toEqual({ id: "g1", name: "Fondo", target: "", current: "", deadline: "", notes: "" });
+    expect(goals[0]).toEqual({ id: "g1", name: "Fondo", target: "", current: "", bank: "", rate: "", notes: "" });
   });
 
   it("parsea goals válidos", () => {
     const raw = [
-      { id: "g1", name: "Viaje", target: "5000", current: "2000", deadline: "2026-12" },
-      { id: "g2", name: "Coche", target: "15000", current: "8000", deadline: "" },
+      { id: "g1", name: "Viaje", target: "5000", current: "2000", bank: "ing", rate: "3.5" },
+      { id: "g2", name: "Coche", target: "15000", current: "8000", bank: "", rate: "" },
     ];
     const goals = parseGoals(raw);
     expect(goals).toHaveLength(2);
     expect(goals[1].name).toBe("Coche");
-    expect(goals[1].deadline).toBe("");
+    expect(goals[1].bank).toBe("");
+    expect(goals[1].rate).toBe("");
   });
 
   it("parseState incluye goals por defecto", () => {
@@ -301,7 +302,7 @@ describe("parseGoals", () => {
 
   it("parseState parsea goals proporcionados", () => {
     const state = parseState({
-      goals: [{ id: "g1", name: "A", target: "100", current: "50", deadline: "" }],
+      goals: [{ id: "g1", name: "A", target: "100", current: "50", bank: "", rate: "" }],
     });
     expect(state.goals).toHaveLength(1);
     expect(state.goals[0].target).toBe("100");
