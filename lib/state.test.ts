@@ -10,6 +10,7 @@ import {
   DEFAULT_VALUES,
   monthLabel,
   parseExpenses,
+  parseFixedExpenses,
   parseGoals,
   parseState,
   sortMonthKeys,
@@ -180,6 +181,7 @@ describe("month helpers", () => {
         { id: "e2", name: "B", amount: "100", type: "variable" as const, bank: "ing" as const, paid: false, category: "otros" as const, recurring: false },
         { id: "e3", name: "C", amount: "50", type: "variable" as const, bank: "santander" as const, paid: true, category: "otros" as const, recurring: false },
       ],
+      fixed: [],
       comidaDaily: "40",
       comidaBank: "ing" as const,
     };
@@ -226,6 +228,7 @@ describe("comidaAmount", () => {
   const month = {
     banks: { ing: "500", santander: "200", trade: "100" },
     expenses: [],
+    fixed: [],
     comidaDaily: "40",
     comidaBank: "ing" as const,
   };
@@ -298,5 +301,54 @@ describe("parseGoals", () => {
     });
     expect(state.goals).toHaveLength(1);
     expect(state.goals[0].target).toBe("100");
+  });
+});
+
+describe("parseFixedExpenses", () => {
+  it("devuelve [] si no es array", () => {
+    expect(parseFixedExpenses(null)).toEqual([]);
+    expect(parseFixedExpenses("mal")).toEqual([]);
+  });
+
+  it("parsea con defaults para campos faltantes", () => {
+    const raw = [{ id: "f1", name: "Hipoteca", amount: "672.80" }];
+    const out = parseFixedExpenses(raw);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toEqual({ id: "f1", name: "Hipoteca", amount: "672.80", bank: "", category: "otros" });
+  });
+
+  it("respeta banco y categoría", () => {
+    const raw = [{ id: "f1", name: "Luz", amount: "50", bank: "ing", category: "vivienda" }];
+    const out = parseFixedExpenses(raw);
+    expect(out[0].bank).toBe("ing");
+    expect(out[0].category).toBe("vivienda");
+  });
+});
+
+describe("parseState + gastos fijos", () => {
+  it("incluye fixedExpenses por defecto", () => {
+    const state = parseState({});
+    expect(state.fixedExpenses.length).toBeGreaterThan(0);
+    expect(state.fixedExpenses[0].name).toBe("Hipoteca");
+  });
+
+  it("sema cada mes con los fijos de la plantilla", () => {
+    const state = parseState({
+      fixedExpenses: [{ id: "luz", name: "Luz", amount: "50", bank: "", category: "vivienda" }],
+      months: { "2026-08": { banks: { ing: "0", santander: "0", trade: "0" }, expenses: [], fixed: [], comidaDaily: "40", comidaBank: "ing" } },
+    });
+    const m = state.months["2026-08"];
+    expect(m.fixed).toHaveLength(1);
+    expect(m.fixed[0].id).toBe("luz");
+    expect(m.fixed[0].amount).toBe("50");
+  });
+
+  it("no duplica fijos ya presentes en el mes", () => {
+    const state = parseState({
+      fixedExpenses: [{ id: "luz", name: "Luz", amount: "50", bank: "", category: "vivienda" }],
+      months: { "2026-08": { banks: { ing: "0", santander: "0", trade: "0" }, expenses: [], fixed: [{ id: "luz", name: "Luz", amount: "99", type: "fijo", bank: "", paid: false, category: "vivienda", recurring: true }], comidaDaily: "40", comidaBank: "ing" } },
+    });
+    expect(state.months["2026-08"].fixed).toHaveLength(1);
+    expect(state.months["2026-08"].fixed[0].amount).toBe("99");
   });
 });

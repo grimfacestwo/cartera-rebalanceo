@@ -18,12 +18,14 @@ import {
   comidaAmount,
   currentMonthKey,
   daysRemaining,
+  DEFAULT_FIXED_EXPENSES,
   monthLabel,
   parseState,
   sortMonthKeys,
   type BankId,
   type CategoryId,
   type Expense,
+  type FixedExpense,
   type Goal,
   type MonthData,
   type PortfolioValues,
@@ -42,7 +44,7 @@ const pct = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 });
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 type TabId = "cartera" | "hogar" | "objetivos";
 
-const EMPTY_MONTH: MonthData = { banks: { ...DEFAULT_BANKS }, expenses: [], comidaDaily: "40", comidaBank: "ing" };
+const EMPTY_MONTH: MonthData = { banks: { ...DEFAULT_BANKS }, expenses: [], fixed: [], comidaDaily: "40", comidaBank: "ing" };
 
 function nextColor(assets: AssetDef[]): string {
   const used = new Set(assets.map((a) => a.color));
@@ -75,6 +77,10 @@ export default function Home() {
   const [newExpCategory, setNewExpCategory] = useState<CategoryId>("otros");
   const [newExpRecurring, setNewExpRecurring] = useState(false);
   const [goals, setGoals] = useState<Goal[]>([]);
+  const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>(DEFAULT_FIXED_EXPENSES);
+  const [newFixedName, setNewFixedName] = useState("");
+  const [newFixedAmount, setNewFixedAmount] = useState("");
+  const [newFixedCategory, setNewFixedCategory] = useState<CategoryId>("otros");
   const [expSearch, setExpSearch] = useState("");
   const [expSort, setExpSort] = useState<"paid" | "amount" | "name" | "category">("paid");
   const [expCategoryFilter, setExpCategoryFilter] = useState<CategoryId | "all">("all");
@@ -100,6 +106,7 @@ export default function Home() {
           setContribution(state.contribution);
           setMonths(state.months);
           setGoals(state.goals);
+          setFixedExpenses(state.fixedExpenses);
           const keys = sortMonthKeys(Object.keys(state.months));
           if (keys.length > 0) setActiveMonth(keys[keys.length - 1]);
           else setActiveMonth(currentMonthKey());
@@ -124,13 +131,13 @@ export default function Home() {
       fetch("/api/state", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assets, values, contribution, months, goals }),
+        body: JSON.stringify({ assets, values, contribution, months, goals, fixedExpenses }),
       })
         .then((res) => setSaveStatus(res.ok ? "saved" : "error"))
         .catch(() => setSaveStatus("error"));
     }, 500);
     return () => clearTimeout(timer);
-  }, [assets, values, contribution, months, goals, loading, loadError]);
+  }, [assets, values, contribution, months, goals, fixedExpenses, loading, loadError]);
 
   const retryLoad = () => { setLoadError(false); setLoading(true); setReloadKey((k) => k + 1); };
 
@@ -185,7 +192,7 @@ export default function Home() {
     setMonths((prev) => ({ ...prev, [activeMonth]: patch(prev[activeMonth] ?? { ...EMPTY_MONTH }) }));
   };
 
-  const activeData: MonthData = months[activeMonth] ?? { ...EMPTY_MONTH };
+  const activeData: MonthData = useMemo(() => months[activeMonth] ?? { ...EMPTY_MONTH }, [months, activeMonth]);
 
   // Banks
   const setBank = (id: BankId, v: string) => {
@@ -194,17 +201,19 @@ export default function Home() {
     }
   };
 
+  const allActiveExpenses = useMemo(() => [...activeData.fixed, ...activeData.expenses], [activeData]);
+
   const bankPendientes = (bankId: BankId) => {
-    const pen = activeData.expenses.filter((e) => e.bank === bankId && !e.paid).reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
+    const pen = allActiveExpenses.filter((e) => e.bank === bankId && !e.paid).reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
     return pen + (activeData.comidaBank === bankId ? activeComida : 0);
   };
 
   const bankTotal = BANK_IDS.reduce((s, id) => s + (Number.parseFloat(activeData.banks[id]) || 0), 0);
-  const totalExpensesBank = activeData.expenses.reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
+  const totalExpensesBank = allActiveExpenses.reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
   const activeDaysRemaining = daysRemaining(activeMonth);
   const activeComida = comidaAmount(activeData, activeMonth);
   const totalExpenses = totalExpensesBank + activeComida;
-  const totalPendientes = activeData.expenses.filter((e) => !e.paid).reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0) + activeComida;
+  const totalPendientes = allActiveExpenses.filter((e) => !e.paid).reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0) + activeComida;
   const remaining = bankTotal - totalPendientes;
 
   // Expenses
@@ -229,6 +238,13 @@ export default function Home() {
     updateMonth((m) => ({ ...m, expenses: m.expenses.filter((e) => e.id !== id) }));
   };
 
+  const setFixedField = (id: string, field: keyof Expense, val: unknown) => {
+    updateMonth((m) => ({
+      ...m,
+      fixed: m.fixed.map((e) => (e.id === id ? { ...e, [field]: val } : e)),
+    }));
+  };
+
   const newMonth = () => {
     const keys = sortMonthKeys(Object.keys(months));
     const lastKey = keys[keys.length - 1];
@@ -243,9 +259,11 @@ export default function Home() {
     const carriedExpenses = prev.expenses
       .filter((e) => e.recurring)
       .map((e) => ({ ...e, id: newId(), paid: false }));
+    const tmpl = fixedExpenses.length > 0 ? fixedExpenses : DEFAULT_FIXED_EXPENSES;
+    const seededFixed: Expense[] = tmpl.map((f) => ({ id: f.id, name: f.name, amount: f.amount, type: "fijo", bank: f.bank, paid: false, category: f.category, recurring: true }));
     setMonths((p) => {
       const prevMonth = lastKey ? p[lastKey] : undefined;
-      return { ...p, [nextKey]: { banks, expenses: carriedExpenses, comidaDaily: prevMonth?.comidaDaily ?? "40", comidaBank: prevMonth?.comidaBank ?? "ing" } };
+      return { ...p, [nextKey]: { banks, expenses: carriedExpenses, fixed: seededFixed, comidaDaily: prevMonth?.comidaDaily ?? "40", comidaBank: prevMonth?.comidaBank ?? "ing" } };
     });
     setActiveMonth(nextKey);
   };
@@ -262,9 +280,10 @@ export default function Home() {
 
   const sortedMonthKeys = sortMonthKeys(Object.keys(months));
   const activeExpenses = activeData.expenses;
-  const totalFijos = activeExpenses.filter((e) => e.type === "fijo").reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
-  const totalRecurring = activeExpenses.filter((e) => e.recurring).reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
-  const pagados = activeExpenses.filter((e) => e.paid).length;
+  const activeFixed = activeData.fixed;
+  const totalFijos = allActiveExpenses.filter((e) => e.type === "fijo").reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
+  const totalRecurring = allActiveExpenses.filter((e) => e.recurring).reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
+  const pagados = allActiveExpenses.filter((e) => e.paid).length;
   const sortedExpenses = useMemo(() => {
     let list = [...activeExpenses];
     if (expSearch) {
@@ -307,13 +326,13 @@ export default function Home() {
   // Category stats
   const categoryStats = useMemo(() => {
     const stats: Record<string, number> = {};
-    for (const e of activeExpenses) {
+    for (const e of allActiveExpenses) {
       stats[e.category] = (stats[e.category] || 0) + (Number.parseFloat(e.amount) || 0);
     }
     return Object.entries(stats)
       .sort((a, b) => b[1] - a[1])
       .map(([cat, total]) => ({ cat: cat as CategoryId, total }));
-  }, [activeExpenses]);
+  }, [allActiveExpenses]);
 
   // Expense trends per month
   const trendsData = useMemo(() => {
@@ -324,7 +343,7 @@ export default function Home() {
       const m = months[key];
       const cats: Record<string, number> = {};
       if (m) {
-        for (const e of m.expenses) {
+        for (const e of [...m.fixed, ...m.expenses]) {
           cats[e.category] = (cats[e.category] || 0) + (Number.parseFloat(e.amount) || 0);
         }
       }
@@ -342,13 +361,8 @@ export default function Home() {
   }, [trendsData]);
 
   // Notifications
-  const [notifEnabled, setNotifEnabled] = useState(false);
+  const [notifEnabled, setNotifEnabled] = useState(() => typeof Notification !== "undefined" && Notification.permission === "granted");
   const notifSentRef = useRef(false);
-
-  useEffect(() => {
-    if (typeof Notification === "undefined") return;
-    setNotifEnabled(Notification.permission === "granted");
-  }, []);
 
   useEffect(() => {
     if (!notifEnabled || notifSentRef.current) return;
@@ -385,7 +399,7 @@ export default function Home() {
 
   // Export/Import
   const handleExport = () => {
-    const payload = { assets, values, contribution, months, goals };
+    const payload = { assets, values, contribution, months, goals, fixedExpenses };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -412,6 +426,7 @@ export default function Home() {
           setContribution(state.contribution);
           setMonths(state.months);
           setGoals(state.goals);
+          setFixedExpenses(state.fixedExpenses);
           const keys = sortMonthKeys(Object.keys(state.months));
           if (keys.length > 0) setActiveMonth(keys[keys.length - 1]);
           else setActiveMonth(currentMonthKey());
@@ -421,7 +436,21 @@ export default function Home() {
       };
       reader.readAsText(file);
     };
-    input.click();
+      input.click();
+  };
+
+  // Fixed expenses template
+  const setFixedTemplateField = (id: string, field: keyof FixedExpense, val: string) => {
+    setFixedExpenses((prev) => prev.map((f) => (f.id === id ? { ...f, [field]: val } : f)));
+  };
+  const addFixedTemplate = () => {
+    const name = newFixedName.trim();
+    if (!name) return;
+    setFixedExpenses((prev) => [...prev, { id: newId(), name, amount: newFixedAmount, bank: "", category: newFixedCategory }]);
+    setNewFixedName(""); setNewFixedAmount("");
+  };
+  const removeFixedTemplate = (id: string) => {
+    setFixedExpenses((prev) => prev.filter((f) => f.id !== id));
   };
 
   return (
@@ -636,6 +665,35 @@ export default function Home() {
                       <td className={styles.hechoCell}>—</td>
                       <td />
                     </tr>
+                    {activeFixed.length > 0 && (
+                      <tr className={styles.fixedHeaderRow}>
+                        <td colSpan={10}>Gastos fijos</td>
+                      </tr>
+                    )}
+                    {activeFixed.map((e) => (
+                      <tr key={e.id} className={`${styles.fixedRow} ${e.paid ? styles.done : ""}`}>
+                        <td><span className={styles.fixedName}>{e.name}</span></td>
+                        <td>
+                          <div className={styles.amountCell}>
+                            <input type="text" inputMode="decimal" value={e.amount} onChange={(ev) => { const v = ev.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setFixedField(e.id, "amount", v); }} className={styles.expenseInput} aria-label={`Importe de ${e.name}`} style={{ width: 4 + "rem" }} />
+                            <span className={styles.amountUnit}>€</span>
+                          </div>
+                        </td>
+                        <td>
+                          <select value={e.category} onChange={(ev) => setFixedField(e.id, "category", ev.target.value as CategoryId)} className={styles.expenseSelect} aria-label={`Categoría de ${e.name}`} style={{ fontSize: "0.8rem" }}>
+                            {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
+                          </select>
+                        </td>
+                        {BANK_IDS.map((b) => (
+                          <td key={b} className={styles.bankCell} onClick={() => setFixedField(e.id, "bank", e.bank === b ? "" : b)}>
+                            {e.bank === b && <span className={styles.bankDot} style={{ background: BANK_COLORS[b] }} />}
+                          </td>
+                        ))}
+                        <td>Fijo</td>
+                        <td className={styles.hechoCell}><input type="checkbox" checked={e.paid} onChange={(ev) => setFixedField(e.id, "paid", ev.target.checked)} aria-label={`Hecho ${e.name}`} /></td>
+                        <td />
+                      </tr>
+                    ))}
                     {sortedExpenses.map((e) => (
                       <tr key={e.id} className={e.paid ? styles.done : ""}>
                         <td><input type="text" value={e.name} onChange={(ev) => setExpField(e.id, "name", ev.target.value)} className={styles.expenseInput} aria-label="Nombre del gasto" /></td>
@@ -711,7 +769,7 @@ export default function Home() {
                       const saldo = Number.parseFloat(activeData.banks[id]) || 0;
                       const gastos = bankPendientes(id);
                       const rest = saldo - gastos;
-                      const pendItems = activeData.expenses.filter((e) => e.bank === id && !e.paid);
+                      const pendItems = allActiveExpenses.filter((e) => e.bank === id && !e.paid);
                       const pendLines = [
                         ...pendItems.map((e) => `${e.name}: ${currency.format(Number.parseFloat(e.amount) || 0)}`),
                         ...(activeData.comidaBank === id && activeComida > 0 ? [`Comida: ${currency.format(activeComida)}`] : []),
@@ -850,6 +908,27 @@ export default function Home() {
                 </div>
               ))}
               {Math.abs(targetSum - 100) > 0.01 && <p className={styles.note}>Los objetivos suman {pct.format(targetSum)}%; se ajustan a 100% automáticamente.</p>}
+              <h3>Gastos fijos (plantilla)</h3>
+              <p className={styles.note}>Estos gastos aparecen automáticamente cada mes. Edita aquí los importes y categorías por defecto; luego puedes cambiarlos mes a mes en la pestaña Hogar.</p>
+              {fixedExpenses.length === 0 ? <p className={styles.empty}>Sin gastos fijos.</p> : fixedExpenses.map((f) => (
+                <div key={f.id} className={styles.settingRow}>
+                  <input type="text" value={f.name} onChange={(e) => setFixedTemplateField(f.id, "name", e.target.value)} aria-label={`Nombre de ${f.name}`} className={styles.settingInput} />
+                  <input type="text" inputMode="decimal" value={f.amount} onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setFixedTemplateField(f.id, "amount", v); }} placeholder="0" aria-label={`Importe de ${f.name}`} className={styles.settingAmount} />
+                  <span className={styles.settingPct}>€</span>
+                  <select value={f.category} onChange={(e) => setFixedTemplateField(f.id, "category", e.target.value as CategoryId)} aria-label={`Categoría de ${f.name}`} className={styles.expenseSelect}>
+                    {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
+                  </select>
+                  <button type="button" className={styles.removeBtn} onClick={() => removeFixedTemplate(f.id)} aria-label={`Eliminar ${f.name}`} title={`Eliminar ${f.name}`}>×</button>
+                </div>
+              ))}
+              <div className={styles.addRow}>
+                <input type="text" value={newFixedName} onChange={(e) => setNewFixedName(e.target.value)} placeholder="Nuevo gasto fijo" aria-label="Nombre del gasto fijo" />
+                <input type="text" inputMode="decimal" value={newFixedAmount} onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setNewFixedAmount(v); }} placeholder="0" aria-label="Importe" className={styles.addTarget} />
+                <select value={newFixedCategory} onChange={(e) => setNewFixedCategory(e.target.value as CategoryId)} aria-label="Categoría" className={styles.expenseSelect}>
+                  {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
+                </select>
+                <button type="button" className={styles.addBtn} onClick={addFixedTemplate}>Añadir</button>
+              </div>
               <h3>Añadir activo</h3>
               <div className={styles.addRow}>
                 <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nombre del activo" aria-label="Nombre del activo" />

@@ -57,6 +57,28 @@ export type Goal = {
   deadline: string;
 };
 
+export type FixedExpense = {
+  id: string;
+  name: string;
+  amount: string;
+  bank: BankId | "";
+  category: CategoryId;
+};
+
+export const DEFAULT_FIXED_EXPENSES: FixedExpense[] = [
+  { id: "hipoteca", name: "Hipoteca", amount: "672.80", bank: "", category: "vivienda" },
+  { id: "digi", name: "Digi", amount: "28", bank: "", category: "suscripciones" },
+  { id: "comunidad", name: "Comunidad", amount: "55.60", bank: "", category: "vivienda" },
+  { id: "combustible", name: "Combustible", amount: "120", bank: "", category: "transporte" },
+  { id: "primitiva", name: "Primitiva", amount: "60", bank: "", category: "ocio" },
+  { id: "gym", name: "Gym", amount: "75", bank: "", category: "salud" },
+  { id: "sharesub", name: "Sharesub", amount: "30", bank: "", category: "suscripciones" },
+  { id: "ahorro", name: "Ahorro", amount: "70", bank: "", category: "otros" },
+  { id: "finanzas", name: "Finanzas", amount: "60", bank: "", category: "otros" },
+  { id: "aportacion", name: "Aportacion", amount: "90", bank: "", category: "otros" },
+  { id: "comedor", name: "Comedor", amount: "180", bank: "", category: "alimentacion" },
+];
+
 export const BANK_IDS = ["ing", "santander", "trade"] as const;
 export type BankId = (typeof BANK_IDS)[number];
 
@@ -81,6 +103,7 @@ export const DEFAULT_BANKS: Record<BankId, string> = {
 export type MonthData = {
   banks: Record<BankId, string>;
   expenses: Expense[];
+  fixed: Expense[];
   comidaDaily: string;
   comidaBank: BankId | "";
 };
@@ -91,6 +114,7 @@ export type PortfolioState = {
   contribution: string;
   months: Record<string, MonthData>;
   goals: Goal[];
+  fixedExpenses: FixedExpense[];
 };
 
 export const DEFAULT_ASSETS: AssetDef[] = [
@@ -111,6 +135,7 @@ export const DEFAULT_STATE: PortfolioState = {
   contribution: "",
   months: {},
   goals: [],
+  fixedExpenses: DEFAULT_FIXED_EXPENSES,
 };
 
 export const PALETTE = [
@@ -251,6 +276,30 @@ export function parseExpenses(raw: unknown): Expense[] {
   return out;
 }
 
+export function parseFixedExpenses(raw: unknown): FixedExpense[] {
+  if (!Array.isArray(raw)) return [];
+  const out: FixedExpense[] = [];
+  for (const item of raw) {
+    if (item && typeof item === "object") {
+      const o = item as Record<string, unknown>;
+      if (typeof o.id === "string" && typeof o.name === "string") {
+        out.push({
+          id: o.id,
+          name: o.name,
+          amount: typeof o.amount === "string" ? o.amount : "",
+          bank: typeof o.bank === "string" && (BANK_IDS.includes(o.bank as BankId) || o.bank === "")
+            ? (o.bank as BankId | "")
+            : "",
+          category: CATEGORIES.includes(o.category as CategoryId)
+            ? (o.category as CategoryId)
+            : "otros",
+        });
+      }
+    }
+  }
+  return out;
+}
+
 export function parseGoals(raw: unknown): Goal[] {
   if (!Array.isArray(raw)) return [];
   const out: Goal[] = [];
@@ -277,6 +326,7 @@ function parseMonthData(raw: unknown): MonthData | null {
   return {
     banks: parseBanks(o.banks),
     expenses: parseExpenses(o.expenses),
+    fixed: parseExpenses(o.fixed),
     comidaDaily: typeof o.comidaDaily === "string"
       ? o.comidaDaily
       : typeof o.comidaDaily === "number"
@@ -322,11 +372,27 @@ export function parseState(raw: unknown): PortfolioState {
         [currentMonthKey()]: {
           banks: legacyBanks,
           expenses: legacyExpenses,
+          fixed: [],
           comidaDaily: "40",
           comidaBank: "ing",
         },
       };
     }
+  }
+
+  const fixedExpenses = o.fixedExpenses !== undefined ? parseFixedExpenses(o.fixedExpenses) : DEFAULT_FIXED_EXPENSES;
+  const tmpl = fixedExpenses.length > 0 ? fixedExpenses : DEFAULT_FIXED_EXPENSES;
+
+  for (const key of Object.keys(months)) {
+    const m = months[key];
+    const present = new Set(m.fixed.map((e) => e.id));
+    const seeded = [...m.fixed];
+    for (const f of tmpl) {
+      if (!present.has(f.id)) {
+        seeded.push({ id: f.id, name: f.name, amount: f.amount, type: "fijo", bank: f.bank, paid: false, category: f.category, recurring: true });
+      }
+    }
+    months[key] = { ...m, fixed: seeded };
   }
 
   return {
@@ -335,5 +401,6 @@ export function parseState(raw: unknown): PortfolioState {
     contribution: typeof o.contribution === "string" ? o.contribution : "",
     months,
     goals: parseGoals(o.goals),
+    fixedExpenses,
   };
 }

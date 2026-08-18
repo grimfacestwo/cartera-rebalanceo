@@ -1233,3 +1233,60 @@
 [data-theme="dark"] .trendLabel {
   color: #64748b;
 }
+
+.fixedHeaderRow td {
+  padding: 0.5rem 0.4rem 0.2rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  border-top: 1px solid #e2e8f0;
+}
+
+[data-theme="dark"] .fixedHeaderRow td {
+  color: #94a3b8;
+  border-top-color: #334155;
+}
+
+.fixedRow td {
+  background: rgba(59, 130, 246, 0.04);
+}
+
+[data-theme="dark"] .fixedRow td {
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.fixedName {
+  font-weight: 600;
+}
+
+.settingInput {
+  flex: 2;
+  min-width: 0;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  background: #fff;
+  color: #0f172a;
+}
+
+.settingAmount {
+  width: 4.5rem;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  background: #fff;
+  color: #0f172a;
+}
+
+[data-theme="dark"] .settingInput,
+[data-theme="dark"] .settingAmount {
+  background: #1e293b;
+  border-color: #334155;
+  color: #e2e8f0;
+}
