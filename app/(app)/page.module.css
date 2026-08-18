@@ -795,14 +795,16 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin-bottom: 0.3rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid #e2e8f0;
-  font-size: 0.7rem;
-  font-weight: 700;
+  margin-bottom: 0;
+  padding: 0.5rem 0.6rem;
+  background: #f1f5f9;
+  border-bottom: 2px solid #e2e8f0;
+  border-radius: 8px 8px 0 0;
+  font-size: 0.75rem;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #3b82f6;
+  letter-spacing: 0.05em;
+  color: #475569;
 }
 
 .goalHeader span {
@@ -820,8 +822,9 @@
 }
 
 [data-theme="dark"] .goalHeader {
-  color: #60a5fa;
-  border-top-color: #334155;
+  background: #1a2332;
+  color: #94a3b8;
+  border-bottom-color: #334155;
 }
 
 .goalFields {
