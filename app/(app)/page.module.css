@@ -185,7 +185,7 @@
   border-radius: 12px;
   padding: 1.5rem;
   width: 100%;
-  max-width: 420px;
+  max-width: 720px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
 }
 
@@ -444,7 +444,6 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 0.5rem 0.6rem;
-  border-bottom: 2px solid #e2e8f0;
 }
 
 .table th:first-child {
@@ -457,7 +456,6 @@
 
 .table td {
   padding: 0.55rem 0.6rem;
-  border-bottom: 1px solid #f1f5f9;
 }
 
 .cellName {
@@ -468,7 +466,6 @@
 }
 
 .totalRow td {
-  border-top: 2px solid #e2e8f0;
   font-weight: 700;
   color: #0f172a;
 }
@@ -812,7 +809,6 @@
 }
 
 .goalProgressRow td {
-  border-top: 1px solid #f1f5f9;
   padding-top: 0.2rem;
   padding-bottom: 0.2rem;
 }
@@ -820,7 +816,6 @@
 .goalNotesRow td {
   padding-top: 0;
   padding-bottom: 1rem;
-  border-bottom: 1px solid #f1f5f9;
 }
 
 .goalNotes {
@@ -845,18 +840,6 @@
 .goalNotes:focus {
   outline: none;
   background: #f8fafc;
-}
-
-.goalAddRow td {
-  border-bottom: none;
-}
-
-[data-theme="dark"] .goalProgressRow td {
-  border-top-color: #1e293b;
-}
-
-[data-theme="dark"] .goalNotesRow td {
-  border-bottom-color: #1e293b;
 }
 
 [data-theme="dark"] .goalNotes {
@@ -1057,16 +1040,13 @@
 [data-theme="dark"] .table th {
   background: #1a2332;
   color: #94a3b8;
-  border-bottom-color: #334155;
 }
 
 [data-theme="dark"] .table td {
-  border-bottom-color: #1e293b;
   color: #e2e8f0;
 }
 
 [data-theme="dark"] .totalRow td {
-  border-top-color: #334155;
 }
 
 [data-theme="dark"] .note {
@@ -1168,10 +1148,6 @@
 
 [data-theme="dark"] .progressBar {
   background: #334155;
-}
-
-[data-theme="dark"] .goalRow {
-  border-bottom-color: #334155;
 }
 
 [data-theme="dark"] .tabs {
@@ -1381,7 +1357,6 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: #64748b;
-  border-top: 1px solid #e2e8f0;
   cursor: pointer;
   user-select: none;
 }
@@ -1397,7 +1372,6 @@
 
 [data-theme="dark"] .paidHeaderRow td {
   color: #94a3b8;
-  border-top-color: #334155;
 }
 
 [data-theme="dark"] .paidHeaderRow td:hover {
