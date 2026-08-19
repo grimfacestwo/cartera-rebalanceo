@@ -15,17 +15,21 @@ export async function sha256Hex(input: string): Promise<string> {
 let cachedToken: string | null | undefined;
 
 export async function expectedToken(): Promise<string | null> {
-  if (cachedToken !== undefined) return cachedToken;
   const password = getSitePassword();
-  cachedToken = password ? await sha256Hex(password) : null;
+  if (!password) return null;
+  if (cachedToken !== undefined) return cachedToken;
+  cachedToken = await sha256Hex(password);
   return cachedToken;
 }
 
 export function safeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) {
-    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  const enc = new TextEncoder();
+  const ab = enc.encode(a);
+  const bb = enc.encode(b);
+  let diff = ab.length ^ bb.length;
+  const len = Math.max(ab.length, bb.length);
+  for (let i = 0; i < len; i++) {
+    diff |= (ab[i] ?? 0) ^ (bb[i] ?? 0);
   }
   return diff === 0;
 }

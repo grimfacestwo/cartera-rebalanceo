@@ -257,7 +257,7 @@ function parseAssets(raw: unknown): AssetDef[] {
 
 function parseValues(raw: unknown): PortfolioValues {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
-  const out: PortfolioValues = {};
+  const out = Object.create(null) as PortfolioValues;
   for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
     if (typeof v === "number") out[k] = String(v);
     else if (typeof v === "string") out[k] = v;
@@ -422,7 +422,7 @@ function parseMonthData(raw: unknown): MonthData | null {
 
 function parseMonths(raw: unknown): Record<string, MonthData> {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
-  const out: Record<string, MonthData> = {};
+  const out = Object.create(null) as Record<string, MonthData>;
   for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
     const parsed = parseMonthData(v);
     if (parsed) out[k] = parsed;
