@@ -96,6 +96,34 @@ function AutoTextarea({
   );
 }
 
+function BankPicker({
+  value,
+  onChange,
+  ariaLabel,
+}: {
+  value: BankId | "";
+  onChange: (b: BankId | "") => void;
+  ariaLabel: string;
+}) {
+  return (
+    <div className={styles.fixedBankPick} role="group" aria-label={ariaLabel}>
+      {BANK_IDS.map((b) => (
+        <button
+          type="button"
+          key={b}
+          className={styles.bankPickDot}
+          onClick={() => onChange(value === b ? "" : b)}
+          aria-label={BANK_LABELS[b]}
+          aria-pressed={value === b}
+          title={BANK_LABELS[b]}
+        >
+          <span className={styles.bankDot} style={{ background: value === b ? BANK_COLORS[b] : "#cbd5e1" }} />
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function Home() {
   const [assets, setAssets] = useState<AssetDef[]>(DEFAULT_ASSETS);
   const [values, setValues] = useState<PortfolioValues>(DEFAULT_VALUES);
@@ -123,6 +151,7 @@ export default function Home() {
   const [newFixedName, setNewFixedName] = useState("");
   const [newFixedAmount, setNewFixedAmount] = useState("");
   const [newFixedCategory, setNewFixedCategory] = useState<CategoryId>("otros");
+  const [newFixedBank, setNewFixedBank] = useState<BankId | "">("");
   const [expSearch, setExpSearch] = useState("");
   const [expSort, setExpSort] = useState<"paid" | "amount" | "name" | "category">("paid");
   const [expCategoryFilter, setExpCategoryFilter] = useState<CategoryId | "all">("all");
@@ -549,8 +578,8 @@ export default function Home() {
   const addFixedTemplate = () => {
     const name = newFixedName.trim();
     if (!name) return;
-    setFixedExpenses((prev) => [...prev, { id: newId(), name, amount: newFixedAmount, bank: "", category: newFixedCategory }]);
-    setNewFixedName(""); setNewFixedAmount("");
+    setFixedExpenses((prev) => [...prev, { id: newId(), name, amount: newFixedAmount, bank: newFixedBank, category: newFixedCategory }]);
+    setNewFixedName(""); setNewFixedAmount(""); setNewFixedBank("");
   };
   const removeFixedTemplate = (id: string) => {
     setFixedExpenses((prev) => prev.filter((f) => f.id !== id));
@@ -1139,7 +1168,7 @@ export default function Home() {
               ))}
               {Math.abs(targetSum - 100) > 0.01 && <p className={styles.note}>Los objetivos suman {pct.format(targetSum)}%; se ajustan a 100% automáticamente.</p>}
               <h3>Gastos fijos (plantilla)</h3>
-              <p className={styles.note}>Estos gastos aparecen automáticamente cada mes. Edita aquí los importes y categorías por defecto; luego puedes cambiarlos mes a mes en la pestaña Hogar.</p>
+              <p className={styles.note}>Estos gastos aparecen automáticamente cada mes. Elige aquí el importe, la categoría y el banco por defecto; luego puedes ajustarlos mes a mes en la pestaña Hogar.</p>
               {fixedExpenses.length === 0 ? <p className={styles.empty}>Sin gastos fijos.</p> : fixedExpenses.map((f) => (
                 <div key={f.id} className={styles.settingRow}>
                   <input type="text" value={f.name} onChange={(e) => setFixedTemplateField(f.id, "name", e.target.value)} aria-label={`Nombre de ${f.name}`} className={styles.settingInput} />
@@ -1148,6 +1177,7 @@ export default function Home() {
                   <select value={f.category} onChange={(e) => setFixedTemplateField(f.id, "category", e.target.value as CategoryId)} aria-label={`Categoría de ${f.name}`} className={styles.expenseSelect}>
                     {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
                   </select>
+                  <BankPicker value={f.bank} onChange={(b) => setFixedTemplateField(f.id, "bank", b)} ariaLabel={`Banco de ${f.name}`} />
                   <button type="button" className={styles.removeBtn} onClick={() => removeFixedTemplate(f.id)} aria-label={`Eliminar ${f.name}`} title={`Eliminar ${f.name}`}>×</button>
                 </div>
               ))}
@@ -1157,6 +1187,7 @@ export default function Home() {
                 <select value={newFixedCategory} onChange={(e) => setNewFixedCategory(e.target.value as CategoryId)} aria-label="Categoría" className={styles.expenseSelect}>
                   {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
                 </select>
+                <BankPicker value={newFixedBank} onChange={setNewFixedBank} ariaLabel="Banco del nuevo gasto fijo" />
                 <button type="button" className={styles.addBtn} onClick={addFixedTemplate}>Añadir</button>
               </div>
               <h3>Reglas de categorización</h3>

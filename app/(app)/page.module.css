@@ -765,6 +765,27 @@
   border-radius: 50%;
 }
 
+.fixedBankPick {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.bankPickDot {
+  border: none;
+  background: transparent;
+  padding: 0.15rem;
+  margin: 0;
+  cursor: pointer;
+  border-radius: 50%;
+  line-height: 0;
+  transition: background 0.12s;
+}
+
+.bankPickDot:hover {
+  background: #f1f5f9;
+}
+
 .done {
   opacity: 0.45;
 }
@@ -1423,6 +1444,10 @@
   background: #1e293b;
   border-color: #334155;
   color: #e2e8f0;
+}
+
+[data-theme="dark"] .bankPickDot:hover {
+  background: #1e293b;
 }
 
 .anomaly td {
