@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { sql } from "@vercel/postgres";
 import { expectedToken, safeEqual } from "@/lib/auth";
+import { BodyTooLargeError, readJsonLimited } from "@/lib/body";
 import { ensureSectionTable } from "@/lib/db";
+
+const MAX_BODY_BYTES = 16 * 1024 * 1024;
 
 const SLUG_RE = /^[a-z0-9-]+$/;
 
@@ -53,8 +56,11 @@ export async function PUT(
   }
   let raw: unknown;
   try {
-    raw = await request.json();
-  } catch {
+    raw = await readJsonLimited(request, MAX_BODY_BYTES);
+  } catch (e) {
+    if (e instanceof BodyTooLargeError) {
+      return NextResponse.json({ error: "Cuerpo demasiado grande" }, { status: 413 });
+    }
     return NextResponse.json({ error: "Cuerpo no válido" }, { status: 400 });
   }
   const data: unknown =

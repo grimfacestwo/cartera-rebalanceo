@@ -62,7 +62,7 @@ export default function NoteSection({ slug }: { slug: string }) {
   if (loading) {
     return (
       <div style={{ padding: "1.5rem" }}>
-        <p style={{ color: "#94a3b8" }}>Cargando…</p>
+        <p style={{ color: "var(--c-muted)" }}>Cargando…</p>
       </div>
     );
   }
@@ -70,15 +70,15 @@ export default function NoteSection({ slug }: { slug: string }) {
   if (loadError) {
     return (
       <div style={{ padding: "1.5rem" }}>
-        <p style={{ color: "#94a3b8" }}>No se pudo cargar el contenido.</p>
+        <p style={{ color: "var(--c-muted)" }}>No se pudo cargar el contenido.</p>
         <button
           type="button"
           onClick={retry}
           style={{
             marginTop: "0.5rem",
             padding: "0.4rem 1rem",
-            background: "#334155",
-            color: "#e2e8f0",
+            background: "var(--c-btn)",
+            color: "var(--c-btn-text)",
             border: "none",
             borderRadius: 6,
             cursor: "pointer",
@@ -101,10 +101,10 @@ export default function NoteSection({ slug }: { slug: string }) {
           style={{
             flex: 1,
             padding: "0.75rem",
-            background: "#1e293b",
-            border: "1px solid #334155",
+            background: "var(--c-surface)",
+            border: "1px solid var(--c-border)",
             borderRadius: 8,
-            color: "#e2e8f0",
+            color: "var(--c-text)",
             fontSize: "0.9rem",
             resize: "vertical",
             fontFamily: "inherit",
@@ -116,7 +116,7 @@ export default function NoteSection({ slug }: { slug: string }) {
         <p
           role="status"
           style={{
-            color: saveStatus === "error" ? "#ef4444" : "#22c55e",
+            color: saveStatus === "error" ? "var(--c-danger)" : "var(--c-ok)",
             fontSize: "0.8rem",
             margin: "0.5rem 0 0",
           }}

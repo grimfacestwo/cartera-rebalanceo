@@ -1,10 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { expectedToken } from "@/lib/auth";
+import { expectedToken, safeEqual } from "@/lib/auth";
 
 export async function proxy(request: NextRequest) {
   const token = await expectedToken();
   if (token === null) return NextResponse.next();
-  if (request.cookies.get("site_auth")?.value !== token) {
+  const cookie = request.cookies.get("site_auth")?.value;
+  if (cookie === undefined || !safeEqual(cookie, token)) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.search = "";

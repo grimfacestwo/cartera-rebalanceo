@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { sql } from "@vercel/postgres";
 import { expectedToken, safeEqual } from "@/lib/auth";
+import { BodyTooLargeError, readJsonLimited } from "@/lib/body";
 import { DEFAULT_STATE, parseState } from "@/lib/state";
 
 async function isAuthed(): Promise<boolean> {
@@ -75,14 +76,13 @@ export async function PUT(request: Request) {
   if (!(await isAuthed())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
-  const cl = request.headers.get("content-length");
-  if (cl && Number(cl) > MAX_BODY_BYTES) {
-    return NextResponse.json({ error: "Cuerpo demasiado grande" }, { status: 413 });
-  }
   let raw: unknown;
   try {
-    raw = await request.json();
-  } catch {
+    raw = await readJsonLimited(request, MAX_BODY_BYTES);
+  } catch (e) {
+    if (e instanceof BodyTooLargeError) {
+      return NextResponse.json({ error: "Cuerpo demasiado grande" }, { status: 413 });
+    }
     return NextResponse.json({ error: "Cuerpo no válido" }, { status: 400 });
   }
   const state = parseState(raw);

@@ -21,3 +21,31 @@ a {
   color: inherit;
   text-decoration: none;
 }
+
+:root {
+  --c-text: #0f172a;
+  --c-muted: #64748b;
+  --c-surface: #e2e8f0;
+  --c-card: #ffffff;
+  --c-border: #e2e8f0;
+  --c-btn: #e2e8f0;
+  --c-btn-text: #0f172a;
+  --c-accent: #3b82f6;
+  --c-danger: #ef4444;
+  --c-ok: #22c55e;
+  --c-warn: #f59e0b;
+}
+
+[data-theme="dark"] {
+  --c-text: #e2e8f0;
+  --c-muted: #94a3b8;
+  --c-surface: #1e293b;
+  --c-card: #0f172a;
+  --c-border: #1e293b;
+  --c-btn: #334155;
+  --c-btn-text: #e2e8f0;
+  --c-accent: #3b82f6;
+  --c-danger: #ef4444;
+  --c-ok: #22c55e;
+  --c-warn: #f59e0b;
+}
