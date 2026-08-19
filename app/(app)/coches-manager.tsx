@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import c from "./coches.module.css";
 import {
   type CarDocument,
   type CochesState,
@@ -27,51 +28,55 @@ import {
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 const STATUS_COLORS: Record<RevisionStatus, string> = {
-  done: "#22c55e",
-  overdue: "#ef4444",
-  soon: "#f59e0b",
-  future: "#94a3b8",
+  done: "var(--c-ok)",
+  overdue: "var(--c-danger)",
+  soon: "var(--c-warn)",
+  future: "var(--c-muted)",
 };
 
 const MNT_STATUS_COLORS: Record<MaintenanceStatus, string> = {
-  ok: "#22c55e",
-  overdue: "#ef4444",
-  soon: "#f59e0b",
-  unknown: "#94a3b8",
+  ok: "var(--c-ok)",
+  overdue: "var(--c-danger)",
+  soon: "var(--c-warn)",
+  unknown: "var(--c-muted)",
 };
 
 const inputStyle: CSSProperties = {
   padding: "0.5rem",
-  background: "#1e293b",
-  border: "1px solid #334155",
+  background: "var(--c-surface)",
+  border: "1px solid var(--c-border)",
   borderRadius: 8,
-  color: "#e2e8f0",
+  color: "var(--c-text)",
   fontSize: "0.85rem",
   fontFamily: "inherit",
+  width: "100%",
 };
 
 const btnStyle: CSSProperties = {
   padding: "0.4rem 0.9rem",
-  background: "#334155",
-  color: "#e2e8f0",
+  background: "var(--c-btn)",
+  color: "var(--c-btn-text)",
   border: "none",
   borderRadius: 6,
   cursor: "pointer",
   fontSize: "0.85rem",
   whiteSpace: "nowrap",
+  fontFamily: "inherit",
 };
 
 const btnDanger: CSSProperties = {
   ...btnStyle,
   background: "transparent",
-  color: "#ef4444",
+  color: "var(--c-danger)",
 };
 
 const cardStyle: CSSProperties = {
-  padding: "0.75rem",
-  background: "#0f172a",
-  border: "1px solid #1e293b",
-  borderRadius: 10,
+  padding: "1.25rem 1.5rem",
+  background: "var(--c-card)",
+  border: "1px solid var(--c-border)",
+  borderRadius: 12,
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
+  marginBottom: "1rem",
 };
 
 const fieldGrid: CSSProperties = {
@@ -162,8 +167,8 @@ export default function CochesManager() {
 
   if (loadError) {
     return (
-      <div style={{ padding: "1.5rem" }}>
-        <p style={{ color: "#94a3b8" }}>No se pudo cargar el contenido.</p>
+      <div className={c.page}>
+        <p style={{ color: "var(--c-muted)" }}>No se pudo cargar el contenido.</p>
         <button type="button" onClick={retry} style={btnStyle}>
           Reintentar
         </button>
@@ -173,8 +178,8 @@ export default function CochesManager() {
 
   if (!state) {
     return (
-      <div style={{ padding: "1.5rem" }}>
-        <p style={{ color: "#94a3b8" }}>Cargando…</p>
+      <div className={c.page}>
+        <p style={{ color: "var(--c-muted)" }}>Cargando…</p>
       </div>
     );
   }
@@ -394,14 +399,14 @@ export default function CochesManager() {
   };
 
   return (
-    <div style={{ padding: "1.5rem" }}>
+    <div className={c.page}>
       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1rem" }}>
-        <h1 style={{ fontSize: "1.2rem", margin: 0, color: "#e2e8f0" }}>Coches</h1>
+        <h1 style={{ fontSize: "1.2rem", margin: 0, color: "var(--c-text)" }}>Coches</h1>
         {saveStatus !== "idle" && (
           <span
             role="status"
             style={{
-              color: saveStatus === "error" ? "#ef4444" : "#22c55e",
+              color: saveStatus === "error" ? "var(--c-danger)" : "var(--c-ok)",
               fontSize: "0.8rem",
             }}
           >
@@ -420,8 +425,8 @@ export default function CochesManager() {
               onClick={() => setActiveId(v.id)}
               style={{
                 ...btnStyle,
-                background: isActive ? "#3b82f6" : "#1e293b",
-                color: isActive ? "#ffffff" : "#e2e8f0",
+                background: isActive ? "var(--c-accent)" : "var(--c-border)",
+                color: isActive ? "#ffffff" : "var(--c-text)",
                 fontWeight: 500,
               }}
             >
@@ -429,7 +434,7 @@ export default function CochesManager() {
             </button>
           );
         })}
-        <button type="button" onClick={addVehicle} style={{ ...btnStyle, border: "1px dashed #475569" }}>
+        <button type="button" onClick={addVehicle} style={{ ...btnStyle, border: `1px dashed var(--c-muted)` }}>
           + Añadir
         </button>
       </div>
@@ -438,7 +443,7 @@ export default function CochesManager() {
         <>
           <div style={{ ...cardStyle, marginBottom: "1.25rem" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
-              <h2 style={{ fontSize: "0.95rem", margin: 0, color: "#e2e8f0", flex: 1 }}>
+              <h2 style={{ fontSize: "0.95rem", margin: 0, color: "var(--c-text)", flex: 1 }}>
                 Ficha del vehículo
               </h2>
               <button type="button" onClick={() => deleteVehicle(active.id)} style={btnDanger}>
@@ -479,19 +484,19 @@ export default function CochesManager() {
 
           {repairs.length > 0 && (
             <div style={{ ...cardStyle, marginBottom: "1.25rem" }}>
-              <h2 style={{ fontSize: "0.95rem", margin: "0 0 0.75rem", color: "#e2e8f0" }}>
+              <h2 style={{ fontSize: "0.95rem", margin: "0 0 0.75rem", color: "var(--c-text)" }}>
                 Estadísticas
               </h2>
               {yearStats.length > 0 && (
                 <div style={{ marginBottom: "0.75rem" }}>
-                  <h3 style={{ fontSize: "0.85rem", margin: "0 0 0.4rem", color: "#94a3b8" }}>
+                  <h3 style={{ fontSize: "0.85rem", margin: "0 0 0.4rem", color: "var(--c-muted)" }}>
                     Coste por año
                   </h3>
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
                     {yearStats.map((s) => (
                       <div
                         key={s.label}
-                        style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", color: "#e2e8f0" }}
+                        style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", color: "var(--c-text)" }}
                       >
                         <span>{s.label}</span>
                         <span>{fmtCost(s.total)}</span>
@@ -501,10 +506,10 @@ export default function CochesManager() {
                 </div>
               )}
               {perKm && (
-                <p style={{ color: "#94a3b8", fontSize: "0.85rem", margin: "0 0 0.75rem" }}>
+                <p style={{ color: "var(--c-muted)", fontSize: "0.85rem", margin: "0 0 0.75rem" }}>
                   Coste por km: {fmtCost(perKm.total)} ÷{" "}
                   {Number.parseFloat(active?.currentKm ?? "") || 0} km ={" "}
-                  <span style={{ color: "#e2e8f0" }}>
+                  <span style={{ color: "var(--c-text)" }}>
                     {new Intl.NumberFormat("es-ES", {
                       style: "currency",
                       currency: "EUR",
@@ -517,14 +522,14 @@ export default function CochesManager() {
               )}
               {componentStats.length > 0 && (
                 <div style={{ marginBottom: "0.75rem" }}>
-                  <h3 style={{ fontSize: "0.85rem", margin: "0 0 0.4rem", color: "#94a3b8" }}>
+                  <h3 style={{ fontSize: "0.85rem", margin: "0 0 0.4rem", color: "var(--c-muted)" }}>
                     Por componente
                   </h3>
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
                     {componentStats.slice(0, 5).map((s) => (
                       <div
                         key={s.label}
-                        style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", color: "#e2e8f0" }}
+                        style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", color: "var(--c-text)" }}
                       >
                         <span>{s.label}</span>
                         <span>{fmtCost(s.total)}</span>
@@ -535,14 +540,14 @@ export default function CochesManager() {
               )}
               {workshopStats.length > 0 && (
                 <div>
-                  <h3 style={{ fontSize: "0.85rem", margin: "0 0 0.4rem", color: "#94a3b8" }}>
+                  <h3 style={{ fontSize: "0.85rem", margin: "0 0 0.4rem", color: "var(--c-muted)" }}>
                     Por taller
                   </h3>
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
                     {workshopStats.slice(0, 5).map((s) => (
                       <div
                         key={s.label}
-                        style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", color: "#e2e8f0" }}
+                        style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", color: "var(--c-text)" }}
                       >
                         <span>{s.label}</span>
                         <span>{fmtCost(s.total)}</span>
@@ -556,7 +561,7 @@ export default function CochesManager() {
 
           <div style={{ ...cardStyle, marginBottom: "1.25rem" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
-              <h2 style={{ fontSize: "0.95rem", margin: 0, color: "#e2e8f0", flex: 1 }}>
+              <h2 style={{ fontSize: "0.95rem", margin: 0, color: "var(--c-text)", flex: 1 }}>
                 Mantenimiento
               </h2>
               <button type="button" onClick={addMaintenance} style={btnStyle}>
@@ -564,7 +569,7 @@ export default function CochesManager() {
               </button>
             </div>
             {active.maintenance.length === 0 && (
-              <p style={{ color: "#94a3b8", fontSize: "0.85rem", margin: 0 }}>
+              <p style={{ color: "var(--c-muted)", fontSize: "0.85rem", margin: 0 }}>
                 Sin elementos de mantenimiento. Añade aceite, filtros, líquido de frenos…
               </p>
             )}
@@ -576,7 +581,7 @@ export default function CochesManager() {
                 <div
                   key={m.id}
                   style={{
-                    border: "1px solid #1e293b",
+                    border: "1px solid var(--c-border)",
                     borderRadius: 8,
                     padding: "0.5rem",
                     marginBottom: "0.5rem",
@@ -624,7 +629,7 @@ export default function CochesManager() {
                       value={derived.km}
                       readOnly
                       placeholder="Últ. cambio km"
-                      style={{ ...inputStyle, background: "#16223a", color: "#94a3b8" }}
+                      style={{ ...inputStyle, background: "var(--c-surface)", color: "var(--c-muted)" }}
                       aria-label="Último cambio en kilómetros (automático)"
                       title={derived.source === "auto" ? "Automático desde la reparación" : undefined}
                     />
@@ -657,16 +662,16 @@ export default function CochesManager() {
                     {maintenanceMessage(effectiveItem, active.currentKm)}
                   </p>
                   {derived.source === "auto" && derived.repair ? (
-                    <p style={{ color: "#64748b", fontSize: "0.75rem", margin: 0 }}>
+                    <p style={{ color: "var(--c-muted)", fontSize: "0.75rem", margin: 0 }}>
                       Automático · de la reparación “{derived.repair.description}” (
                       {derived.repair.date || "sin fecha"})
                     </p>
                   ) : derived.source === "manual" ? (
-                    <p style={{ color: "#64748b", fontSize: "0.75rem", margin: 0 }}>
+                    <p style={{ color: "var(--c-muted)", fontSize: "0.75rem", margin: 0 }}>
                       Km manual (sin reparación coincidente)
                     </p>
                   ) : (
-                    <p style={{ color: "#64748b", fontSize: "0.75rem", margin: 0 }}>
+                    <p style={{ color: "var(--c-muted)", fontSize: "0.75rem", margin: 0 }}>
                       Sin dato: añade una reparación con su km, p. ej. “Cambio de aceite”
                     </p>
                   )}
@@ -677,7 +682,7 @@ export default function CochesManager() {
 
           <div style={{ ...cardStyle, marginBottom: "1.25rem" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
-              <h2 style={{ fontSize: "0.95rem", margin: 0, color: "#e2e8f0", flex: 1 }}>Talleres</h2>
+              <h2 style={{ fontSize: "0.95rem", margin: 0, color: "var(--c-text)", flex: 1 }}>Talleres</h2>
             </div>
             <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
               <input
@@ -695,7 +700,7 @@ export default function CochesManager() {
               </button>
             </div>
             {state.workshops.length === 0 ? (
-              <p style={{ color: "#94a3b8", fontSize: "0.85rem", margin: 0 }}>
+              <p style={{ color: "var(--c-muted)", fontSize: "0.85rem", margin: 0 }}>
                 Sin talleres. Añádelos y podrás elegirlos en las reparaciones.
               </p>
             ) : (
@@ -707,12 +712,12 @@ export default function CochesManager() {
                       display: "inline-flex",
                       alignItems: "center",
                       gap: "0.4rem",
-                      background: "#1e293b",
-                      border: "1px solid #334155",
+                      background: "var(--c-border)",
+                      border: "1px solid var(--c-border)",
                       borderRadius: 999,
                       padding: "0.2rem 0.6rem",
                       fontSize: "0.8rem",
-                      color: "#e2e8f0",
+                      color: "var(--c-text)",
                     }}
                   >
                     {w}
@@ -732,9 +737,9 @@ export default function CochesManager() {
 
           <div style={{ ...cardStyle, marginBottom: "1.25rem" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
-              <h2 style={{ fontSize: "0.95rem", margin: 0, color: "#e2e8f0", flex: 1 }}>
+              <h2 style={{ fontSize: "0.95rem", margin: 0, color: "var(--c-text)", flex: 1 }}>
                 Reparaciones
-                <span style={{ color: "#94a3b8", fontSize: "0.8rem", fontWeight: 400, marginLeft: "0.5rem" }}>
+                <span style={{ color: "var(--c-muted)", fontSize: "0.8rem", fontWeight: 400, marginLeft: "0.5rem" }}>
                   Total: {fmtCost(totalCost)}
                 </span>
               </h2>
@@ -743,7 +748,7 @@ export default function CochesManager() {
               </button>
             </div>
             {repairs.length === 0 ? (
-              <p style={{ color: "#94a3b8", fontSize: "0.85rem", margin: 0 }}>Sin reparaciones registradas.</p>
+              <p style={{ color: "var(--c-muted)", fontSize: "0.85rem", margin: 0 }}>Sin reparaciones registradas.</p>
             ) : (
               <>
                 {(usedComponents.length > 0 || usedWorkshops.length > 0 || usedYears.length > 0) && (
@@ -816,7 +821,7 @@ export default function CochesManager() {
                   </div>
                 )}
                 {filteredRepairs.length === 0 && (
-                  <p style={{ color: "#94a3b8", fontSize: "0.85rem", marginBottom: "0.5rem" }}>
+                  <p style={{ color: "var(--c-muted)", fontSize: "0.85rem", marginBottom: "0.5rem" }}>
                     Sin reparaciones con los filtros aplicados.
                   </p>
                 )}
@@ -925,7 +930,7 @@ export default function CochesManager() {
 
           <div style={{ ...cardStyle, marginBottom: "1.25rem" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
-              <h2 style={{ fontSize: "0.95rem", margin: 0, color: "#e2e8f0", flex: 1 }}>Documentos</h2>
+              <h2 style={{ fontSize: "0.95rem", margin: 0, color: "var(--c-text)", flex: 1 }}>Documentos</h2>
             </div>
             <input
               type="file"
@@ -935,11 +940,11 @@ export default function CochesManager() {
                 if (f) addDocument(f);
                 e.target.value = "";
               }}
-              style={{ ...inputStyle, color: "#94a3b8", marginBottom: "0.75rem" }}
+              style={{ ...inputStyle, color: "var(--c-muted)", marginBottom: "0.75rem" }}
               aria-label="Subir documento"
             />
             {activeDocs.length === 0 ? (
-              <p style={{ color: "#94a3b8", fontSize: "0.85rem", margin: 0 }}>
+              <p style={{ color: "var(--c-muted)", fontSize: "0.85rem", margin: 0 }}>
                 Sin documentos. Sube facturas, informes o lo que quieras (máx. 2 MB).
               </p>
             ) : (
@@ -954,10 +959,10 @@ export default function CochesManager() {
                     flexWrap: "wrap",
                   }}
                 >
-                  <span style={{ color: "#e2e8f0", fontSize: "0.85rem", flex: 1, minWidth: "140px" }}>
+                  <span style={{ color: "var(--c-text)", fontSize: "0.85rem", flex: 1, minWidth: "140px" }}>
                     {d.name}
                   </span>
-                  <span style={{ color: "#94a3b8", fontSize: "0.75rem", whiteSpace: "nowrap" }}>
+                  <span style={{ color: "var(--c-muted)", fontSize: "0.75rem", whiteSpace: "nowrap" }}>
                     {fmtSize(d.size)} · {d.date}
                   </span>
                   <a
@@ -982,9 +987,9 @@ export default function CochesManager() {
 
           <div style={cardStyle}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
-              <h2 style={{ fontSize: "0.95rem", margin: 0, color: "#e2e8f0", flex: 1 }}>
+              <h2 style={{ fontSize: "0.95rem", margin: 0, color: "var(--c-text)", flex: 1 }}>
                 Revisiones
-                <span style={{ color: "#94a3b8", fontSize: "0.8rem", fontWeight: 400, marginLeft: "0.5rem" }}>
+                <span style={{ color: "var(--c-muted)", fontSize: "0.8rem", fontWeight: 400, marginLeft: "0.5rem" }}>
                   {pendingCount} pendiente{pendingCount === 1 ? "" : "s"}
                 </span>
               </h2>
@@ -993,7 +998,7 @@ export default function CochesManager() {
               </button>
             </div>
             {revisions.length === 0 && (
-              <p style={{ color: "#94a3b8", fontSize: "0.85rem", margin: 0 }}>Sin revisiones programadas.</p>
+              <p style={{ color: "var(--c-muted)", fontSize: "0.85rem", margin: 0 }}>Sin revisiones programadas.</p>
             )}
             {revisions.map((r) => {
               const status = revisionStatus(r);
@@ -1012,7 +1017,7 @@ export default function CochesManager() {
                     type="checkbox"
                     checked={r.done}
                     onChange={(e) => updateRevision(r.id, { done: e.target.checked })}
-                    style={{ width: 18, height: 18, accentColor: "#22c55e" }}
+                    style={{ width: 18, height: 18, accentColor: "var(--c-ok)" }}
                     aria-label="Marcar como hecha"
                   />
                   <input
@@ -1042,7 +1047,7 @@ export default function CochesManager() {
                       borderRadius: 999,
                       fontSize: "0.75rem",
                       background: STATUS_COLORS[status],
-                      color: "#0f172a",
+                      color: "var(--c-card)",
                       whiteSpace: "nowrap",
                     }}
                   >
@@ -1062,7 +1067,7 @@ export default function CochesManager() {
           </div>
         </>
       ) : (
-        <div style={{ color: "#94a3b8", fontSize: "0.9rem" }}>
+        <div style={{ color: "var(--c-muted)", fontSize: "0.9rem" }}>
           No hay vehículos. Pulsa “+ Añadir” para crear uno.
         </div>
       )}
