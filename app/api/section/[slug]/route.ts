@@ -64,9 +64,7 @@ export async function PUT(
     return NextResponse.json({ error: "Cuerpo no válido" }, { status: 400 });
   }
   const data: unknown =
-    raw && typeof raw === "object" && !Array.isArray(raw)
-      ? { note: typeof (raw as Record<string, unknown>).note === "string" ? (raw as Record<string, unknown>).note : "" }
-      : { note: "" };
+    raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
   try {
     await ensureSectionTable();
     await sql`

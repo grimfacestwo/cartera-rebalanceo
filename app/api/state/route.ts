@@ -70,7 +70,7 @@ export async function GET() {
   }
 }
 
-const MAX_BODY_BYTES = 512 * 1024;
+const MAX_BODY_BYTES = 2 * 1024 * 1024;
 
 export async function PUT(request: Request) {
   if (!(await isAuthed())) {

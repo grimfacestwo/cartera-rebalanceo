@@ -173,11 +173,13 @@ export function addMonth(key: string): string {
   return `${y}-${String(m + 1).padStart(2, "0")}`;
 }
 
+const monthFmt = new Intl.DateTimeFormat("es-ES", { month: "long", year: "numeric" });
+
 export function monthLabel(key: string): string {
   const [y, m] = key.split("-").map(Number);
   if (!y || !m) return key;
   const d = new Date(y, m - 1, 1);
-  const label = new Intl.DateTimeFormat("es-ES", { month: "long", year: "numeric" }).format(d);
+  const label = monthFmt.format(d);
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 

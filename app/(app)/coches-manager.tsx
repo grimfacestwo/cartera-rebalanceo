@@ -27,6 +27,51 @@ import {
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
+async function saveCoches(state: CochesState, setStatus: (s: SaveStatus) => void) {
+  const stripped = {
+    ...state,
+    documents: state.documents.map((d) => ({
+      id: d.id,
+      vehicleId: d.vehicleId,
+      name: d.name,
+      fileName: d.fileName,
+      mimeType: d.mimeType,
+      size: d.size,
+      date: d.date,
+    })),
+  } as CochesState;
+  const docsPayload = { docs: state.documents };
+
+  setStatus("saving");
+  let mainOk = false;
+  for (let i = 0; i < 2 && !mainOk; i++) {
+    try {
+      const res = await fetch("/api/section/coches", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(stripped),
+      });
+      mainOk = res.ok;
+    } catch {
+      mainOk = false;
+    }
+  }
+  let docsOk = false;
+  for (let i = 0; i < 2 && !docsOk; i++) {
+    try {
+      const res = await fetch("/api/section/coches-docs", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(docsPayload),
+      });
+      docsOk = res.ok;
+    } catch {
+      docsOk = false;
+    }
+  }
+  setStatus(mainOk && docsOk ? "saved" : "error");
+}
+
 const STATUS_COLORS: Record<RevisionStatus, string> = {
   done: "var(--c-ok)",
   overdue: "var(--c-danger)",
@@ -92,12 +137,20 @@ function uid(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+const eurFmt = new Intl.NumberFormat("es-ES", {
+  style: "currency",
+  currency: "EUR",
+  maximumFractionDigits: 0,
+});
+const eur3Fmt = new Intl.NumberFormat("es-ES", {
+  style: "currency",
+  currency: "EUR",
+  minimumFractionDigits: 3,
+  maximumFractionDigits: 3,
+});
+
 function fmtCost(total: number): string {
-  return new Intl.NumberFormat("es-ES", {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 0,
-  }).format(total);
+  return eurFmt.format(total);
 }
 
 function fmtSize(bytes: number): string {
@@ -126,6 +179,20 @@ export default function CochesManager() {
         if (!res.ok) throw new Error("no data");
         const data = (await res.json()) as { data?: unknown };
         const parsed = parseCochesState(data.data);
+        try {
+          const docsRes = await fetch("/api/section/coches-docs");
+          if (docsRes.ok) {
+            const docsData = (await docsRes.json()) as { data?: { docs?: unknown } };
+            const docs = Array.isArray(docsData.data?.docs) ? (docsData.data?.docs as CarDocument[]) : [];
+            const byKey = new Map(docs.map((d) => [`${d.vehicleId}:${d.id}`, d]));
+            parsed.documents = parsed.documents.map((doc) => {
+              const full = byKey.get(`${doc.vehicleId}:${doc.id}`);
+              return full ? { ...doc, data: full.data } : doc;
+            });
+          }
+        } catch {
+          /* sin documentos guardados */
+        }
         if (!cancelled) {
           setState(parsed);
           setActiveId(parsed.vehicles[0]?.id ?? "");
@@ -147,14 +214,7 @@ export default function CochesManager() {
       return;
     }
     const timer = setTimeout(() => {
-      setSaveStatus("saving");
-      fetch("/api/section/coches", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(state),
-      })
-        .then((res) => setSaveStatus(res.ok ? "saved" : "error"))
-        .catch(() => setSaveStatus("error"));
+      void saveCoches(state, setSaveStatus);
     }, 500);
     return () => clearTimeout(timer);
   }, [state, loadError]);
@@ -510,12 +570,7 @@ export default function CochesManager() {
                   Coste por km: {fmtCost(perKm.total)} ÷{" "}
                   {Number.parseFloat(active?.currentKm ?? "") || 0} km ={" "}
                   <span style={{ color: "var(--c-text)" }}>
-                    {new Intl.NumberFormat("es-ES", {
-                      style: "currency",
-                      currency: "EUR",
-                      minimumFractionDigits: 3,
-                      maximumFractionDigits: 3,
-                    }).format(perKm.perKm)}
+                    {eur3Fmt.format(perKm.perKm)}
                   </span>
                   /km
                 </p>

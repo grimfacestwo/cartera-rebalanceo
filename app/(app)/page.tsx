@@ -339,15 +339,23 @@ export default function Home() {
   useEffect(() => {
     if (loading || loadError) return;
     if (skipOnce.current) { skipOnce.current = false; return; }
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
       setSaveStatus("saving");
-      fetch("/api/state", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets }),
-      })
-        .then((res) => setSaveStatus(res.ok ? "saved" : "error"))
-        .catch(() => setSaveStatus("error"));
+      const body = JSON.stringify({ assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets });
+      let ok = false;
+      for (let i = 0; i < 2 && !ok; i++) {
+        try {
+          const res = await fetch("/api/state", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body,
+          });
+          ok = res.ok;
+        } catch {
+          ok = false;
+        }
+      }
+      setSaveStatus(ok ? "saved" : "error");
     }, 500);
     return () => clearTimeout(timer);
   }, [assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, loading, loadError]);
