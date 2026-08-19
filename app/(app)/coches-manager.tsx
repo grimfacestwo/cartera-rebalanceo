@@ -170,6 +170,7 @@ export default function CochesManager() {
   const [filterWorkshop, setFilterWorkshop] = useState("");
   const [filterYear, setFilterYear] = useState("");
   const skipOnce = useRef(true);
+  const pendingCochesRef = useRef<CochesState | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -213,11 +214,50 @@ export default function CochesManager() {
       skipOnce.current = false;
       return;
     }
+    pendingCochesRef.current = state;
     const timer = setTimeout(() => {
       void saveCoches(state, setSaveStatus);
     }, 500);
     return () => clearTimeout(timer);
   }, [state, loadError]);
+
+  useEffect(() => {
+    const flush = () => {
+      const s = pendingCochesRef.current;
+      if (!s) return;
+      try {
+        const stripped = {
+          ...s,
+          documents: s.documents.map((d) => ({
+            id: d.id,
+            vehicleId: d.vehicleId,
+            name: d.name,
+            fileName: d.fileName,
+            mimeType: d.mimeType,
+            size: d.size,
+            date: d.date,
+          })),
+        } as CochesState;
+        fetch("/api/section/coches", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(stripped),
+          keepalive: true,
+        });
+      } catch {
+        /* ignore */
+      }
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
 
   const retry = () => {
     setLoadError(false);

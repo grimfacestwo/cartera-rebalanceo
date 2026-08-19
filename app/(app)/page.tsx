@@ -301,6 +301,7 @@ export default function Home() {
   const [goalRate, setGoalRate] = useState("");
   const skipOnce = useRef(true);
   const activeTabRef = useRef<HTMLButtonElement>(null);
+  const pendingSaveRef = useRef<string | null>(null);
 
   // --- Load ---
   useEffect(() => {
@@ -321,7 +322,8 @@ export default function Home() {
           setCatRules(state.catRules);
           setPlanTargets(state.planTargets);
           const keys = sortMonthKeys(Object.keys(state.months));
-          if (keys.length > 0) setActiveMonth(keys[keys.length - 1]);
+          if (keys.includes(currentMonthKey())) setActiveMonth(currentMonthKey());
+          else if (keys.length > 0) setActiveMonth(keys[keys.length - 1]);
           else setActiveMonth(currentMonthKey());
           skipOnce.current = true;
           setLoadError(false);
@@ -342,6 +344,7 @@ export default function Home() {
     const timer = setTimeout(async () => {
       setSaveStatus("saving");
       const body = JSON.stringify({ assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets });
+      pendingSaveRef.current = body;
       let ok = false;
       for (let i = 0; i < 2 && !ok; i++) {
         try {
@@ -359,6 +362,34 @@ export default function Home() {
     }, 500);
     return () => clearTimeout(timer);
   }, [assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, loading, loadError]);
+
+  // Flush the último estado antes de cerrar/refrescar para no perder ediciones
+  // que queden dentro de la ventana de debounce de 500 ms.
+  useEffect(() => {
+    const flush = () => {
+      const body = pendingSaveRef.current;
+      if (!body) return;
+      try {
+        fetch("/api/state", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body,
+          keepalive: true,
+        });
+      } catch {
+        /* ignore */
+      }
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
 
   const retryLoad = () => { setLoadError(false); setLoading(true); setReloadKey((k) => k + 1); };
 
