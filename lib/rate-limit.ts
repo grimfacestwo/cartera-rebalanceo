@@ -1,26 +1,57 @@
-const attempts = new Map<string, number[]>();
+import { sql } from "@vercel/postgres";
+
 const WINDOW_MS = 60_000;
 const MAX_ATTEMPTS = 5;
 
-export function isRateLimited(ip: string): boolean {
-  const now = Date.now();
-  const history = attempts.get(ip) ?? [];
-  const recent = history.filter((t) => now - t < WINDOW_MS);
-  attempts.set(ip, recent);
-  return recent.length >= MAX_ATTEMPTS;
-}
+let ensured: Promise<void> | null = null;
 
-export function recordAttempt(ip: string): void {
-  const history = attempts.get(ip) ?? [];
-  history.push(Date.now());
-  attempts.set(ip, history);
-}
-
-setInterval(() => {
-  const now = Date.now();
-  for (const [ip, history] of attempts) {
-    const recent = history.filter((t) => now - t < WINDOW_MS);
-    if (recent.length === 0) attempts.delete(ip);
-    else attempts.set(ip, recent);
+function ensureTable(): Promise<void> {
+  if (!ensured) {
+    ensured = sql`
+      CREATE TABLE IF NOT EXISTS login_attempts (
+        ip text PRIMARY KEY,
+        attempts jsonb NOT NULL DEFAULT '[]'::jsonb,
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )
+    `
+      .then(() => undefined)
+      .catch((e) => {
+        ensured = null;
+        throw e;
+      });
   }
-}, WINDOW_MS);
+  return ensured;
+}
+
+export async function isRateLimited(ip: string): Promise<boolean> {
+  try {
+    await ensureTable();
+    const { rows } = await sql<{ attempts: number[] }>`
+      SELECT attempts FROM login_attempts WHERE ip = ${ip}
+    `;
+    const now = Date.now();
+    const history = rows[0]?.attempts ?? [];
+    return history.filter((t) => now - t < WINDOW_MS).length >= MAX_ATTEMPTS;
+  } catch {
+    return false;
+  }
+}
+
+export async function recordAttempt(ip: string): Promise<void> {
+  try {
+    await ensureTable();
+    const { rows } = await sql<{ attempts: number[] }>`
+      SELECT attempts FROM login_attempts WHERE ip = ${ip}
+    `;
+    const now = Date.now();
+    const history = (rows[0]?.attempts ?? []).filter((t) => now - t < WINDOW_MS);
+    history.push(now);
+    await sql`
+      INSERT INTO login_attempts (ip, attempts, updated_at)
+      VALUES (${ip}, ${JSON.stringify(history)}::jsonb, now())
+      ON CONFLICT (ip) DO UPDATE SET attempts = EXCLUDED.attempts, updated_at = now()
+    `;
+  } catch {
+    /* best-effort */
+  }
+}

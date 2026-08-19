@@ -7,7 +7,7 @@ const MAX_AGE = 60 * 60 * 24 * 30;
 export async function POST(request: Request) {
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
 
-  if (isRateLimited(ip)) {
+  if (await isRateLimited(ip)) {
     return NextResponse.json({ error: "Demasiados intentos" }, { status: 429 });
   }
 
@@ -20,14 +20,14 @@ export async function POST(request: Request) {
 
   const password = getSitePassword();
   if (!password || typeof body.password !== "string") {
-    recordAttempt(ip);
+    await recordAttempt(ip);
     return NextResponse.json({ ok: false }, { status: 401 });
   }
 
   const expectedHash = await sha256Hex(password);
   const submittedHash = await sha256Hex(body.password);
   if (!safeEqual(submittedHash, expectedHash)) {
-    recordAttempt(ip);
+    await recordAttempt(ip);
     return NextResponse.json({ ok: false }, { status: 401 });
   }
 

@@ -359,8 +359,17 @@ export function effectiveLastKm(
   vehicleId: string
 ): LastKmInfo {
   const auto = latestMatchingRepair(repairs, vehicleId, item.name);
-  if (auto) return { km: auto.km, source: "auto", repair: auto };
-  if (item.lastKm) return { km: item.lastKm, source: "manual", repair: null };
+  if (auto && auto.km !== "") {
+    const autoKm = Number.parseFloat(auto.km);
+    const manualKm = item.lastKm !== "" ? Number.parseFloat(item.lastKm) : NaN;
+    if (Number.isFinite(manualKm) && manualKm > autoKm) {
+      return { km: item.lastKm, source: "manual", repair: null };
+    }
+    return { km: auto.km, source: "auto", repair: auto };
+  }
+  if (item.lastKm !== "") {
+    return { km: item.lastKm, source: "manual", repair: null };
+  }
   return { km: "", source: "none", repair: null };
 }
 

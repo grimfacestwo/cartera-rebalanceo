@@ -446,6 +446,14 @@ describe("effectiveLastKm", () => {
     expect(res.km).toBe("");
     expect(res.source).toBe("none");
   });
+
+  it("prefiere el km manual cuando es mayor que el de la reparación", () => {
+    const repairs = [mkRepair("r1", "2026-05-20", "cambio de aceite", "105000")];
+    const res = effectiveLastKm(mkMaint("Aceite", "120000"), repairs, "v1");
+    expect(res.km).toBe("120000");
+    expect(res.source).toBe("manual");
+    expect(res.repair).toBeNull();
+  });
 });
 
 describe("parseMaintenanceItems warn thresholds", () => {
