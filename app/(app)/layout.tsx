@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { parseCochesState, pendingAlerts, type Alerts } from "@/lib/coches";
-import { parseState, BANK_IDS, currentMonthKey, comidaAmount } from "@/lib/state";
+import { parseState, BANK_IDS, currentMonthKey, daysRemaining, effectiveAmount, type Expense } from "@/lib/state";
 import styles from "./layout.module.css";
 
 const SECTIONS = [
@@ -101,9 +101,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         const { state: raw } = (await res.json()) as { state?: unknown };
         const state = parseState(raw);
         const curKey = currentMonthKey();
-        const active = state.months[curKey] ?? { banks: {} as Record<string, string>, expenses: [], comidaDaily: "40", comidaBank: "" as const };
+        const active = state.months[curKey] ?? { banks: {} as Record<string, string>, expenses: [], fixed: [] };
+        const days = daysRemaining(curKey);
+        const allExp: Array<{ paid?: boolean; amount: string; daily?: boolean }> = [...(active.fixed ?? []), ...active.expenses];
         const bankTotal = BANK_IDS.reduce((s, id) => s + (Number.parseFloat(active.banks[id]) || 0), 0);
-        const pendientes = active.expenses.filter((e: { paid?: boolean }) => !e.paid).reduce((s: number, e: { amount: string }) => s + (Number.parseFloat(e.amount) || 0), 0) + comidaAmount(active, curKey);
+        const pendientes = allExp.filter((e) => !e.paid).reduce((s, e) => s + effectiveAmount(e as Expense, days), 0);
         if (!cancelled) setDisponible(bankTotal - pendientes);
       } catch {
         if (!cancelled) setDisponible(null);

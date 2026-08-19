@@ -16,10 +16,10 @@ import {
   addMonth,
   bankRemaining,
   categoryTotals,
-  comidaAmount,
   currentMonthKey,
   daysInMonth,
   daysRemaining,
+  effectiveAmount,
   DEFAULT_FIXED_EXPENSES,
   matchCategory,
   monthLabel,
@@ -49,7 +49,7 @@ const pct = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 });
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 type TabId = "cartera" | "hogar" | "objetivos";
 
-const EMPTY_MONTH: MonthData = { banks: { ...DEFAULT_BANKS }, expenses: [], fixed: [], comidaDaily: "40", comidaBank: "ing" };
+const EMPTY_MONTH: MonthData = { banks: { ...DEFAULT_BANKS }, expenses: [], fixed: [] };
 
 function nextColor(assets: AssetDef[]): string {
   const used = new Set(assets.map((a) => a.color));
@@ -374,23 +374,19 @@ export default function Home() {
   };
 
   const allActiveExpenses = useMemo(() => [...activeData.fixed, ...activeData.expenses], [activeData]);
+  const activeDaysRemaining = daysRemaining(activeMonth);
 
   const bankPendientes = (bankId: BankId) => {
-    const pen = allActiveExpenses.filter((e) => e.bank === bankId && !e.paid).reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
-    return pen + (activeData.comidaBank === bankId ? activeComida : 0);
+    return allActiveExpenses
+      .filter((e) => e.bank === bankId && !e.paid)
+      .reduce((s, e) => s + effectiveAmount(e, activeDaysRemaining), 0);
   };
 
   const bankTotal = BANK_IDS.reduce((s, id) => s + (Number.parseFloat(activeData.banks[id]) || 0), 0);
-  const totalExpensesBank = allActiveExpenses.reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
-  const activeDaysRemaining = daysRemaining(activeMonth);
-  const activeComida = comidaAmount(activeData, activeMonth);
-  const planTotals = useMemo(() => {
-    const t = categoryTotals(activeData);
-    t.gastos = (t.gastos || 0) + comidaAmount(activeData, activeMonth);
-    return t;
-  }, [activeData, activeMonth]);
-  const totalExpenses = totalExpensesBank + activeComida;
-  const totalPendientes = allActiveExpenses.filter((e) => !e.paid).reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0) + activeComida;
+  const totalExpensesBank = allActiveExpenses.reduce((s, e) => s + effectiveAmount(e, activeDaysRemaining), 0);
+  const planTotals = categoryTotals(activeData, activeDaysRemaining);
+  const totalExpenses = totalExpensesBank;
+  const totalPendientes = allActiveExpenses.filter((e) => !e.paid).reduce((s, e) => s + effectiveAmount(e, activeDaysRemaining), 0);
   const remaining = bankTotal - totalPendientes;
   const planSum = CATEGORIES.reduce((s, c) => s + (Number.parseFloat(planTargets[c]) || 0), 0);
 
@@ -461,22 +457,12 @@ export default function Home() {
       .filter((e) => e.recurring)
       .map((e) => ({ ...e, id: newId(), paid: false }));
     const tmpl = fixedExpenses.length > 0 ? fixedExpenses : DEFAULT_FIXED_EXPENSES;
-    const seededFixed: Expense[] = tmpl.map((f) => ({ id: f.id, name: f.name, amount: f.amount, type: "fijo", bank: f.bank, paid: false, category: f.category, recurring: true }));
-    setMonths((p) => {
-      const prevMonth = lastKey ? p[lastKey] : undefined;
-      return { ...p, [nextKey]: { banks, expenses: carriedExpenses, fixed: seededFixed, comidaDaily: prevMonth?.comidaDaily ?? "40", comidaBank: prevMonth?.comidaBank ?? "ing" } };
-    });
+    const seededFixed: Expense[] = tmpl.map((f) => ({ id: f.id, name: f.name, amount: f.amount, type: "fijo", bank: f.bank, paid: false, category: f.category, recurring: true, daily: f.daily }));
+    setMonths((p) => ({
+      ...p,
+      [nextKey]: { banks, expenses: carriedExpenses, fixed: seededFixed },
+    }));
     setActiveMonth(nextKey);
-  };
-
-  const setComidaDaily = (v: string) => {
-    if (v === "" || /^\d*\.?\d*$/.test(v)) {
-      updateMonth((m) => ({ ...m, comidaDaily: v }));
-    }
-  };
-
-  const setComidaBank = (v: BankId | "") => {
-    updateMonth((m) => ({ ...m, comidaBank: v }));
   };
 
   const sortedMonthKeys = sortMonthKeys(Object.keys(months));
@@ -487,8 +473,8 @@ export default function Home() {
   const paidFixed = activeFixed.filter((e) => e.paid);
   const paidVariable = activeExpenses.filter((e) => e.paid);
   const paidCount = paidFixed.length + paidVariable.length;
-  const totalFijos = allActiveExpenses.filter((e) => e.type === "fijo").reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
-  const totalRecurring = allActiveExpenses.filter((e) => e.recurring).reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
+  const totalFijos = allActiveExpenses.filter((e) => e.type === "fijo").reduce((s, e) => s + effectiveAmount(e, activeDaysRemaining), 0);
+  const totalRecurring = allActiveExpenses.filter((e) => e.recurring).reduce((s, e) => s + effectiveAmount(e, activeDaysRemaining), 0);
   const pagados = allActiveExpenses.filter((e) => e.paid).length;
   const sortedExpenses = useMemo(() => {
     let list = activeExpenses.filter((e) => !e.paid);
@@ -538,27 +524,19 @@ export default function Home() {
   const goalCurrentTotal = goals.reduce((s, g) => s + (Number.parseFloat(g.current) || 0), 0);
 
   // Category stats
-  const categoryStats = useMemo(() => {
-    const stats = categoryTotals(activeData);
-    return Object.entries(stats)
-      .sort((a, b) => b[1] - a[1])
-      .map(([cat, total]) => ({ cat: cat as CategoryId, total }));
-  }, [activeData]);
+  const categoryStats = Object.entries(categoryTotals(activeData, activeDaysRemaining))
+    .sort((a, b) => b[1] - a[1])
+    .map(([cat, total]) => ({ cat: cat as CategoryId, total }));
 
-  // Month-over-month comparison (includes Comida in Alimentación)
-  const comidaFull = (m: MonthData | undefined, key: string) =>
-    m ? (Number.parseFloat(m.comidaDaily) || 0) * daysInMonth(key) : 0;
-
-  const comparison = useMemo(() => {
+  // Month-over-month comparison (la comida diaria usa días del mes completo)
+  const comparison = (() => {
     const idx = sortedMonthKeys.indexOf(activeMonth);
     if (idx <= 0) return null;
     const prevKey = sortedMonthKeys[idx - 1];
     const cur = months[activeMonth];
     const prev = months[prevKey];
-    const curTotals = categoryTotals(cur);
-    curTotals.gastos = (curTotals.gastos || 0) + comidaFull(cur, activeMonth);
-    const prevTotals = categoryTotals(prev);
-    prevTotals.gastos = (prevTotals.gastos || 0) + comidaFull(prev, prevKey);
+    const curTotals = categoryTotals(cur, daysInMonth(activeMonth));
+    const prevTotals = categoryTotals(prev, daysInMonth(prevKey));
     const cats = new Set([...Object.keys(curTotals), ...Object.keys(prevTotals)]);
     const rows = [...cats]
       .map((cat) => {
@@ -572,7 +550,7 @@ export default function Home() {
     const curTotal = Object.values(curTotals).reduce((s, v) => s + v, 0);
     const prevTotal = Object.values(prevTotals).reduce((s, v) => s + v, 0);
     return { prevKey, rows, curTotal, prevTotal, totalDelta: curTotal - prevTotal };
-  }, [sortedMonthKeys, activeMonth, months]);
+  })();
 
   const isAnomaly = (delta: number, pctDelta: number) => delta > 0 && delta >= 20 && pctDelta >= 50;
 
@@ -678,7 +656,7 @@ export default function Home() {
   const addFixedTemplate = () => {
     const name = newFixedName.trim();
     if (!name) return;
-    setFixedExpenses((prev) => [...prev, { id: newId(), name, amount: newFixedAmount, bank: newFixedBank, category: newFixedCategory }]);
+    setFixedExpenses((prev) => [...prev, { id: newId(), name, amount: newFixedAmount, bank: newFixedBank, category: newFixedCategory, daily: false }]);
     setNewFixedName(""); setNewFixedAmount(""); setNewFixedBank("");
   };
   const removeFixedTemplate = (id: string) => {
@@ -858,11 +836,8 @@ export default function Home() {
             <section className={styles.card}>
               <h2 title={
                 (() => {
-                  const pendAll = activeData.expenses.filter((e) => !e.paid);
-                  const lines = [
-                    ...pendAll.map((e) => `${e.name}: ${currency.format(Number.parseFloat(e.amount) || 0)}`),
-                    ...(activeComida > 0 ? [`Comida: ${currency.format(activeComida)}`] : []),
-                  ];
+                  const pendAll = allActiveExpenses.filter((e) => !e.paid);
+                  const lines = pendAll.map((e) => `${e.name}: ${currency.format(effectiveAmount(e, activeDaysRemaining))}`);
                   return lines.length ? `Gastos pendientes del mes:\n${lines.join("\n")}` : "Sin gastos pendientes este mes";
                 })()
               }>Gastos</h2>
@@ -901,26 +876,6 @@ export default function Home() {
                 <table className={styles.table}>
                   <thead><tr><th>Concepto</th><th>Importe</th><th>Categoría</th><th>ING</th><th>Santander</th><th>Trade</th><th>Tipo</th><th>Hecho</th><th>Rec</th><th></th></tr></thead>
                   <tbody>
-                    <tr className={styles.comidaRow}>
-                      <td>
-                        <span style={{ fontWeight: 600 }}>Comida</span>
-                      </td>
-                      <td className={styles.comidaInputCell}>
-                        <input type="text" inputMode="decimal" value={activeData.comidaDaily} onChange={(ev) => setComidaDaily(ev.target.value)} className={styles.expenseInput} aria-label="Comida por día" style={{ width: 3.5 + "rem" }} />
-                        <span className={styles.comidaUnit}>€/día</span>
-                        <span className={styles.comidaCalc}>= {currency.format(activeComida)}</span>
-                      </td>
-                      <td className={styles.plain}>—</td>
-                      {BANK_IDS.map((b) => (
-                        <td key={b} className={styles.bankCell} onClick={() => setComidaBank(activeData.comidaBank === b ? "" : b)}>
-                          {activeData.comidaBank === b && <span className={styles.bankDot} style={{ background: BANK_COLORS[b] }} />}
-                        </td>
-                      ))}
-                      <td>Fijo</td>
-                      <td className={styles.hechoCell}>—</td>
-                      <td />
-                      <td />
-                    </tr>
                     {unpaidFixed.length > 0 && (
                       <tr className={styles.fixedHeaderRow}>
                         <td colSpan={10}>Gastos fijos</td>
@@ -932,7 +887,8 @@ export default function Home() {
                         <td>
                           <div className={styles.amountCell}>
                             <input type="text" inputMode="decimal" value={e.amount} onChange={(ev) => { const v = ev.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setFixedField(e.id, "amount", v); }} className={styles.expenseInput} aria-label={`Importe de ${e.name}`} style={{ width: 4 + "rem" }} />
-                            <span className={styles.amountUnit}>€</span>
+                            <span className={styles.amountUnit}>{e.daily ? "€/día" : "€"}</span>
+                            {e.daily && <span className={styles.comidaCalc}>= {currency.format(effectiveAmount(e, activeDaysRemaining))}</span>}
                           </div>
                         </td>
                         <td>
@@ -1010,7 +966,7 @@ export default function Home() {
                     {paidOpen && paidFixed.map((e) => (
                       <tr key={e.id} className={styles.fixedRow}>
                         <td><span className={styles.fixedName}>{e.name}</span></td>
-                        <td><div className={styles.amountCell}><input type="text" inputMode="decimal" value={e.amount} onChange={(ev) => { const v = ev.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setFixedField(e.id, "amount", v); }} className={styles.expenseInput} aria-label={`Importe de ${e.name}`} style={{ width: 4 + "rem" }} /><span className={styles.amountUnit}>€</span></div></td>
+                        <td><div className={styles.amountCell}><input type="text" inputMode="decimal" value={e.amount} onChange={(ev) => { const v = ev.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setFixedField(e.id, "amount", v); }} className={styles.expenseInput} aria-label={`Importe de ${e.name}`} style={{ width: 4 + "rem" }} /><span className={styles.amountUnit}>{e.daily ? "€/día" : "€"}</span>{e.daily && <span className={styles.comidaCalc}>= {currency.format(effectiveAmount(e, activeDaysRemaining))}</span>}</div></td>
                         <td><select value={e.category} onChange={(ev) => setFixedField(e.id, "category", ev.target.value as CategoryId)} className={styles.expenseSelect} aria-label={`Categoría de ${e.name}`} style={{ fontSize: "0.8rem" }}>{CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}</select></td>
                         {BANK_IDS.map((b) => (<td key={b} className={styles.bankCell} onClick={() => setFixedField(e.id, "bank", e.bank === b ? "" : b)}>{e.bank === b && <span className={styles.bankDot} style={{ background: BANK_COLORS[b] }} />}</td>))}
                         <td>Fijo</td>
@@ -1067,10 +1023,7 @@ export default function Home() {
                       const gastos = bankPendientes(id);
                       const rest = saldo - gastos;
                       const pendItems = allActiveExpenses.filter((e) => e.bank === id && !e.paid);
-                      const pendLines = [
-                        ...pendItems.map((e) => `${e.name}: ${currency.format(Number.parseFloat(e.amount) || 0)}`),
-                        ...(activeData.comidaBank === id && activeComida > 0 ? [`Comida: ${currency.format(activeComida)}`] : []),
-                      ];
+                      const pendLines = pendItems.map((e) => `${e.name}: ${currency.format(effectiveAmount(e, activeDaysRemaining))}`);
                       const bankTitle = pendLines.length ? `Pendientes en ${BANK_LABELS[id]}:\n${pendLines.join("\n")}` : `Sin pendientes en ${BANK_LABELS[id]}`;
                       return (
                         <tr key={id}>
@@ -1313,7 +1266,7 @@ export default function Home() {
                       fixedExpenses.map((f) => (
                         <tr key={f.id}>
                           <td><input type="text" value={f.name} onChange={(e) => setFixedTemplateField(f.id, "name", e.target.value)} aria-label={`Nombre de ${f.name}`} className={styles.settingInput} /></td>
-                          <td><div className={styles.amountCell}><input type="text" inputMode="decimal" value={f.amount} onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setFixedTemplateField(f.id, "amount", v); }} placeholder="0" aria-label={`Importe de ${f.name}`} className={styles.settingAmount} /><span className={styles.amountUnit}>€</span></div></td>
+                          <td><div className={styles.amountCell}><input type="text" inputMode="decimal" value={f.amount} onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setFixedTemplateField(f.id, "amount", v); }} placeholder="0" aria-label={`Importe de ${f.name}`} className={styles.settingAmount} /><span className={styles.amountUnit}>{f.daily ? "€/día" : "€"}</span></div></td>
                           <td><select value={f.category} onChange={(e) => setFixedTemplateField(f.id, "category", e.target.value as CategoryId)} aria-label={`Categoría de ${f.name}`} className={styles.expenseSelect}>
                             {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
                           </select></td>

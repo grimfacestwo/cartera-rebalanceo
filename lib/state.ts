@@ -35,6 +35,7 @@ export type Expense = {
   paid: boolean;
   category: CategoryId;
   recurring: boolean;
+  daily?: boolean;
 };
 
 export type Goal = {
@@ -53,6 +54,7 @@ export type FixedExpense = {
   amount: string;
   bank: BankId | "";
   category: CategoryId;
+  daily?: boolean;
 };
 
 export type CategoryRule = {
@@ -62,17 +64,18 @@ export type CategoryRule = {
 };
 
 export const DEFAULT_FIXED_EXPENSES: FixedExpense[] = [
-  { id: "hipoteca", name: "Hipoteca", amount: "672.80", bank: "", category: "gastos" },
-  { id: "digi", name: "Digi", amount: "28", bank: "", category: "gastos" },
-  { id: "comunidad", name: "Comunidad", amount: "55.60", bank: "", category: "gastos" },
-  { id: "combustible", name: "Combustible", amount: "120", bank: "", category: "gastos" },
-  { id: "primitiva", name: "Primitiva", amount: "60", bank: "", category: "disfrute" },
-  { id: "gym", name: "Gym", amount: "75", bank: "", category: "disfrute" },
-  { id: "sharesub", name: "Sharesub", amount: "30", bank: "", category: "gastos" },
-  { id: "ahorro", name: "Ahorro", amount: "70", bank: "", category: "inversion" },
-  { id: "finanzas", name: "Finanzas", amount: "60", bank: "", category: "inversion" },
-  { id: "aportacion", name: "Aportacion", amount: "90", bank: "", category: "inversion" },
-  { id: "comedor", name: "Comedor", amount: "180", bank: "", category: "gastos" },
+  { id: "hipoteca", name: "Hipoteca", amount: "672.80", bank: "", category: "gastos", daily: false },
+  { id: "digi", name: "Digi", amount: "28", bank: "", category: "gastos", daily: false },
+  { id: "comunidad", name: "Comunidad", amount: "55.60", bank: "", category: "gastos", daily: false },
+  { id: "combustible", name: "Combustible", amount: "120", bank: "", category: "gastos", daily: false },
+  { id: "primitiva", name: "Primitiva", amount: "60", bank: "", category: "disfrute", daily: false },
+  { id: "gym", name: "Gym", amount: "75", bank: "", category: "disfrute", daily: false },
+  { id: "sharesub", name: "Sharesub", amount: "30", bank: "", category: "gastos", daily: false },
+  { id: "ahorro", name: "Ahorro", amount: "70", bank: "", category: "inversion", daily: false },
+  { id: "finanzas", name: "Finanzas", amount: "60", bank: "", category: "inversion", daily: false },
+  { id: "aportacion", name: "Aportacion", amount: "90", bank: "", category: "inversion", daily: false },
+  { id: "comedor", name: "Comedor", amount: "180", bank: "", category: "gastos", daily: false },
+  { id: "comida", name: "Comida", amount: "40", bank: "ing", category: "gastos", daily: true },
 ];
 
 export const PLAN_TARGETS_DEFAULT: Record<CategoryId, string> = {
@@ -107,8 +110,6 @@ export type MonthData = {
   banks: Record<BankId, string>;
   expenses: Expense[];
   fixed: Expense[];
-  comidaDaily: string;
-  comidaBank: BankId | "";
 };
 
 export type PortfolioState = {
@@ -206,9 +207,9 @@ export function daysRemaining(key: string): number {
   return total;
 }
 
-export function comidaAmount(month: MonthData, key: string): number {
-  const rate = Number.parseFloat(month.comidaDaily) || 0;
-  return rate * daysRemaining(key);
+export function effectiveAmount(e: Expense, days: number): number {
+  const base = Number.parseFloat(e.amount) || 0;
+  return e.daily ? base * days : base;
 }
 
 export function matchCategory(name: string, rules: CategoryRule[]): CategoryId | undefined {
@@ -223,11 +224,12 @@ export function matchCategory(name: string, rules: CategoryRule[]): CategoryId |
   return undefined;
 }
 
-export function categoryTotals(month: MonthData | undefined): Record<string, number> {
+export function categoryTotals(month: MonthData | undefined, days?: number): Record<string, number> {
   const stats: Record<string, number> = {};
   if (!month) return stats;
   for (const e of [...month.fixed, ...month.expenses]) {
-    stats[e.category] = (stats[e.category] || 0) + (Number.parseFloat(e.amount) || 0);
+    const amt = days !== undefined ? effectiveAmount(e, days) : Number.parseFloat(e.amount) || 0;
+    stats[e.category] = (stats[e.category] || 0) + amt;
   }
   return stats;
 }
@@ -297,6 +299,7 @@ export function parseExpenses(raw: unknown): Expense[] {
             ? (o.category as CategoryId)
             : "gastos",
           recurring: o.recurring === true,
+          ...(o.daily === true ? { daily: true } : {}),
         });
       }
     }
@@ -321,6 +324,7 @@ export function parseFixedExpenses(raw: unknown): FixedExpense[] {
           category: CATEGORIES.includes(o.category as CategoryId)
             ? (o.category as CategoryId)
             : "gastos",
+          ...(o.daily === true ? { daily: true } : {}),
         });
       }
     }
@@ -385,18 +389,34 @@ export function parsePlanTargets(raw: unknown): Record<string, string> {
 function parseMonthData(raw: unknown): MonthData | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const o = raw as Record<string, unknown>;
+  const fixed = parseExpenses(o.fixed);
+  const fixedIds = new Set(fixed.map((e) => e.id));
+  const legacyComidaDaily = typeof o.comidaDaily === "string"
+    ? o.comidaDaily
+    : typeof o.comidaDaily === "number"
+      ? String(o.comidaDaily)
+      : "";
+  const legacyComidaBank = typeof o.comidaBank === "string" && (BANK_IDS.includes(o.comidaBank as BankId) || o.comidaBank === "")
+    ? (o.comidaBank as BankId | "")
+    : "ing";
+  const migrated: Expense[] = [];
+  if (legacyComidaDaily !== "" && !fixedIds.has("comida")) {
+    migrated.push({
+      id: "comida",
+      name: "Comida",
+      amount: legacyComidaDaily,
+      type: "fijo",
+      bank: legacyComidaBank,
+      paid: false,
+      category: "gastos",
+      recurring: true,
+      daily: true,
+    });
+  }
   return {
     banks: parseBanks(o.banks),
     expenses: parseExpenses(o.expenses),
-    fixed: parseExpenses(o.fixed),
-    comidaDaily: typeof o.comidaDaily === "string"
-      ? o.comidaDaily
-      : typeof o.comidaDaily === "number"
-        ? String(o.comidaDaily)
-        : "40",
-    comidaBank: typeof o.comidaBank === "string" && (BANK_IDS.includes(o.comidaBank as BankId) || o.comidaBank === "")
-      ? (o.comidaBank as BankId | "")
-      : "ing",
+    fixed: [...fixed, ...migrated],
   };
 }
 
@@ -435,8 +455,6 @@ export function parseState(raw: unknown): PortfolioState {
           banks: legacyBanks,
           expenses: legacyExpenses,
           fixed: [],
-          comidaDaily: "40",
-          comidaBank: "ing",
         },
       };
     }
@@ -451,7 +469,7 @@ export function parseState(raw: unknown): PortfolioState {
     const seeded = [...m.fixed];
     for (const f of tmpl) {
       if (!present.has(f.id)) {
-        seeded.push({ id: f.id, name: f.name, amount: f.amount, type: "fijo", bank: f.bank, paid: false, category: f.category, recurring: true });
+        seeded.push({ id: f.id, name: f.name, amount: f.amount, type: "fijo", bank: f.bank, paid: false, category: f.category, recurring: true, daily: f.daily });
       }
     }
     months[key] = { ...m, fixed: seeded };

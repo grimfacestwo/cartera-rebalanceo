@@ -3,12 +3,12 @@ import {
   addMonth,
   bankRemaining,
   categoryTotals,
-  comidaAmount,
   currentMonthKey,
   daysInMonth,
   daysRemaining,
   DEFAULT_ASSETS,
   DEFAULT_VALUES,
+  effectiveAmount,
   matchCategory,
   monthLabel,
   parseCatRules,
@@ -188,8 +188,6 @@ describe("month helpers", () => {
         { id: "e3", name: "C", amount: "50", type: "variable" as const, bank: "santander" as const, paid: true, category: "gastos" as const, recurring: false },
       ],
       fixed: [],
-      comidaDaily: "40",
-      comidaBank: "ing" as const,
     };
     expect(bankRemaining(month, "ing")).toBe(700);
     expect(bankRemaining(month, "santander")).toBe(450);
@@ -230,32 +228,31 @@ describe("daysRemaining", () => {
   });
 });
 
-describe("comidaAmount", () => {
+describe("effectiveAmount", () => {
+  const comida = { id: "c", name: "Comida", amount: "40", type: "fijo" as const, bank: "ing" as const, paid: false, category: "gastos" as const, recurring: true, daily: true };
+
+  it("gasto diario = tarifa × días", () => {
+    expect(effectiveAmount(comida, 31)).toBe(1240);
+  });
+
+  it("gasto no diario = importe", () => {
+    expect(effectiveAmount({ ...comida, daily: false }, 31)).toBe(40);
+  });
+});
+
+describe("categoryTotals con gastos diarios", () => {
   const month = {
     banks: { ing: "500", santander: "200", trade: "100" },
     expenses: [],
-    fixed: [],
-    comidaDaily: "40",
-    comidaBank: "ing" as const,
+    fixed: [{ id: "c", name: "Comida", amount: "40", type: "fijo" as const, bank: "ing" as const, paid: false, category: "gastos" as const, recurring: true, daily: true }],
   };
 
-  it("mes futuro = 40 × díasDelMes", () => {
-    const total = daysInMonth("2999-01");
-    expect(comidaAmount(month, "2999-01")).toBe(40 * total);
+  it("sin días usa el importe base", () => {
+    expect(categoryTotals(month).gastos).toBe(40);
   });
 
-  it("mes pasado = 0", () => {
-    expect(comidaAmount(month, "2020-01")).toBe(0);
-  });
-
-  it("mes actual = 40 × daysRemaining", () => {
-    const cur = currentMonthKey();
-    expect(comidaAmount(month, cur)).toBe(40 * daysRemaining(cur));
-  });
-
-  it("comidaDaily vacío = 0", () => {
-    const empty = { ...month, comidaDaily: "" };
-    expect(comidaAmount(empty, "2999-01")).toBe(0);
+  it("con días aplica el cálculo diario", () => {
+    expect(categoryTotals(month, 31).gastos).toBe(1240);
   });
 });
 
@@ -342,7 +339,7 @@ describe("parseState + gastos fijos", () => {
   it("sema cada mes con los fijos de la plantilla", () => {
     const state = parseState({
       fixedExpenses: [{ id: "luz", name: "Luz", amount: "50", bank: "", category: "vivienda" }],
-      months: { "2026-08": { banks: { ing: "0", santander: "0", trade: "0" }, expenses: [], fixed: [], comidaDaily: "40", comidaBank: "ing" } },
+      months: { "2026-08": { banks: { ing: "0", santander: "0", trade: "0" }, expenses: [], fixed: [] } },
     });
     const m = state.months["2026-08"];
     expect(m.fixed).toHaveLength(1);
@@ -353,10 +350,22 @@ describe("parseState + gastos fijos", () => {
   it("no duplica fijos ya presentes en el mes", () => {
     const state = parseState({
       fixedExpenses: [{ id: "luz", name: "Luz", amount: "50", bank: "", category: "vivienda" }],
-      months: { "2026-08": { banks: { ing: "0", santander: "0", trade: "0" }, expenses: [], fixed: [{ id: "luz", name: "Luz", amount: "99", type: "fijo", bank: "", paid: false, category: "vivienda", recurring: true }], comidaDaily: "40", comidaBank: "ing" } },
+      months: { "2026-08": { banks: { ing: "0", santander: "0", trade: "0" }, expenses: [], fixed: [{ id: "luz", name: "Luz", amount: "99", type: "fijo", bank: "", paid: false, category: "vivienda", recurring: true }] } },
     });
     expect(state.months["2026-08"].fixed).toHaveLength(1);
     expect(state.months["2026-08"].fixed[0].amount).toBe("99");
+  });
+
+  it("migra comidaDaily legacy a gasto fijo diario", () => {
+    const state = parseState({
+      months: { "2026-08": { banks: { ing: "0", santander: "0", trade: "0" }, expenses: [], fixed: [], comidaDaily: "40", comidaBank: "ing" } },
+    });
+    const comida = state.months["2026-08"].fixed.find((e) => e.id === "comida");
+    expect(comida).toBeDefined();
+    expect(comida?.daily).toBe(true);
+    expect(comida?.amount).toBe("40");
+    expect(comida?.bank).toBe("ing");
+    expect(comida?.category).toBe("gastos");
   });
 });
 
@@ -366,8 +375,6 @@ describe("categoryTotals", () => {
       banks: { ing: "0", santander: "0", trade: "0" },
       expenses: [{ id: "e1", name: "X", amount: "30", type: "variable", bank: "", paid: false, category: "disfrute", recurring: false }],
       fixed: [{ id: "f1", name: "Luz", amount: "50", type: "fijo", bank: "", paid: false, category: "gastos", recurring: true }],
-      comidaDaily: "40",
-      comidaBank: "ing",
     };
     const totals = categoryTotals(month);
     expect(totals.disfrute).toBe(30);
