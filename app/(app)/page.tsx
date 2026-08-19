@@ -1169,26 +1169,44 @@ export default function Home() {
               {Math.abs(targetSum - 100) > 0.01 && <p className={styles.note}>Los objetivos suman {pct.format(targetSum)}%; se ajustan a 100% automáticamente.</p>}
               <h3>Gastos fijos (plantilla)</h3>
               <p className={styles.note}>Estos gastos aparecen automáticamente cada mes. Elige aquí el importe, la categoría y el banco por defecto; luego puedes ajustarlos mes a mes en la pestaña Hogar.</p>
-              {fixedExpenses.length === 0 ? <p className={styles.empty}>Sin gastos fijos.</p> : fixedExpenses.map((f) => (
-                <div key={f.id} className={styles.settingRow}>
-                  <input type="text" value={f.name} onChange={(e) => setFixedTemplateField(f.id, "name", e.target.value)} aria-label={`Nombre de ${f.name}`} className={styles.settingInput} />
-                  <input type="text" inputMode="decimal" value={f.amount} onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setFixedTemplateField(f.id, "amount", v); }} placeholder="0" aria-label={`Importe de ${f.name}`} className={styles.settingAmount} />
-                  <span className={styles.settingPct}>€</span>
-                  <select value={f.category} onChange={(e) => setFixedTemplateField(f.id, "category", e.target.value as CategoryId)} aria-label={`Categoría de ${f.name}`} className={styles.expenseSelect}>
-                    {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
-                  </select>
-                  <BankPicker value={f.bank} onChange={(b) => setFixedTemplateField(f.id, "bank", b)} ariaLabel={`Banco de ${f.name}`} />
-                  <button type="button" className={styles.removeBtn} onClick={() => removeFixedTemplate(f.id)} aria-label={`Eliminar ${f.name}`} title={`Eliminar ${f.name}`}>×</button>
-                </div>
-              ))}
-              <div className={styles.addRow}>
-                <input type="text" value={newFixedName} onChange={(e) => setNewFixedName(e.target.value)} placeholder="Nuevo gasto fijo" aria-label="Nombre del gasto fijo" />
-                <input type="text" inputMode="decimal" value={newFixedAmount} onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setNewFixedAmount(v); }} placeholder="0" aria-label="Importe" className={styles.addTarget} />
-                <select value={newFixedCategory} onChange={(e) => setNewFixedCategory(e.target.value as CategoryId)} aria-label="Categoría" className={styles.expenseSelect}>
-                  {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
-                </select>
-                <BankPicker value={newFixedBank} onChange={setNewFixedBank} ariaLabel="Banco del nuevo gasto fijo" />
-                <button type="button" className={styles.addBtn} onClick={addFixedTemplate}>Añadir</button>
+              <div className={styles.tableWrap}>
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th>Nombre</th>
+                      <th>Importe</th>
+                      <th>Categoría</th>
+                      <th>Banco</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {fixedExpenses.length === 0 ? (
+                      <tr><td colSpan={5} className={styles.empty}>Sin gastos fijos.</td></tr>
+                    ) : (
+                      fixedExpenses.map((f) => (
+                        <tr key={f.id}>
+                          <td><input type="text" value={f.name} onChange={(e) => setFixedTemplateField(f.id, "name", e.target.value)} aria-label={`Nombre de ${f.name}`} className={styles.settingInput} /></td>
+                          <td><div className={styles.amountCell}><input type="text" inputMode="decimal" value={f.amount} onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setFixedTemplateField(f.id, "amount", v); }} placeholder="0" aria-label={`Importe de ${f.name}`} className={styles.settingAmount} /><span className={styles.amountUnit}>€</span></div></td>
+                          <td><select value={f.category} onChange={(e) => setFixedTemplateField(f.id, "category", e.target.value as CategoryId)} aria-label={`Categoría de ${f.name}`} className={styles.expenseSelect}>
+                            {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
+                          </select></td>
+                          <td><BankPicker value={f.bank} onChange={(b) => setFixedTemplateField(f.id, "bank", b)} ariaLabel={`Banco de ${f.name}`} /></td>
+                          <td><button type="button" className={styles.removeBtn} onClick={() => removeFixedTemplate(f.id)} aria-label={`Eliminar ${f.name}`} title={`Eliminar ${f.name}`}>×</button></td>
+                        </tr>
+                      ))
+                    )}
+                    <tr>
+                      <td><input type="text" value={newFixedName} onChange={(e) => setNewFixedName(e.target.value)} placeholder="Nuevo gasto fijo" aria-label="Nombre del gasto fijo" /></td>
+                      <td><div className={styles.amountCell}><input type="text" inputMode="decimal" value={newFixedAmount} onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setNewFixedAmount(v); }} placeholder="0" aria-label="Importe" className={styles.settingAmount} /><span className={styles.amountUnit}>€</span></div></td>
+                      <td><select value={newFixedCategory} onChange={(e) => setNewFixedCategory(e.target.value as CategoryId)} aria-label="Categoría" className={styles.expenseSelect}>
+                        {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
+                      </select></td>
+                      <td><BankPicker value={newFixedBank} onChange={setNewFixedBank} ariaLabel="Banco del nuevo gasto fijo" /></td>
+                      <td><button type="button" className={styles.addBtn} onClick={addFixedTemplate}>Añadir</button></td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
               <h3>Reglas de categorización</h3>
               <p className={styles.note}>Al escribir el nombre de un gasto nuevo, se asigna la categoría automáticamente si coincide con la palabra clave (sin distinguir mayúsculas).</p>
