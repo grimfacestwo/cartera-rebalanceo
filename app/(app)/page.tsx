@@ -135,12 +135,15 @@ function planCompliant(cat: string, actualPct: number, target: number): boolean 
 function PlanDonut({
   totals,
   planTargets,
+  breakdown,
   currency,
 }: {
   totals: Record<string, number>;
   planTargets: Record<string, string>;
+  breakdown: Record<CategoryId, { name: string; amount: number; paid: boolean }[]>;
   currency: Intl.NumberFormat;
 }) {
+  const [openCat, setOpenCat] = useState<CategoryId | null>(null);
   const amounts = CATEGORIES.map((cat) => ({ cat, amount: totals[cat] || 0 }));
   const total = amounts.reduce((s, a) => s + a.amount, 0);
   const size = 180;
@@ -149,6 +152,14 @@ function PlanDonut({
   const center = size / 2;
   const C = 2 * Math.PI * r;
   let offset = 0;
+
+  const buildTooltip = (cat: CategoryId) => {
+    const items = breakdown[cat] || [];
+    const head = `${CATEGORY_LABELS[cat]}: ${currency.format(totals[cat] || 0)}`;
+    if (!items.length) return `${head}\nSin gastos`;
+    const lines = items.map((it) => `· ${it.name}: ${currency.format(it.amount)}${it.paid ? " (pagado)" : ""}`);
+    return `${head}\n${lines.join("\n")}`;
+  };
 
   return (
     <div className={styles.planWrap}>
@@ -170,7 +181,9 @@ function PlanDonut({
                 strokeDasharray={`${seg} ${C - seg}`}
                 strokeDashoffset={-offset}
                 transform={`rotate(-90 ${center} ${center})`}
-              />
+              >
+                <title>{buildTooltip(cat)}</title>
+              </circle>
             );
             offset += seg;
             return el;
@@ -192,18 +205,51 @@ function PlanDonut({
           const actualPct = total > 0 ? (amount / total) * 100 : 0;
           const target = Number.parseFloat(planTargets[cat] || "0") || 0;
           const ok = total > 0 && planCompliant(cat, actualPct, target);
+          const items = breakdown[cat] || [];
+          const open = openCat === cat;
           return (
-            <li key={cat} className={styles.planLegendRow}>
-              <span className={styles.dot} style={{ background: CATEGORY_COLORS[cat] }} />
-              <span className={styles.planLegendName}>{CATEGORY_LABELS[cat]}</span>
-              <span className={styles.planLegendPct}>
-                {actualPct.toFixed(0)}% <span className={styles.planLegendTarget}>/ {target}%</span>
-              </span>
-              <span
-                className={ok ? styles.planOk : styles.planBad}
-                title={ok ? "Dentro del plan" : "Fuera del plan"}
-                aria-label={ok ? "Dentro del plan" : "Fuera del plan"}
-              />
+            <li key={cat} className={styles.planLegendItem}>
+              <button
+                type="button"
+                className={styles.planLegendRow}
+                onClick={() => setOpenCat(open ? null : cat)}
+                aria-expanded={open}
+                title={buildTooltip(cat)}
+              >
+                <span className={styles.dot} style={{ background: CATEGORY_COLORS[cat] }} />
+                <span className={styles.planLegendName}>{CATEGORY_LABELS[cat]}</span>
+                <span className={styles.planLegendPct}>
+                  {actualPct.toFixed(0)}% <span className={styles.planLegendTarget}>/ {target}%</span>
+                </span>
+                <span
+                  className={ok ? styles.planOk : styles.planBad}
+                  title={ok ? "Dentro del plan" : "Fuera del plan"}
+                  aria-label={ok ? "Dentro del plan" : "Fuera del plan"}
+                />
+              </button>
+              {open && (
+                <ul className={styles.planLegendBreakdown}>
+                  {items.length === 0 ? (
+                    <li className={styles.planLegendEmpty}>Sin gastos este mes</li>
+                  ) : (
+                    items.map((it, i) => (
+                      <li key={i} className={styles.planLegendBreakdownRow}>
+                        <span className={styles.planLegendBreakdownName}>
+                          <span className={it.paid ? styles.planPaidMark : styles.planPendingMark} aria-hidden="true">
+                            {it.paid ? "✓" : "•"}
+                          </span>
+                          <span className={it.paid ? styles.planLegendPaid : ""}>{it.name}</span>
+                        </span>
+                        <span className={it.paid ? styles.planLegendPaid : ""}>{currency.format(it.amount)}</span>
+                      </li>
+                    ))
+                  )}
+                  <li className={styles.planLegendBreakdownTotal}>
+                    <span>Total</span>
+                    <span>{currency.format(amount)}</span>
+                  </li>
+                </ul>
+              )}
             </li>
           );
         })}
@@ -385,6 +431,12 @@ export default function Home() {
   const bankTotal = BANK_IDS.reduce((s, id) => s + (Number.parseFloat(activeData.banks[id]) || 0), 0);
   const totalExpensesBank = allActiveExpenses.reduce((s, e) => s + effectiveAmount(e, activeDaysRemaining), 0);
   const planTotals = categoryTotals(activeData, activeDaysRemaining);
+  const expensesByCategory = CATEGORIES.reduce((acc, c) => {
+    acc[c] = allActiveExpenses
+      .filter((e) => e.category === c)
+      .map((e) => ({ name: e.name, amount: effectiveAmount(e, activeDaysRemaining), paid: e.paid }));
+    return acc;
+  }, {} as Record<CategoryId, { name: string; amount: number; paid: boolean }[]>);
   const totalExpenses = totalExpensesBank;
   const totalPendientes = allActiveExpenses.filter((e) => !e.paid).reduce((s, e) => s + effectiveAmount(e, activeDaysRemaining), 0);
   const remaining = bankTotal - totalPendientes;
@@ -1049,7 +1101,7 @@ export default function Home() {
             {/* Plan de hogar */}
             <section className={styles.card}>
               <h2>Plan de hogar</h2>
-              <PlanDonut totals={planTotals} planTargets={planTargets} currency={currency} />
+              <PlanDonut totals={planTotals} planTargets={planTargets} breakdown={expensesByCategory} currency={currency} />
             </section>
 
             {trendsData.length > 1 && (
