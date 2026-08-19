@@ -24,6 +24,7 @@ import {
   matchCategory,
   monthLabel,
   parseState,
+  PLAN_TARGETS_DEFAULT,
   sortMonthKeys,
   type BankId,
   type CategoryId,
@@ -124,6 +125,93 @@ function BankPicker({
   );
 }
 
+const PLAN_TOLERANCE = 5;
+
+function planCompliant(cat: string, actualPct: number, target: number): boolean {
+  if (cat === "inversion" || cat === "crecimiento") return actualPct >= target - PLAN_TOLERANCE;
+  return actualPct <= target + PLAN_TOLERANCE;
+}
+
+function PlanDonut({
+  totals,
+  planTargets,
+  currency,
+}: {
+  totals: Record<string, number>;
+  planTargets: Record<string, string>;
+  currency: Intl.NumberFormat;
+}) {
+  const amounts = CATEGORIES.map((cat) => ({ cat, amount: totals[cat] || 0 }));
+  const total = amounts.reduce((s, a) => s + a.amount, 0);
+  const size = 180;
+  const stroke = 22;
+  const r = (size - stroke) / 2;
+  const center = size / 2;
+  const C = 2 * Math.PI * r;
+  let offset = 0;
+
+  return (
+    <div className={styles.planWrap}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-label="Reparto del plan de hogar">
+        <circle cx={center} cy={center} r={r} fill="none" stroke="#f1f5f9" strokeWidth={stroke} />
+        {total > 0 &&
+          amounts.map(({ cat, amount }) => {
+            const frac = amount / total;
+            const seg = frac * C;
+            const el = (
+              <circle
+                key={cat}
+                cx={center}
+                cy={center}
+                r={r}
+                fill="none"
+                stroke={CATEGORY_COLORS[cat as CategoryId]}
+                strokeWidth={stroke}
+                strokeDasharray={`${seg} ${C - seg}`}
+                strokeDashoffset={-offset}
+                transform={`rotate(-90 ${center} ${center})`}
+              />
+            );
+            offset += seg;
+            return el;
+          })}
+        {total > 0 && (
+          <text x={center} y={center - 4} textAnchor="middle" className={styles.donutTotal}>
+            {currency.format(total)}
+          </text>
+        )}
+        {total > 0 && (
+          <text x={center} y={center + 16} textAnchor="middle" className={styles.donutSub}>
+            Total mes
+          </text>
+        )}
+      </svg>
+      <ul className={styles.planLegend}>
+        {CATEGORIES.map((cat) => {
+          const amount = totals[cat] || 0;
+          const actualPct = total > 0 ? (amount / total) * 100 : 0;
+          const target = Number.parseFloat(planTargets[cat] || "0") || 0;
+          const ok = total > 0 && planCompliant(cat, actualPct, target);
+          return (
+            <li key={cat} className={styles.planLegendRow}>
+              <span className={styles.dot} style={{ background: CATEGORY_COLORS[cat] }} />
+              <span className={styles.planLegendName}>{CATEGORY_LABELS[cat]}</span>
+              <span className={styles.planLegendPct}>
+                {actualPct.toFixed(0)}% <span className={styles.planLegendTarget}>/ {target}%</span>
+              </span>
+              <span
+                className={ok ? styles.planOk : styles.planBad}
+                title={ok ? "Dentro del plan" : "Fuera del plan"}
+                aria-label={ok ? "Dentro del plan" : "Fuera del plan"}
+              />
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 export default function Home() {
   const [assets, setAssets] = useState<AssetDef[]>(DEFAULT_ASSETS);
   const [values, setValues] = useState<PortfolioValues>(DEFAULT_VALUES);
@@ -141,16 +229,17 @@ export default function Home() {
   const [newExpName, setNewExpName] = useState("");
   const [newExpAmount, setNewExpAmount] = useState("");
   const [newExpType, setNewExpType] = useState<"fijo" | "variable">("variable");
-  const [newExpCategory, setNewExpCategory] = useState<CategoryId>("otros");
+  const [newExpCategory, setNewExpCategory] = useState<CategoryId>("gastos");
   const [newExpRecurring, setNewExpRecurring] = useState(false);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>(DEFAULT_FIXED_EXPENSES);
   const [catRules, setCatRules] = useState<CategoryRule[]>([]);
   const [newCatRuleMatch, setNewCatRuleMatch] = useState("");
-  const [newCatRuleCategory, setNewCatRuleCategory] = useState<CategoryId>("otros");
+  const [newCatRuleCategory, setNewCatRuleCategory] = useState<CategoryId>("gastos");
   const [newFixedName, setNewFixedName] = useState("");
   const [newFixedAmount, setNewFixedAmount] = useState("");
-  const [newFixedCategory, setNewFixedCategory] = useState<CategoryId>("otros");
+  const [newFixedCategory, setNewFixedCategory] = useState<CategoryId>("gastos");
+  const [planTargets, setPlanTargets] = useState<Record<string, string>>({ ...PLAN_TARGETS_DEFAULT });
   const [newFixedBank, setNewFixedBank] = useState<BankId | "">("");
   const [expSearch, setExpSearch] = useState("");
   const [expSort, setExpSort] = useState<"paid" | "amount" | "name" | "category">("paid");
@@ -184,6 +273,7 @@ export default function Home() {
           setGoals(state.goals);
           setFixedExpenses(state.fixedExpenses);
           setCatRules(state.catRules);
+          setPlanTargets(state.planTargets);
           const keys = sortMonthKeys(Object.keys(state.months));
           if (keys.length > 0) setActiveMonth(keys[keys.length - 1]);
           else setActiveMonth(currentMonthKey());
@@ -208,13 +298,13 @@ export default function Home() {
       fetch("/api/state", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assets, values, contribution, months, goals, fixedExpenses, catRules }),
+        body: JSON.stringify({ assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets }),
       })
         .then((res) => setSaveStatus(res.ok ? "saved" : "error"))
         .catch(() => setSaveStatus("error"));
     }, 500);
     return () => clearTimeout(timer);
-  }, [assets, values, contribution, months, goals, fixedExpenses, catRules, loading, loadError]);
+  }, [assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, loading, loadError]);
 
   const retryLoad = () => { setLoadError(false); setLoading(true); setReloadKey((k) => k + 1); };
 
@@ -294,9 +384,15 @@ export default function Home() {
   const totalExpensesBank = allActiveExpenses.reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
   const activeDaysRemaining = daysRemaining(activeMonth);
   const activeComida = comidaAmount(activeData, activeMonth);
+  const planTotals = useMemo(() => {
+    const t = categoryTotals(activeData);
+    t.gastos = (t.gastos || 0) + comidaAmount(activeData, activeMonth);
+    return t;
+  }, [activeData, activeMonth]);
   const totalExpenses = totalExpensesBank + activeComida;
   const totalPendientes = allActiveExpenses.filter((e) => !e.paid).reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0) + activeComida;
   const remaining = bankTotal - totalPendientes;
+  const planSum = CATEGORIES.reduce((s, c) => s + (Number.parseFloat(planTargets[c]) || 0), 0);
 
   // Expenses
   const setExpField = (id: string, field: keyof Expense, val: unknown) => {
@@ -313,7 +409,7 @@ export default function Home() {
       ...m,
       expenses: [...m.expenses, { id: newId(), name, amount: newExpAmount, type: newExpType, bank: "ing", paid: false, category: newExpCategory, recurring: newExpRecurring }],
     }));
-    setNewExpName(""); setNewExpAmount(""); setNewExpType("variable"); setNewExpCategory("otros"); setNewExpRecurring(false);
+    setNewExpName(""); setNewExpAmount(""); setNewExpType("variable"); setNewExpCategory("gastos"); setNewExpRecurring(false);
   };
 
   const removeExpense = (id: string) => {
@@ -419,6 +515,10 @@ export default function Home() {
     setGoals((prev) => prev.map((g) => (g.id === id ? { ...g, [field]: val } : g)));
   };
 
+  const setPlanTarget = (id: string, val: string) => {
+    setPlanTargets((prev) => ({ ...prev, [id]: val }));
+  };
+
   const addGoal = () => {
     const name = goalName.trim();
     if (!name) return;
@@ -456,9 +556,9 @@ export default function Home() {
     const cur = months[activeMonth];
     const prev = months[prevKey];
     const curTotals = categoryTotals(cur);
-    curTotals.alimentacion = (curTotals.alimentacion || 0) + comidaFull(cur, activeMonth);
+    curTotals.gastos = (curTotals.gastos || 0) + comidaFull(cur, activeMonth);
     const prevTotals = categoryTotals(prev);
-    prevTotals.alimentacion = (prevTotals.alimentacion || 0) + comidaFull(prev, prevKey);
+    prevTotals.gastos = (prevTotals.gastos || 0) + comidaFull(prev, prevKey);
     const cats = new Set([...Object.keys(curTotals), ...Object.keys(prevTotals)]);
     const rows = [...cats]
       .map((cat) => {
@@ -530,7 +630,7 @@ export default function Home() {
 
   // Export/Import
   const handleExport = () => {
-    const payload = { assets, values, contribution, months, goals, fixedExpenses, catRules };
+    const payload = { assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -590,7 +690,7 @@ export default function Home() {
     const match = newCatRuleMatch.trim();
     if (!match) return;
     setCatRules((prev) => [...prev, { id: newId(), match, category: newCatRuleCategory }]);
-    setNewCatRuleMatch(""); setNewCatRuleCategory("otros");
+    setNewCatRuleMatch(""); setNewCatRuleCategory("gastos");
   };
   const removeCatRule = (id: string) => {
     setCatRules((prev) => prev.filter((r) => r.id !== id));
@@ -993,6 +1093,12 @@ export default function Home() {
               <p className={`${styles.disponibleTotal} ${remaining >= 0 ? styles.inject : styles.negative}`}>Disponible total: {currency.format(remaining)} €</p>
             </section>
 
+            {/* Plan de hogar */}
+            <section className={styles.card}>
+              <h2>Plan de hogar</h2>
+              <PlanDonut totals={planTotals} planTargets={planTargets} currency={currency} />
+            </section>
+
             {trendsData.length > 1 && (
               <section className={styles.card}>
                 <h2>Tendencia de gastos</h2>
@@ -1167,6 +1273,26 @@ export default function Home() {
                 </div>
               ))}
               {Math.abs(targetSum - 100) > 0.01 && <p className={styles.note}>Los objetivos suman {pct.format(targetSum)}%; se ajustan a 100% automáticamente.</p>}
+              <h3>Plan de hogar</h3>
+              <p className={styles.note}>Reparto objetivo del gasto mensual en 4 categorías. Se compara con el reparto real en la pestaña Hogar (donut de cumplimiento).</p>
+              {CATEGORIES.map((c) => (
+                <div key={c} className={styles.settingRow}>
+                  <span className={styles.dot} style={{ background: CATEGORY_COLORS[c] }} />
+                  <span className={styles.settingName}>{CATEGORY_LABELS[c]}</span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={planTargets[c] === "" || planTargets[c] === undefined ? "" : planTargets[c]}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === "" || /^\d*\.?\d*$/.test(v)) setPlanTarget(c, v);
+                    }}
+                    aria-label={`Objetivo de ${CATEGORY_LABELS[c]} en porcentaje`}
+                  />
+                  <span className={styles.settingPct}>%</span>
+                </div>
+              ))}
+              {Math.abs(planSum - 100) > 0.01 && <p className={styles.note}>Los porcentajes suman {planSum}%; el plan ideal suma 100%.</p>}
               <h3>Gastos fijos (plantilla)</h3>
               <p className={styles.note}>Estos gastos aparecen automáticamente cada mes. Elige aquí el importe, la categoría y el banco por defecto; luego puedes ajustarlos mes a mes en la pestaña Hogar.</p>
               <div className={styles.tableWrap}>

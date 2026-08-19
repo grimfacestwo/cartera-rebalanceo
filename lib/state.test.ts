@@ -15,7 +15,9 @@ import {
   parseExpenses,
   parseFixedExpenses,
   parseGoals,
+  parsePlanTargets,
   parseState,
+  PLAN_TARGETS_DEFAULT,
   sortMonthKeys,
   type MonthData,
 } from "./state";
@@ -119,8 +121,8 @@ describe("parseExpenses", () => {
     ];
     const result = parseExpenses(data);
     expect(result).toHaveLength(2);
-    expect(result[0]).toEqual({ id: "e1", name: "Alquiler", amount: "800", type: "fijo", bank: "santander", paid: true, category: "otros", recurring: false });
-    expect(result[1]).toEqual({ id: "e2", name: "Gasolina", amount: "50", type: "variable", bank: "trade", paid: false, category: "otros", recurring: false });
+    expect(result[0]).toEqual({ id: "e1", name: "Alquiler", amount: "800", type: "fijo", bank: "santander", paid: true, category: "gastos", recurring: false });
+    expect(result[1]).toEqual({ id: "e2", name: "Gasolina", amount: "50", type: "variable", bank: "trade", paid: false, category: "gastos", recurring: false });
   });
 
   it("devuelve [] para datos inválidos", () => {
@@ -181,9 +183,9 @@ describe("month helpers", () => {
     const month = {
       banks: { ing: "1000", santander: "500", trade: "300" },
       expenses: [
-        { id: "e1", name: "A", amount: "200", type: "fijo" as const, bank: "ing" as const, paid: false, category: "otros" as const, recurring: false },
-        { id: "e2", name: "B", amount: "100", type: "variable" as const, bank: "ing" as const, paid: false, category: "otros" as const, recurring: false },
-        { id: "e3", name: "C", amount: "50", type: "variable" as const, bank: "santander" as const, paid: true, category: "otros" as const, recurring: false },
+        { id: "e1", name: "A", amount: "200", type: "fijo" as const, bank: "ing" as const, paid: false, category: "gastos" as const, recurring: false },
+        { id: "e2", name: "B", amount: "100", type: "variable" as const, bank: "ing" as const, paid: false, category: "gastos" as const, recurring: false },
+        { id: "e3", name: "C", amount: "50", type: "variable" as const, bank: "santander" as const, paid: true, category: "gastos" as const, recurring: false },
       ],
       fixed: [],
       comidaDaily: "40",
@@ -319,14 +321,14 @@ describe("parseFixedExpenses", () => {
     const raw = [{ id: "f1", name: "Hipoteca", amount: "672.80" }];
     const out = parseFixedExpenses(raw);
     expect(out).toHaveLength(1);
-    expect(out[0]).toEqual({ id: "f1", name: "Hipoteca", amount: "672.80", bank: "", category: "otros" });
+    expect(out[0]).toEqual({ id: "f1", name: "Hipoteca", amount: "672.80", bank: "", category: "gastos" });
   });
 
   it("respeta banco y categoría", () => {
-    const raw = [{ id: "f1", name: "Luz", amount: "50", bank: "ing", category: "vivienda" }];
+    const raw = [{ id: "f1", name: "Luz", amount: "50", bank: "ing", category: "gastos" }];
     const out = parseFixedExpenses(raw);
     expect(out[0].bank).toBe("ing");
-    expect(out[0].category).toBe("vivienda");
+    expect(out[0].category).toBe("gastos");
   });
 });
 
@@ -362,14 +364,14 @@ describe("categoryTotals", () => {
   it("suma fijos y variables por categoría", () => {
     const month: MonthData = {
       banks: { ing: "0", santander: "0", trade: "0" },
-      expenses: [{ id: "e1", name: "X", amount: "30", type: "variable", bank: "", paid: false, category: "ocio", recurring: false }],
-      fixed: [{ id: "f1", name: "Luz", amount: "50", type: "fijo", bank: "", paid: false, category: "vivienda", recurring: true }],
+      expenses: [{ id: "e1", name: "X", amount: "30", type: "variable", bank: "", paid: false, category: "disfrute", recurring: false }],
+      fixed: [{ id: "f1", name: "Luz", amount: "50", type: "fijo", bank: "", paid: false, category: "gastos", recurring: true }],
       comidaDaily: "40",
       comidaBank: "ing",
     };
     const totals = categoryTotals(month);
-    expect(totals.ocio).toBe(30);
-    expect(totals.vivienda).toBe(50);
+    expect(totals.disfrute).toBe(30);
+    expect(totals.gastos).toBe(50);
   });
 
   it("devuelve {} para mes undefined", () => {
@@ -379,12 +381,12 @@ describe("categoryTotals", () => {
 
 describe("matchCategory", () => {
   const rules = [
-    { id: "r1", match: "netflix", category: "suscripciones" as const },
-    { id: "r2", match: "Luz", category: "vivienda" as const },
+    { id: "r1", match: "netflix", category: "gastos" as const },
+    { id: "r2", match: "Luz", category: "inversion" as const },
   ];
 
   it("encuentra coincidencia sin distinguir mayúsculas", () => {
-    expect(matchCategory("Netflix mensual", rules)).toBe("suscripciones");
+    expect(matchCategory("Netflix mensual", rules)).toBe("gastos");
   });
 
   it("devuelve undefined si no hay coincidencia", () => {
@@ -399,20 +401,36 @@ describe("matchCategory", () => {
 describe("parseCatRules", () => {
   it("filtra reglas inválidas y respeta categorías", () => {
     const raw = [
-      { id: "r1", match: "netflix", category: "suscripciones" },
+      { id: "r1", match: "netflix", category: "gastos" },
       { id: "r2", match: "x", category: "noexiste" },
       { match: "sinid", category: "ocio" },
     ];
     const out = parseCatRules(raw);
     expect(out).toHaveLength(1);
-    expect(out[0]).toEqual({ id: "r1", match: "netflix", category: "suscripciones" });
+    expect(out[0]).toEqual({ id: "r1", match: "netflix", category: "gastos" });
   });
 
   it("parseState round-trips catRules", () => {
     const state = parseState({
-      catRules: [{ id: "r1", match: "netflix", category: "suscripciones" }],
+      catRules: [{ id: "r1", match: "netflix", category: "gastos" }],
     });
     expect(state.catRules).toHaveLength(1);
     expect(state.catRules[0].match).toBe("netflix");
+  });
+});
+
+describe("parsePlanTargets", () => {
+  it("usa valores por defecto si no hay datos", () => {
+    expect(parsePlanTargets(undefined)).toEqual(PLAN_TARGETS_DEFAULT);
+  });
+
+  it("mantiene solo categorías válidas y respeta valores", () => {
+    const out = parsePlanTargets({ inversion: "20", gastos: "60", crecimiento: "10", disfrute: "10", otro: "99" });
+    expect(out).toEqual({ inversion: "20", gastos: "60", crecimiento: "10", disfrute: "10" });
+  });
+
+  it("parseState incluye planTargets por defecto", () => {
+    const state = parseState({});
+    expect(state.planTargets).toEqual(PLAN_TARGETS_DEFAULT);
   });
 });

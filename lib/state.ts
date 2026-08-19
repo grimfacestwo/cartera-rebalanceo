@@ -3,39 +3,27 @@ import type { AssetDef } from "@/lib/rebalance";
 export type PortfolioValues = Record<string, string>;
 
 export const CATEGORIES = [
-  "alimentacion",
-  "transporte",
-  "vivienda",
-  "ocio",
-  "salud",
-  "educacion",
-  "suscripciones",
-  "otros",
+  "inversion",
+  "gastos",
+  "crecimiento",
+  "disfrute",
 ] as const;
 export type CategoryId = (typeof CATEGORIES)[number];
 export type CategoryLabel = Record<CategoryId, string>;
 export type CategoryColor = Record<CategoryId, string>;
 
 export const CATEGORY_LABELS: CategoryLabel = {
-  alimentacion: "Alimentación",
-  transporte: "Transporte",
-  vivienda: "Vivienda",
-  ocio: "Ocio",
-  salud: "Salud",
-  educacion: "Educación",
-  suscripciones: "Suscripciones",
-  otros: "Otros",
+  inversion: "Inversión",
+  gastos: "Gastos",
+  crecimiento: "Crecimiento",
+  disfrute: "Disfrute",
 };
 
 export const CATEGORY_COLORS: CategoryColor = {
-  alimentacion: "#f97316",
-  transporte: "#3b82f6",
-  vivienda: "#8b5cf6",
-  ocio: "#ec4899",
-  salud: "#22c55e",
-  educacion: "#06b6d4",
-  suscripciones: "#eab308",
-  otros: "#94a3b8",
+  inversion: "#3b82f6",
+  gastos: "#f97316",
+  crecimiento: "#22c55e",
+  disfrute: "#ec4899",
 };
 
 export type Expense = {
@@ -74,18 +62,25 @@ export type CategoryRule = {
 };
 
 export const DEFAULT_FIXED_EXPENSES: FixedExpense[] = [
-  { id: "hipoteca", name: "Hipoteca", amount: "672.80", bank: "", category: "vivienda" },
-  { id: "digi", name: "Digi", amount: "28", bank: "", category: "suscripciones" },
-  { id: "comunidad", name: "Comunidad", amount: "55.60", bank: "", category: "vivienda" },
-  { id: "combustible", name: "Combustible", amount: "120", bank: "", category: "transporte" },
-  { id: "primitiva", name: "Primitiva", amount: "60", bank: "", category: "ocio" },
-  { id: "gym", name: "Gym", amount: "75", bank: "", category: "salud" },
-  { id: "sharesub", name: "Sharesub", amount: "30", bank: "", category: "suscripciones" },
-  { id: "ahorro", name: "Ahorro", amount: "70", bank: "", category: "otros" },
-  { id: "finanzas", name: "Finanzas", amount: "60", bank: "", category: "otros" },
-  { id: "aportacion", name: "Aportacion", amount: "90", bank: "", category: "otros" },
-  { id: "comedor", name: "Comedor", amount: "180", bank: "", category: "alimentacion" },
+  { id: "hipoteca", name: "Hipoteca", amount: "672.80", bank: "", category: "gastos" },
+  { id: "digi", name: "Digi", amount: "28", bank: "", category: "gastos" },
+  { id: "comunidad", name: "Comunidad", amount: "55.60", bank: "", category: "gastos" },
+  { id: "combustible", name: "Combustible", amount: "120", bank: "", category: "gastos" },
+  { id: "primitiva", name: "Primitiva", amount: "60", bank: "", category: "disfrute" },
+  { id: "gym", name: "Gym", amount: "75", bank: "", category: "disfrute" },
+  { id: "sharesub", name: "Sharesub", amount: "30", bank: "", category: "gastos" },
+  { id: "ahorro", name: "Ahorro", amount: "70", bank: "", category: "inversion" },
+  { id: "finanzas", name: "Finanzas", amount: "60", bank: "", category: "inversion" },
+  { id: "aportacion", name: "Aportacion", amount: "90", bank: "", category: "inversion" },
+  { id: "comedor", name: "Comedor", amount: "180", bank: "", category: "gastos" },
 ];
+
+export const PLAN_TARGETS_DEFAULT: Record<CategoryId, string> = {
+  inversion: "15",
+  gastos: "70",
+  crecimiento: "5",
+  disfrute: "10",
+};
 
 export const BANK_IDS = ["ing", "santander", "trade"] as const;
 export type BankId = (typeof BANK_IDS)[number];
@@ -124,6 +119,7 @@ export type PortfolioState = {
   goals: Goal[];
   fixedExpenses: FixedExpense[];
   catRules: CategoryRule[];
+  planTargets: Record<string, string>;
 };
 
 export const DEFAULT_ASSETS: AssetDef[] = [
@@ -146,6 +142,7 @@ export const DEFAULT_STATE: PortfolioState = {
   goals: [],
   fixedExpenses: DEFAULT_FIXED_EXPENSES,
   catRules: [],
+  planTargets: { ...PLAN_TARGETS_DEFAULT },
 };
 
 export const PALETTE = [
@@ -298,7 +295,7 @@ export function parseExpenses(raw: unknown): Expense[] {
           paid: o.paid === true,
           category: CATEGORIES.includes(o.category as CategoryId)
             ? (o.category as CategoryId)
-            : "otros",
+            : "gastos",
           recurring: o.recurring === true,
         });
       }
@@ -323,7 +320,7 @@ export function parseFixedExpenses(raw: unknown): FixedExpense[] {
             : "",
           category: CATEGORIES.includes(o.category as CategoryId)
             ? (o.category as CategoryId)
-            : "otros",
+            : "gastos",
         });
       }
     }
@@ -368,6 +365,18 @@ export function parseCatRules(raw: unknown): CategoryRule[] {
       ) {
         out.push({ id: o.id, match: o.match, category: o.category as CategoryId });
       }
+    }
+  }
+  return out;
+}
+
+export function parsePlanTargets(raw: unknown): Record<string, string> {
+  const out: Record<string, string> = { ...PLAN_TARGETS_DEFAULT };
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (CATEGORIES.includes(k as CategoryId)) {
+      out[k as CategoryId] =
+        typeof v === "number" ? String(v) : typeof v === "string" ? v : out[k as CategoryId];
     }
   }
   return out;
@@ -456,5 +465,6 @@ export function parseState(raw: unknown): PortfolioState {
     goals: parseGoals(o.goals),
     fixedExpenses,
     catRules: parseCatRules(o.catRules),
+    planTargets: parsePlanTargets(o.planTargets),
   };
 }

@@ -1431,3 +1431,86 @@
 [data-theme="dark"] .anomaly td {
   background: rgba(239, 68, 68, 0.18);
 }
+
+.planWrap {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.donutTotal {
+  font-size: 0.95rem;
+  font-weight: 700;
+  fill: #0f172a;
+}
+
+.donutSub {
+  font-size: 0.7rem;
+  fill: #64748b;
+}
+
+.planLegend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.planLegendRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.planLegendName {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.planLegendPct {
+  color: #475569;
+}
+
+.planLegendTarget {
+  color: #94a3b8;
+  font-size: 0.8rem;
+}
+
+.planOk {
+  display: inline-block;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: #16a34a;
+}
+
+.planBad {
+  display: inline-block;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: #dc2626;
+}
+
+[data-theme="dark"] .donutTotal {
+  fill: #e2e8f0;
+}
+
+[data-theme="dark"] .donutSub {
+  fill: #94a3b8;
+}
+
+[data-theme="dark"] .planLegendPct {
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .planLegendTarget {
+  color: #64748b;
+}
