@@ -341,10 +341,10 @@ export default function Home() {
   useEffect(() => {
     if (loading || loadError) return;
     if (skipOnce.current) { skipOnce.current = false; return; }
+    const body = JSON.stringify({ assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets });
+    pendingSaveRef.current = body;
     const timer = setTimeout(async () => {
       setSaveStatus("saving");
-      const body = JSON.stringify({ assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets });
-      pendingSaveRef.current = body;
       let ok = false;
       for (let i = 0; i < 2 && !ok; i++) {
         try {
