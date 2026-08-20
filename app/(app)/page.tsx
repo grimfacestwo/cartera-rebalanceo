@@ -524,6 +524,7 @@ export default function Home() {
 
   const removeFixed = (id: string) => {
     updateMonth((m) => ({ ...m, fixed: m.fixed.filter((e) => e.id !== id) }));
+    setFixedExpenses((prev) => prev.filter((f) => f.id !== id));
   };
 
   const setFixedField = (id: string, field: keyof Expense, val: unknown) => {
