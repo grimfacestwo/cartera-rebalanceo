@@ -235,6 +235,7 @@ function ExpenseMatrix({
   onSetPlanTarget,
   onMoveRow,
   onDeleteRow,
+  onAddRow,
 }: {
   groups: SummaryCategoryGroup[];
   monthKeys: string[];
@@ -249,10 +250,25 @@ function ExpenseMatrix({
   onSetPlanTarget: (cat: CategoryId, value: string) => void;
   onMoveRow: (row: SummaryRow, direction: "up" | "down") => void;
   onDeleteRow: (row: SummaryRow) => void;
+  onAddRow: (input: { name: string; amount: string; bank: BankId | ""; category: CategoryId }) => void;
 }) {
+  const [newName, setNewName] = useState("");
+  const [newAmount, setNewAmount] = useState("");
+  const [newBank, setNewBank] = useState<BankId | "">("");
+  const [newCategory, setNewCategory] = useState<CategoryId>("gastos");
+
   const visibleGroups = groups.filter((g) => g.rows.length > 0);
-  if (monthKeys.length === 0 || visibleGroups.length === 0) return null;
+  if (monthKeys.length === 0) return null;
   const colCount = 4 + monthKeys.length;
+
+  const submitAdd = () => {
+    const name = newName.trim();
+    if (!name) return;
+    onAddRow({ name, amount: newAmount, bank: newBank, category: newCategory });
+    setNewName("");
+    setNewAmount("");
+    setNewBank("");
+  };
 
   return (
     <div className={styles.summaryWrap}>
@@ -365,6 +381,49 @@ function ExpenseMatrix({
             </Fragment>
             );
           })}
+          <tr className={styles.expenseAddRow}>
+            <td />
+            <td className={styles.summaryConceptCell}>
+              <input
+                type="text"
+                value={newName}
+                onChange={(ev) => setNewName(ev.target.value)}
+                placeholder="Nuevo gasto"
+                className={styles.expenseInput}
+                aria-label="Nombre del nuevo gasto"
+                onKeyDown={(ev) => { if (ev.key === "Enter") submitAdd(); }}
+              />
+            </td>
+            <td className={styles.summaryAmountCell}>
+              <div className={styles.amountCell}>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={newAmount}
+                  onChange={(ev) => { const v = ev.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setNewAmount(v); }}
+                  placeholder="0"
+                  className={styles.expenseInput}
+                  aria-label="Importe del nuevo gasto"
+                  style={{ width: "4rem" }}
+                />
+                <span className={styles.amountUnit}>€</span>
+              </div>
+            </td>
+            <td className={styles.summaryBankCell}>
+              <BankPicker value={newBank} onChange={setNewBank} ariaLabel="Banco del nuevo gasto" />
+            </td>
+            <td colSpan={monthKeys.length}>
+              <select
+                value={newCategory}
+                onChange={(ev) => setNewCategory(ev.target.value as CategoryId)}
+                className={styles.expenseSelect}
+                aria-label="Categoría del nuevo gasto"
+              >
+                {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
+              </select>
+              <button type="button" className={styles.addBtn} onClick={submitAdd}>+ Añadir</button>
+            </td>
+          </tr>
         </tbody>
       </table>
     </div>
@@ -685,6 +744,22 @@ export default function HogarManager() {
     });
   };
 
+  // Añade un gasto fijo nuevo: entra en la plantilla y se siembra al
+  // instante en todos los meses ya creados (igual que hace parseState al
+  // cargar), para que la nueva fila aparezca ya en el resumen sin recargar.
+  const addFixedRow = ({ name, amount, bank, category }: { name: string; amount: string; bank: BankId | ""; category: CategoryId }) => {
+    const id = newId();
+    setFixedExpenses((prev) => [...prev, { id, name, amount, bank, category, daily: false }]);
+    setMonths((prev) => {
+      const next: Record<string, MonthData> = {};
+      for (const [key, m] of Object.entries(prev)) {
+        if (m.fixed.some((e) => e.id === id)) { next[key] = m; continue; }
+        next[key] = { ...m, fixed: [...m.fixed, { id, name, amount, type: "fijo", bank, paid: false, category, recurring: true, daily: false }] };
+      }
+      return next;
+    });
+  };
+
   // Elimina el gasto de una fila del resumen de TODOS los meses donde
   // aparece (y de la plantilla si es fijo), igual que las demás ediciones
   // "globales" de fila (banco/nombre/importe).
@@ -858,6 +933,7 @@ export default function HogarManager() {
                 onSetPlanTarget={setPlanTarget}
                 onMoveRow={moveRow}
                 onDeleteRow={deleteRow}
+                onAddRow={addFixedRow}
               />
               <p className={styles.note}>Los gastos puntuales no recurrentes no aparecen aquí.</p>
             </section>
