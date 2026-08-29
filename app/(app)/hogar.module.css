@@ -1636,6 +1636,33 @@
   text-align: center;
 }
 
+.summaryActionsHeader,
+.summaryActionsCell {
+  white-space: nowrap;
+  text-align: left;
+}
+
+.moveBtn {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 0.7rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.2rem 0.3rem;
+  border-radius: 4px;
+}
+
+.moveBtn:hover:not(:disabled) {
+  color: #334155;
+  background: rgba(100, 116, 139, 0.1);
+}
+
+.moveBtn:disabled {
+  color: #e2e8f0;
+  cursor: default;
+}
+
 .summaryConceptHeader,
 .summaryConceptCell {
   position: sticky;
@@ -1770,4 +1797,13 @@
 
 [data-theme="dark"] .summaryTargetInput {
   background: rgba(15, 23, 42, 0.35);
+}
+
+[data-theme="dark"] .moveBtn:hover:not(:disabled) {
+  color: #f1f5f9;
+  background: rgba(148, 163, 184, 0.15);
+}
+
+[data-theme="dark"] .moveBtn:disabled {
+  color: #334155;
 }

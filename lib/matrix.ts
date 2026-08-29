@@ -44,6 +44,7 @@ export function buildExpenseMatrix(
   months: Record<string, MonthData>,
   monthKeys: string[],
   planTargets: Record<string, string>,
+  rowOrder: string[] = [],
 ): SummaryCategoryGroup[] {
   const fixedRows = new Map<string, SummaryRow>();
   const variableRows = new Map<string, SummaryRow>();
@@ -90,6 +91,15 @@ export function buildExpenseMatrix(
       if (!(key in row.cells)) row.cells[key] = cellFor(undefined);
     }
   }
+
+  // Orden preferido por el usuario (arrastrado en el resumen); las filas sin
+  // posición guardada mantienen su orden natural al final (sort estable).
+  const orderIndex = new Map(rowOrder.map((key, i) => [key, i]));
+  allRows.sort((a, b) => {
+    const ia = orderIndex.get(a.key) ?? Number.MAX_SAFE_INTEGER;
+    const ib = orderIndex.get(b.key) ?? Number.MAX_SAFE_INTEGER;
+    return ia - ib;
+  });
 
   return CATEGORIES.map((category) => ({
     category,

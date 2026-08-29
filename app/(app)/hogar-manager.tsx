@@ -233,6 +233,8 @@ function ExpenseMatrix({
   onToggleCell,
   onToggleCategory,
   onSetPlanTarget,
+  onMoveRow,
+  onDeleteRow,
 }: {
   groups: SummaryCategoryGroup[];
   monthKeys: string[];
@@ -245,16 +247,19 @@ function ExpenseMatrix({
   onToggleCell: (row: SummaryRow, monthKey: string) => void;
   onToggleCategory: (cat: CategoryId) => void;
   onSetPlanTarget: (cat: CategoryId, value: string) => void;
+  onMoveRow: (row: SummaryRow, direction: "up" | "down") => void;
+  onDeleteRow: (row: SummaryRow) => void;
 }) {
   const visibleGroups = groups.filter((g) => g.rows.length > 0);
   if (monthKeys.length === 0 || visibleGroups.length === 0) return null;
-  const colCount = 3 + monthKeys.length;
+  const colCount = 4 + monthKeys.length;
 
   return (
     <div className={styles.summaryWrap}>
       <table className={styles.summaryTable}>
         <thead>
           <tr>
+            <th className={styles.summaryActionsHeader} />
             <th className={styles.summaryConceptHeader}>Concepto</th>
             <th>Importe</th>
             <th>Banco</th>
@@ -303,8 +308,13 @@ function ExpenseMatrix({
                   </span>
                 </td>
               </tr>
-              {!collapsed && group.rows.map((row) => (
+              {!collapsed && group.rows.map((row, idx) => (
                 <tr key={`${group.category}-${row.kind}-${row.key}`}>
+                  <td className={styles.summaryActionsCell}>
+                    <button type="button" className={styles.moveBtn} onClick={() => onMoveRow(row, "up")} disabled={idx === 0} aria-label={`Subir ${row.name}`} title="Subir">▲</button>
+                    <button type="button" className={styles.moveBtn} onClick={() => onMoveRow(row, "down")} disabled={idx === group.rows.length - 1} aria-label={`Bajar ${row.name}`} title="Bajar">▼</button>
+                    <button type="button" className={styles.removeBtn} onClick={() => onDeleteRow(row)} aria-label={`Eliminar ${row.name}`} title="Eliminar">×</button>
+                  </td>
                   <td className={styles.summaryConceptCell}>
                     <input
                       type="text"
@@ -375,6 +385,7 @@ export default function HogarManager() {
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>(DEFAULT_FIXED_EXPENSES);
   const [catRules, setCatRules] = useState<CategoryRule[]>([]);
   const [planTargets, setPlanTargets] = useState<Record<string, string>>({ ...PLAN_TARGETS_DEFAULT });
+  const [rowOrder, setRowOrder] = useState<string[]>([]);
   const skipOnce = useRef(true);
   const activeTabRef = useRef<HTMLButtonElement>(null);
   const pendingSaveRef = useRef<string | null>(null);
@@ -397,6 +408,7 @@ export default function HogarManager() {
           setFixedExpenses(state.fixedExpenses);
           setCatRules(state.catRules);
           setPlanTargets(state.planTargets);
+          setRowOrder(state.rowOrder);
           const keys = sortMonthKeys(Object.keys(state.months));
           if (keys.includes(currentMonthKey())) setActiveMonth(currentMonthKey());
           else if (keys.length > 0) setActiveMonth(keys[keys.length - 1]);
@@ -417,7 +429,7 @@ export default function HogarManager() {
   useEffect(() => {
     if (loading || loadError) return;
     if (skipOnce.current) { skipOnce.current = false; return; }
-    const body = JSON.stringify({ assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets });
+    const body = JSON.stringify({ assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder });
     pendingSaveRef.current = body;
     const timer = setTimeout(async () => {
       setSaveStatus("saving");
@@ -437,7 +449,7 @@ export default function HogarManager() {
       setSaveStatus(ok ? "saved" : "error");
     }, 500);
     return () => clearTimeout(timer);
-  }, [assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, loading, loadError]);
+  }, [assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder, loading, loadError]);
 
   // Flush el último estado antes de cerrar/refrescar para no perder ediciones
   // que queden dentro de la ventana de debounce de 500 ms.
@@ -586,8 +598,8 @@ export default function HogarManager() {
   }, [trendsData]);
 
   const matrixGroups = useMemo(
-    () => buildExpenseMatrix(months, sortedMonthKeys, planTargets),
-    [months, sortedMonthKeys, planTargets],
+    () => buildExpenseMatrix(months, sortedMonthKeys, planTargets, rowOrder),
+    [months, sortedMonthKeys, planTargets, rowOrder],
   );
 
   const [matrixBankFilter, setMatrixBankFilter] = useState<BankId | "all">("all");
@@ -671,6 +683,54 @@ export default function HogarManager() {
         [monthKey]: { ...m, expenses: m.expenses.map((e) => (e.recurring && e.name.trim().toLowerCase() === norm ? { ...e, paid: !e.paid } : e)) },
       };
     });
+  };
+
+  // Elimina el gasto de una fila del resumen de TODOS los meses donde
+  // aparece (y de la plantilla si es fijo), igual que las demás ediciones
+  // "globales" de fila (banco/nombre/importe).
+  const deleteRow = (row: SummaryRow) => {
+    if (row.kind === "fixed") {
+      setFixedExpenses((prev) => prev.filter((f) => f.id !== row.key));
+    }
+    setMonths((prev) => {
+      const next: Record<string, MonthData> = {};
+      for (const [key, m] of Object.entries(prev)) {
+        if (row.kind === "fixed") {
+          next[key] = m.fixed.some((e) => e.id === row.key)
+            ? { ...m, fixed: m.fixed.filter((e) => e.id !== row.key) }
+            : m;
+        } else {
+          const norm = row.key;
+          next[key] = m.expenses.some((e) => e.recurring && e.name.trim().toLowerCase() === norm)
+            ? { ...m, expenses: m.expenses.filter((e) => !(e.recurring && e.name.trim().toLowerCase() === norm)) }
+            : m;
+        }
+      }
+      return next;
+    });
+    setRowOrder((prev) => prev.filter((k) => k !== row.key));
+  };
+
+  // Mueve una fila un puesto arriba/abajo dentro de su categoría. Se
+  // normaliza el orden completo actual (matrixGroups, sin filtrar) y se
+  // guarda como `rowOrder` para que persista entre sesiones.
+  const moveRow = (row: SummaryRow, direction: "up" | "down") => {
+    // Se mueve respecto al vecino VISIBLE (según los filtros activos), pero
+    // el intercambio se aplica sobre el orden maestro completo para no
+    // perder la posición de las filas que los filtros dejan ocultas.
+    const group = filteredMatrixGroups.find((g) => g.category === row.category);
+    if (!group) return;
+    const idx = group.rows.findIndex((r) => r.key === row.key);
+    const targetIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (idx === -1 || targetIdx < 0 || targetIdx >= group.rows.length) return;
+    const neighborKey = group.rows[targetIdx].key;
+    const fullOrder = matrixGroups.flatMap((g) => g.rows.map((r) => r.key));
+    const ia = fullOrder.indexOf(row.key);
+    const ib = fullOrder.indexOf(neighborKey);
+    if (ia === -1 || ib === -1) return;
+    const newOrder = [...fullOrder];
+    [newOrder[ia], newOrder[ib]] = [newOrder[ib], newOrder[ia]];
+    setRowOrder(newOrder);
   };
 
   const [collapsedCategories, setCollapsedCategories] = useState<Set<CategoryId>>(new Set());
@@ -796,6 +856,8 @@ export default function HogarManager() {
                 onToggleCell={toggleCellPaid}
                 onToggleCategory={toggleCategory}
                 onSetPlanTarget={setPlanTarget}
+                onMoveRow={moveRow}
+                onDeleteRow={deleteRow}
               />
               <p className={styles.note}>Los gastos puntuales no recurrentes no aparecen aquí.</p>
             </section>

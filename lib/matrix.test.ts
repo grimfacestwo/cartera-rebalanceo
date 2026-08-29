@@ -83,4 +83,20 @@ describe("buildExpenseMatrix", () => {
     expect(crecimiento.rows.map((r) => r.key)).toContain("ahorro");
     expect(inversion.rows.map((r) => r.key)).not.toContain("ahorro");
   });
+
+  it("respeta el orden personalizado y deja las filas sin posición al final", () => {
+    const months: Record<string, MonthData> = {
+      "2026-01": month({
+        fixed: [
+          expense({ id: "a", name: "A", category: "gastos" }),
+          expense({ id: "b", name: "B", category: "gastos" }),
+          expense({ id: "c", name: "C", category: "gastos" }),
+        ],
+      }),
+    };
+    const keys = ["2026-01"];
+    const groups = buildExpenseMatrix(months, keys, {}, ["c", "a"]);
+    const gastos = groups.find((g) => g.category === "gastos")!;
+    expect(gastos.rows.map((r) => r.key)).toEqual(["c", "a", "b"]);
+  });
 });
