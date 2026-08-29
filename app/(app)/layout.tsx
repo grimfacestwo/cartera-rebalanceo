@@ -19,6 +19,15 @@ const SECTIONS = [
     ),
   },
   {
+    slug: "/hogar",
+    label: "Hogar",
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M3 9l9-7 9 7" /><path d="M9 22V12h6v10" /><path d="M5 10v10a1 1 0 0 0 1 1h3m10-11v10a1 1 0 0 1-1 1h-3" />
+      </svg>
+    ),
+  },
+  {
     slug: "/coches",
     label: "Coches",
     icon: (
@@ -156,7 +165,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         const active = s.slug === "/" ? pathname === "/" : pathname.startsWith(s.slug);
         const total = alerts ? alerts.overdue + alerts.soon : 0;
         const isCoches = s.slug === "/coches";
-        const isFinanzas = s.slug === "/";
+        const isHogar = s.slug === "/hogar";
         return (
           <Link
             key={s.slug}
@@ -165,7 +174,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             title={
               isCoches && alerts && total > 0
                 ? `${alerts.overdue} vencido${alerts.overdue === 1 ? "" : "s"}, ${alerts.soon} próxim${alerts.soon === 1 ? "o" : "os"} en Coches`
-                : isFinanzas && disponible !== null
+                : isHogar && disponible !== null
                   ? `Disponible total: ${currencySidebar.format(disponible)}`
                   : s.label
             }
@@ -173,7 +182,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           >
             {s.icon}
             {!collapsed && <span className={styles.navLabel}>{s.label}</span>}
-            {isFinanzas && disponible !== null && (
+            {isHogar && disponible !== null && (
               <span
                 className={styles.navBadge}
                 style={{ background: disponible >= 0 ? "#16a34a" : "#dc2626" }}
