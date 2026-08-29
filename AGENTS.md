@@ -24,7 +24,7 @@ npm test           # vitest run (no config, picks up lib/*.test.ts)
 - **Next.js 16.3.1 App Router**, React 19, TypeScript strict, Vercel Postgres (`@vercel/postgres`).
 - **`proxy.ts` is the middleware** (Next 16 renamed `middleware` → `proxy`). Auth: `SITE_PASSWORD` env var → sha256 stored in cookie `site_auth`. If env var is unset, no auth. Matcher skips `/api`, static, `/login`. API routes do their own auth check via `expectedToken`/`safeEqual` from `@/lib/auth`. `.env*` is gitignored — never commit credentials.
 - **Route handlers use async params** (Next 15+/16 convention): `{ params }: { params: Promise<{ slug: string }> }` — must `await params`.
-- **Persistence**: tables are created at runtime with `CREATE TABLE IF NOT EXISTS` inside route code. `portfolio_state` (Finanzas) in `app/api/state/route.ts`; `section_state` (key-value: `id` text, `data` jsonb) in `lib/db.ts` via `ensureSectionTable()`. **`db/schema.sql` is stale** — it's missing `banks`/`expenses`/`months` columns. Trust the route code, not schema.sql.
+- **Persistence**: tables are created at runtime with `CREATE TABLE IF NOT EXISTS` inside route code. `portfolio_state` (Finanzas) in `app/api/state/route.ts`; `section_state` (key-value: `id` text, `data` jsonb) in `lib/db.ts` via `ensureSectionTable()`. `db/schema.sql` documents the real schema but the route code is the source of truth if they ever diverge again. All UI/app state lives in Postgres — no `localStorage`/`sessionStorage` for app data (`section_state` slug `ui-prefs` holds sidebar/dark-mode prefs).
 
 ## State pattern (`lib/state.ts`)
 

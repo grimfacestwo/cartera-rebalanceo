@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { parseCochesState, pendingAlerts, type Alerts } from "@/lib/coches";
 import { parseState, BANK_IDS, currentMonthKey, daysRemaining, effectiveAmount, type Expense } from "@/lib/state";
+import { parseUiPrefs } from "@/lib/ui-prefs";
 import styles from "./layout.module.css";
 
 const SECTIONS = [
@@ -46,33 +47,37 @@ const SECTIONS = [
   },
 ];
 
-const SIDEBAR_KEY = "cartera:sidebar";
-const DARK_KEY = "cartera:dark";
-
 const currencySidebar = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
-function readCollapsed(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return localStorage.getItem(SIDEBAR_KEY) === "1";
-  } catch { return false; }
-}
-
-function readDark(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return localStorage.getItem(DARK_KEY) === "1";
-  } catch { return false; }
-}
-
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const [collapsed, setCollapsed] = useState(readCollapsed);
+  const [collapsed, setCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [darkMode, setDarkMode] = useState(readDark);
+  const [darkMode, setDarkMode] = useState(false);
   const [alerts, setAlerts] = useState<Alerts | null>(null);
   const [disponible, setDisponible] = useState<number | null>(null);
   const pathname = usePathname();
   const router = useRouter();
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/section/ui-prefs");
+        if (!res.ok) throw new Error("no data");
+        const { data } = (await res.json()) as { data?: unknown };
+        const prefs = parseUiPrefs(data);
+        if (!cancelled) {
+          setCollapsed(prefs.sidebar);
+          setDarkMode(prefs.dark);
+        }
+      } catch {
+        /* mantener defaults */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -114,10 +119,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return () => { cancelled = true; };
   }, []);
 
+  const saveUiPrefs = (prefs: { sidebar: boolean; dark: boolean }) => {
+    fetch("/api/section/ui-prefs", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(prefs),
+    }).catch(() => { /* best-effort */ });
+  };
+
   const toggleCollapsed = () => {
     setCollapsed((c) => {
       const next = !c;
-      try { localStorage.setItem(SIDEBAR_KEY, next ? "1" : "0"); } catch { /* */ }
+      saveUiPrefs({ sidebar: next, dark: darkMode });
       return next;
     });
   };
@@ -125,7 +138,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const toggleDark = () => {
     setDarkMode((d) => {
       const next = !d;
-      try { localStorage.setItem(DARK_KEY, next ? "1" : "0"); } catch { /* */ }
+      saveUiPrefs({ sidebar: collapsed, dark: next });
       return next;
     });
   };
