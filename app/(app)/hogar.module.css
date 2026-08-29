@@ -1690,6 +1690,34 @@
   color: #475569;
   text-align: left;
   position: static;
+  cursor: pointer;
+  user-select: none;
+}
+
+.summaryCatRow .chevron {
+  display: inline-block;
+  margin-right: 0.4rem;
+  font-size: 0.7rem;
+}
+
+.summaryTargetWrap {
+  cursor: default;
+}
+
+.summaryTargetInput {
+  width: 2.4rem;
+  border: none;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 4px;
+  padding: 0.05rem 0.2rem;
+  font: inherit;
+  font-weight: 700;
+  color: inherit;
+  text-align: right;
+}
+
+.summaryTargetInput:focus {
+  outline: 2px solid rgba(59, 130, 246, 0.4);
 }
 
 .summaryCell {
@@ -1698,6 +1726,7 @@
 
 .summaryCellPaid {
   color: #16a34a;
+  background: rgba(22, 163, 74, 0.14);
 }
 
 .summaryCellPending {
@@ -1733,4 +1762,12 @@
 
 [data-theme="dark"] .summaryCellNa {
   color: #475569;
+}
+
+[data-theme="dark"] .summaryCellPaid {
+  background: rgba(22, 163, 74, 0.22);
+}
+
+[data-theme="dark"] .summaryTargetInput {
+  background: rgba(15, 23, 42, 0.35);
 }

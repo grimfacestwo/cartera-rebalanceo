@@ -225,20 +225,26 @@ function ExpenseMatrix({
   groups,
   monthKeys,
   activeMonth,
+  collapsedCategories,
   onSelectMonth,
   onSetRowBank,
   onSetRowName,
   onSetRowAmount,
   onToggleCell,
+  onToggleCategory,
+  onSetPlanTarget,
 }: {
   groups: SummaryCategoryGroup[];
   monthKeys: string[];
   activeMonth: string;
+  collapsedCategories: Set<CategoryId>;
   onSelectMonth: (key: string) => void;
   onSetRowBank: (row: SummaryRow, bank: BankId | "") => void;
   onSetRowName: (row: SummaryRow, name: string) => void;
   onSetRowAmount: (row: SummaryRow, amount: string) => void;
   onToggleCell: (row: SummaryRow, monthKey: string) => void;
+  onToggleCategory: (cat: CategoryId) => void;
+  onSetPlanTarget: (cat: CategoryId, value: string) => void;
 }) {
   const visibleGroups = groups.filter((g) => g.rows.length > 0);
   if (monthKeys.length === 0 || visibleGroups.length === 0) return null;
@@ -268,15 +274,36 @@ function ExpenseMatrix({
           </tr>
         </thead>
         <tbody>
-          {visibleGroups.map((group) => (
+          {visibleGroups.map((group) => {
+            const collapsed = collapsedCategories.has(group.category);
+            return (
             <Fragment key={group.category}>
-              <tr className={styles.summaryCatRow}>
+              <tr
+                className={styles.summaryCatRow}
+                role="button"
+                tabIndex={0}
+                aria-expanded={!collapsed}
+                onClick={() => onToggleCategory(group.category)}
+                onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); onToggleCategory(group.category); } }}
+              >
                 <td colSpan={colCount} style={{ background: `${CATEGORY_COLORS[group.category]}1a` }}>
+                  <span className={styles.chevron}>{collapsed ? "▶" : "▼"}</span>
                   {CATEGORY_LABELS[group.category].toUpperCase()}
-                  {group.targetPct !== "" ? ` · ${group.targetPct}%` : ""}
+                  <span className={styles.summaryTargetWrap} onClick={(ev) => ev.stopPropagation()}>
+                    {" · "}
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={group.targetPct}
+                      onChange={(ev) => { const v = ev.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) onSetPlanTarget(group.category, v); }}
+                      className={styles.summaryTargetInput}
+                      aria-label={`Objetivo de ${CATEGORY_LABELS[group.category]} en porcentaje`}
+                    />
+                    %
+                  </span>
                 </td>
               </tr>
-              {group.rows.map((row) => (
+              {!collapsed && group.rows.map((row) => (
                 <tr key={`${group.category}-${row.kind}-${row.key}`}>
                   <td className={styles.summaryConceptCell}>
                     <input
@@ -326,7 +353,8 @@ function ExpenseMatrix({
                 </tr>
               ))}
             </Fragment>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -629,6 +657,20 @@ export default function HogarManager() {
     });
   };
 
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<CategoryId>>(new Set());
+  const toggleCategory = (cat: CategoryId) => {
+    setCollapsedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat);
+      else next.add(cat);
+      return next;
+    });
+  };
+
+  const setPlanTarget = (cat: CategoryId, value: string) => {
+    setPlanTargets((prev) => ({ ...prev, [cat]: value }));
+  };
+
   // Notifications
   // `Notification` es una API solo de navegador: su comprobación no puede
   // decidir el render inicial (server no la tiene) sin provocar un mismatch
@@ -709,11 +751,14 @@ export default function HogarManager() {
                 groups={matrixGroups}
                 monthKeys={sortedMonthKeys}
                 activeMonth={activeMonth}
+                collapsedCategories={collapsedCategories}
                 onSelectMonth={setActiveMonth}
                 onSetRowBank={setRowBank}
                 onSetRowName={setRowName}
                 onSetRowAmount={setRowAmount}
                 onToggleCell={toggleCellPaid}
+                onToggleCategory={toggleCategory}
+                onSetPlanTarget={setPlanTarget}
               />
               <p className={styles.note}>Los gastos puntuales no recurrentes no aparecen aquí.</p>
             </section>
