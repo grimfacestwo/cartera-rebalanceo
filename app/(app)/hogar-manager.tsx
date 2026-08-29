@@ -590,6 +590,22 @@ export default function HogarManager() {
     [months, sortedMonthKeys, planTargets],
   );
 
+  const [matrixBankFilter, setMatrixBankFilter] = useState<BankId | "all">("all");
+  const [matrixPaidFilter, setMatrixPaidFilter] = useState<"all" | "paid" | "pending">("all");
+
+  // El filtro de pagado/pendiente se evalúa sobre el mes activo (columna
+  // resaltada), ya que el estado de pagado es por mes, no por fila.
+  const filteredMatrixGroups = useMemo(() => {
+    return matrixGroups.map((group) => ({
+      ...group,
+      rows: group.rows.filter((row) => {
+        if (matrixBankFilter !== "all" && row.bank !== matrixBankFilter) return false;
+        if (matrixPaidFilter !== "all" && row.cells[activeMonth]?.status !== matrixPaidFilter) return false;
+        return true;
+      }),
+    }));
+  }, [matrixGroups, matrixBankFilter, matrixPaidFilter, activeMonth]);
+
   // Cambiar el banco de una fila del resumen actualiza el gasto en TODOS los
   // meses donde aparece (por id si es fijo, por nombre si es variable
   // recurrente), y además la plantilla si es un gasto fijo, para que los
@@ -747,8 +763,29 @@ export default function HogarManager() {
             {/* Resumen multi-mes */}
             <section className={styles.card}>
               <h2>Resumen por mes</h2>
+              <div className={styles.filterBar}>
+                <select
+                  value={matrixBankFilter}
+                  onChange={(ev) => setMatrixBankFilter(ev.target.value as BankId | "all")}
+                  className={styles.expenseSelect}
+                  aria-label="Filtrar por banco"
+                >
+                  <option value="all">Todos los bancos</option>
+                  {BANK_IDS.map((b) => <option key={b} value={b}>{BANK_LABELS[b]}</option>)}
+                </select>
+                <select
+                  value={matrixPaidFilter}
+                  onChange={(ev) => setMatrixPaidFilter(ev.target.value as "all" | "paid" | "pending")}
+                  className={styles.expenseSelect}
+                  aria-label="Filtrar por estado de pago del mes activo"
+                >
+                  <option value="all">Pagados y pendientes</option>
+                  <option value="paid">Solo pagados ({monthShortLabel(activeMonth)})</option>
+                  <option value="pending">Solo pendientes ({monthShortLabel(activeMonth)})</option>
+                </select>
+              </div>
               <ExpenseMatrix
-                groups={matrixGroups}
+                groups={filteredMatrixGroups}
                 monthKeys={sortedMonthKeys}
                 activeMonth={activeMonth}
                 collapsedCategories={collapsedCategories}
