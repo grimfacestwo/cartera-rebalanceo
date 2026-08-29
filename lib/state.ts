@@ -95,9 +95,9 @@ export const BANK_LABELS: Record<BankId, string> = {
 };
 
 export const BANK_COLORS: Record<BankId, string> = {
-  ing: "#3b82f6",
+  ing: "#f97316",
   santander: "#ef4444",
-  trade: "#8b5cf6",
+  trade: "#94a3b8",
 };
 
 export const DEFAULT_BANKS: Record<BankId, string> = {

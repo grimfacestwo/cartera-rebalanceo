@@ -227,18 +227,22 @@ function ExpenseMatrix({
   activeMonth,
   onSelectMonth,
   onSetRowBank,
+  onSetRowName,
+  onSetRowAmount,
+  onToggleCell,
 }: {
   groups: SummaryCategoryGroup[];
   monthKeys: string[];
   activeMonth: string;
   onSelectMonth: (key: string) => void;
   onSetRowBank: (row: SummaryRow, bank: BankId | "") => void;
+  onSetRowName: (row: SummaryRow, name: string) => void;
+  onSetRowAmount: (row: SummaryRow, amount: string) => void;
+  onToggleCell: (row: SummaryRow, monthKey: string) => void;
 }) {
   const visibleGroups = groups.filter((g) => g.rows.length > 0);
   if (monthKeys.length === 0 || visibleGroups.length === 0) return null;
   const colCount = 3 + monthKeys.length;
-
-  const selectMonth = (key: string) => () => onSelectMonth(key);
 
   return (
     <div className={styles.summaryWrap}>
@@ -255,7 +259,7 @@ function ExpenseMatrix({
                 tabIndex={0}
                 title={monthLabel(key)}
                 className={`${styles.summaryMonthHeader} ${key === activeMonth ? styles.summaryMonthHeaderActive : ""}`}
-                onClick={selectMonth(key)}
+                onClick={() => onSelectMonth(key)}
                 onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); onSelectMonth(key); } }}
               >
                 {monthShortLabel(key)}
@@ -274,8 +278,29 @@ function ExpenseMatrix({
               </tr>
               {group.rows.map((row) => (
                 <tr key={`${group.category}-${row.kind}-${row.key}`}>
-                  <td className={styles.summaryConceptCell}>{row.name}</td>
-                  <td className={styles.summaryAmountCell}>{currency.format(Number.parseFloat(row.amount) || 0)}</td>
+                  <td className={styles.summaryConceptCell}>
+                    <input
+                      type="text"
+                      value={row.name}
+                      onChange={(ev) => onSetRowName(row, ev.target.value)}
+                      className={styles.expenseInput}
+                      aria-label={`Concepto de ${row.name}`}
+                    />
+                  </td>
+                  <td className={styles.summaryAmountCell}>
+                    <div className={styles.amountCell}>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={row.amount}
+                        onChange={(ev) => { const v = ev.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) onSetRowAmount(row, v); }}
+                        className={styles.expenseInput}
+                        aria-label={`Importe de ${row.name}`}
+                        style={{ width: "4rem" }}
+                      />
+                      <span className={styles.amountUnit}>€</span>
+                    </div>
+                  </td>
                   <td className={styles.summaryBankCell}>
                     <BankPicker value={row.bank} onChange={(b) => onSetRowBank(row, b)} ariaLabel={`Banco de ${row.name}`} />
                   </td>
@@ -283,12 +308,16 @@ function ExpenseMatrix({
                     const cell = row.cells[key];
                     const cls =
                       cell.status === "paid" ? styles.summaryCellPaid : cell.status === "pending" ? styles.summaryCellPending : styles.summaryCellNa;
+                    const na = cell.status === "na";
                     return (
                       <td
                         key={key}
                         className={`${styles.summaryCell} ${cls}`}
-                        onClick={selectMonth(key)}
-                        title={cell.status === "na" ? "No aplica este mes" : currency.format(cell.amount)}
+                        role={na ? undefined : "button"}
+                        tabIndex={na ? undefined : 0}
+                        onClick={na ? undefined : () => onToggleCell(row, key)}
+                        onKeyDown={na ? undefined : (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); onToggleCell(row, key); } }}
+                        title={na ? "No aplica este mes" : `${cell.status === "paid" ? "Pagado" : "Pendiente"} · ${currency.format(cell.amount)}`}
                       >
                         {cell.status === "paid" ? "✓" : cell.status === "pending" ? "•" : "—"}
                       </td>
@@ -537,25 +566,66 @@ export default function HogarManager() {
   // meses donde aparece (por id si es fijo, por nombre si es variable
   // recurrente), y además la plantilla si es un gasto fijo, para que los
   // próximos meses se sigan sembrando con el banco elegido.
+  // Aplica `patch` al gasto de una fila del resumen en TODOS los meses donde
+  // aparece (por id si es fijo, por nombre si es variable recurrente).
+  const patchRowInMonths = (
+    prev: Record<string, MonthData>,
+    row: SummaryRow,
+    patch: (e: Expense) => Expense,
+  ): Record<string, MonthData> => {
+    const next: Record<string, MonthData> = {};
+    for (const [key, m] of Object.entries(prev)) {
+      if (row.kind === "fixed") {
+        next[key] = m.fixed.some((e) => e.id === row.key)
+          ? { ...m, fixed: m.fixed.map((e) => (e.id === row.key ? patch(e) : e)) }
+          : m;
+      } else {
+        const norm = row.key;
+        next[key] = m.expenses.some((e) => e.recurring && e.name.trim().toLowerCase() === norm)
+          ? { ...m, expenses: m.expenses.map((e) => (e.recurring && e.name.trim().toLowerCase() === norm ? patch(e) : e)) }
+          : m;
+      }
+    }
+    return next;
+  };
+
   const setRowBank = (row: SummaryRow, bank: BankId | "") => {
     if (row.kind === "fixed") {
       setFixedExpenses((prev) => prev.map((f) => (f.id === row.key ? { ...f, bank } : f)));
     }
+    setMonths((prev) => patchRowInMonths(prev, row, (e) => ({ ...e, bank })));
+  };
+
+  const setRowName = (row: SummaryRow, name: string) => {
+    if (row.kind === "fixed") {
+      setFixedExpenses((prev) => prev.map((f) => (f.id === row.key ? { ...f, name } : f)));
+    }
+    setMonths((prev) => patchRowInMonths(prev, row, (e) => ({ ...e, name })));
+  };
+
+  const setRowAmount = (row: SummaryRow, amount: string) => {
+    if (row.kind === "fixed") {
+      setFixedExpenses((prev) => prev.map((f) => (f.id === row.key ? { ...f, amount } : f)));
+    }
+    setMonths((prev) => patchRowInMonths(prev, row, (e) => ({ ...e, amount })));
+  };
+
+  // Alterna pagado/pendiente de un gasto en un mes concreto (no afecta a
+  // los demás meses de la fila, a diferencia de banco/nombre/importe).
+  const toggleCellPaid = (row: SummaryRow, monthKey: string) => {
     setMonths((prev) => {
-      const next: Record<string, MonthData> = {};
-      for (const [key, m] of Object.entries(prev)) {
-        if (row.kind === "fixed") {
-          next[key] = m.fixed.some((e) => e.id === row.key)
-            ? { ...m, fixed: m.fixed.map((e) => (e.id === row.key ? { ...e, bank } : e)) }
-            : m;
-        } else {
-          const norm = row.key;
-          next[key] = m.expenses.some((e) => e.recurring && e.name.trim().toLowerCase() === norm)
-            ? { ...m, expenses: m.expenses.map((e) => (e.recurring && e.name.trim().toLowerCase() === norm ? { ...e, bank } : e)) }
-            : m;
-        }
+      const m = prev[monthKey];
+      if (!m) return prev;
+      if (row.kind === "fixed") {
+        if (!m.fixed.some((e) => e.id === row.key)) return prev;
+        return { ...prev, [monthKey]: { ...m, fixed: m.fixed.map((e) => (e.id === row.key ? { ...e, paid: !e.paid } : e)) } };
       }
-      return next;
+      const norm = row.key;
+      if (!m.expenses.some((e) => e.recurring && e.name.trim().toLowerCase() === norm)) return prev;
+      return {
+        ...prev,
+        [monthKey]: { ...m, expenses: m.expenses.map((e) => (e.recurring && e.name.trim().toLowerCase() === norm ? { ...e, paid: !e.paid } : e)) },
+      };
     });
   };
 
@@ -635,7 +705,16 @@ export default function HogarManager() {
             {/* Resumen multi-mes */}
             <section className={styles.card}>
               <h2>Resumen por mes</h2>
-              <ExpenseMatrix groups={matrixGroups} monthKeys={sortedMonthKeys} activeMonth={activeMonth} onSelectMonth={setActiveMonth} onSetRowBank={setRowBank} />
+              <ExpenseMatrix
+                groups={matrixGroups}
+                monthKeys={sortedMonthKeys}
+                activeMonth={activeMonth}
+                onSelectMonth={setActiveMonth}
+                onSetRowBank={setRowBank}
+                onSetRowName={setRowName}
+                onSetRowAmount={setRowAmount}
+                onToggleCell={toggleCellPaid}
+              />
               <p className={styles.note}>Los gastos puntuales no recurrentes no aparecen aquí.</p>
             </section>
 
