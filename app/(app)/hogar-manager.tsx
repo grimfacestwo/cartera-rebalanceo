@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { AssetDef } from "@/lib/rebalance";
-import { buildExpenseMatrix, type SummaryCategoryGroup } from "@/lib/matrix";
+import { buildExpenseMatrix, type SummaryCategoryGroup, type SummaryRow } from "@/lib/matrix";
 import {
   BANK_IDS,
   BANK_LABELS,
@@ -194,16 +194,46 @@ function PlanDonut({
   );
 }
 
+function BankPicker({
+  value,
+  onChange,
+  ariaLabel,
+}: {
+  value: BankId | "";
+  onChange: (b: BankId | "") => void;
+  ariaLabel: string;
+}) {
+  return (
+    <div className={styles.fixedBankPick} role="group" aria-label={ariaLabel}>
+      {BANK_IDS.map((b) => (
+        <button
+          type="button"
+          key={b}
+          className={styles.bankPickDot}
+          onClick={() => onChange(value === b ? "" : b)}
+          aria-label={BANK_LABELS[b]}
+          aria-pressed={value === b}
+          title={BANK_LABELS[b]}
+        >
+          <span className={styles.bankDot} style={{ background: value === b ? BANK_COLORS[b] : "#cbd5e1" }} />
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function ExpenseMatrix({
   groups,
   monthKeys,
   activeMonth,
   onSelectMonth,
+  onSetRowBank,
 }: {
   groups: SummaryCategoryGroup[];
   monthKeys: string[];
   activeMonth: string;
   onSelectMonth: (key: string) => void;
+  onSetRowBank: (row: SummaryRow, bank: BankId | "") => void;
 }) {
   const visibleGroups = groups.filter((g) => g.rows.length > 0);
   if (monthKeys.length === 0 || visibleGroups.length === 0) return null;
@@ -248,7 +278,7 @@ function ExpenseMatrix({
                   <td className={styles.summaryConceptCell}>{row.name}</td>
                   <td className={styles.summaryAmountCell}>{currency.format(Number.parseFloat(row.amount) || 0)}</td>
                   <td className={styles.summaryBankCell}>
-                    <span className={styles.bankDot} style={{ background: row.bank ? BANK_COLORS[row.bank] : "#cbd5e1" }} title={row.bank ? BANK_LABELS[row.bank] : "Sin banco"} />
+                    <BankPicker value={row.bank} onChange={(b) => onSetRowBank(row, b)} ariaLabel={`Banco de ${row.name}`} />
                   </td>
                   {monthKeys.map((key) => {
                     const cell = row.cells[key];
@@ -611,6 +641,32 @@ export default function HogarManager() {
     [months, sortedMonthKeys, planTargets],
   );
 
+  // Cambiar el banco de una fila del resumen actualiza el gasto en TODOS los
+  // meses donde aparece (por id si es fijo, por nombre si es variable
+  // recurrente), y además la plantilla si es un gasto fijo, para que los
+  // próximos meses se sigan sembrando con el banco elegido.
+  const setRowBank = (row: SummaryRow, bank: BankId | "") => {
+    if (row.kind === "fixed") {
+      setFixedExpenses((prev) => prev.map((f) => (f.id === row.key ? { ...f, bank } : f)));
+    }
+    setMonths((prev) => {
+      const next: Record<string, MonthData> = {};
+      for (const [key, m] of Object.entries(prev)) {
+        if (row.kind === "fixed") {
+          next[key] = m.fixed.some((e) => e.id === row.key)
+            ? { ...m, fixed: m.fixed.map((e) => (e.id === row.key ? { ...e, bank } : e)) }
+            : m;
+        } else {
+          const norm = row.key;
+          next[key] = m.expenses.some((e) => e.recurring && e.name.trim().toLowerCase() === norm)
+            ? { ...m, expenses: m.expenses.map((e) => (e.recurring && e.name.trim().toLowerCase() === norm ? { ...e, bank } : e)) }
+            : m;
+        }
+      }
+      return next;
+    });
+  };
+
   // Notifications
   // `Notification` es una API solo de navegador: su comprobación no puede
   // decidir el render inicial (server no la tiene) sin provocar un mismatch
@@ -687,7 +743,7 @@ export default function HogarManager() {
             {/* Resumen multi-mes */}
             <section className={styles.card}>
               <h2>Resumen por mes</h2>
-              <ExpenseMatrix groups={matrixGroups} monthKeys={sortedMonthKeys} activeMonth={activeMonth} onSelectMonth={goToMonth} />
+              <ExpenseMatrix groups={matrixGroups} monthKeys={sortedMonthKeys} activeMonth={activeMonth} onSelectMonth={goToMonth} onSetRowBank={setRowBank} />
               <p className={styles.note}>Los gastos puntuales no recurrentes no aparecen aquí; consulta el detalle del mes abajo.</p>
             </section>
 
