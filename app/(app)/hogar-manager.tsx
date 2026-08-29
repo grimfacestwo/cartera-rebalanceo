@@ -21,7 +21,6 @@ import {
   daysRemaining,
   effectiveAmount,
   DEFAULT_FIXED_EXPENSES,
-  matchCategory,
   monthLabel,
   parseState,
   PLAN_TARGETS_DEFAULT,
@@ -315,26 +314,13 @@ export default function HogarManager() {
   const [loadError, setLoadError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
-  const [newExpName, setNewExpName] = useState("");
-  const [newExpAmount, setNewExpAmount] = useState("");
-  const [newExpType, setNewExpType] = useState<"fijo" | "variable">("variable");
-  const [newExpCategory, setNewExpCategory] = useState<CategoryId>("gastos");
-  const [newExpRecurring, setNewExpRecurring] = useState(false);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>(DEFAULT_FIXED_EXPENSES);
   const [catRules, setCatRules] = useState<CategoryRule[]>([]);
   const [planTargets, setPlanTargets] = useState<Record<string, string>>({ ...PLAN_TARGETS_DEFAULT });
-  const [expSearch, setExpSearch] = useState("");
-  const [expSort, setExpSort] = useState<"paid" | "amount" | "name" | "category">("paid");
-  const [expCategoryFilter, setExpCategoryFilter] = useState<CategoryId | "all">("all");
-  const [expRecurringFilter, setExpRecurringFilter] = useState<"all" | "recurring" | "onetime">("all");
-  const [paidOpen, setPaidOpen] = useState(false);
-  const [copySource, setCopySource] = useState<Expense | null>(null);
-  const [copyTarget, setCopyTarget] = useState<string>("");
   const skipOnce = useRef(true);
   const activeTabRef = useRef<HTMLButtonElement>(null);
   const pendingSaveRef = useRef<string | null>(null);
-  const detailSectionRef = useRef<HTMLElement>(null);
 
   // --- Load ---
   useEffect(() => {
@@ -431,11 +417,6 @@ export default function HogarManager() {
     activeTabRef.current?.scrollIntoView({ inline: "center", block: "nearest" });
   }, [activeMonth]);
 
-  const goToMonth = (key: string) => {
-    setActiveMonth(key);
-    detailSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-
   // --- Months helpers ---
   const updateMonth = (patch: (m: MonthData) => MonthData) => {
     setMonths((prev) => ({ ...prev, [activeMonth]: patch(prev[activeMonth] ?? { ...EMPTY_MONTH }) }));
@@ -460,7 +441,6 @@ export default function HogarManager() {
   };
 
   const bankTotal = BANK_IDS.reduce((s, id) => s + (Number.parseFloat(activeData.banks[id]) || 0), 0);
-  const totalExpensesBank = allActiveExpenses.reduce((s, e) => s + effectiveAmount(e, activeDaysRemaining), 0);
   const planTotals = categoryTotals(activeData, activeDaysRemaining);
   const expensesByCategory = CATEGORIES.reduce((acc, c) => {
     acc[c] = allActiveExpenses
@@ -468,62 +448,8 @@ export default function HogarManager() {
       .map((e) => ({ name: e.name, amount: effectiveAmount(e, activeDaysRemaining), paid: e.paid }));
     return acc;
   }, {} as Record<CategoryId, { name: string; amount: number; paid: boolean }[]>);
-  const totalExpenses = totalExpensesBank;
   const totalPendientes = allActiveExpenses.filter((e) => !e.paid).reduce((s, e) => s + effectiveAmount(e, activeDaysRemaining), 0);
   const remaining = bankTotal - totalPendientes;
-
-  // Expenses
-  const setExpField = (id: string, field: keyof Expense, val: unknown) => {
-    updateMonth((m) => ({
-      ...m,
-      expenses: m.expenses.map((e) => (e.id === id ? { ...e, [field]: val } : e)),
-    }));
-  };
-
-  const addExpense = () => {
-    const name = newExpName.trim();
-    if (!name || newExpAmount === "") return;
-    updateMonth((m) => ({
-      ...m,
-      expenses: [...m.expenses, { id: newId(), name, amount: newExpAmount, type: newExpType, bank: "ing", paid: false, category: newExpCategory, recurring: newExpRecurring }],
-    }));
-    setNewExpName(""); setNewExpAmount(""); setNewExpType("variable"); setNewExpCategory("gastos"); setNewExpRecurring(false);
-  };
-
-  const removeExpense = (id: string) => {
-    updateMonth((m) => ({ ...m, expenses: m.expenses.filter((e) => e.id !== id) }));
-  };
-
-  const startCopy = (e: Expense) => {
-    setCopySource(e);
-    setCopyTarget("");
-  };
-
-  const confirmCopy = () => {
-    if (!copySource || !copyTarget) return;
-    const src = copySource;
-    setMonths((prev) => {
-      const t = prev[copyTarget];
-      if (!t) return prev;
-      const copy: Expense = { ...src, id: newId(), paid: false };
-      return { ...prev, [copyTarget]: { ...t, expenses: [...t.expenses, copy] } };
-    });
-    setCopySource(null);
-  };
-
-  const cancelCopy = () => setCopySource(null);
-
-  const removeFixed = (id: string) => {
-    updateMonth((m) => ({ ...m, fixed: m.fixed.filter((e) => e.id !== id) }));
-    setFixedExpenses((prev) => prev.filter((f) => f.id !== id));
-  };
-
-  const setFixedField = (id: string, field: keyof Expense, val: unknown) => {
-    updateMonth((m) => ({
-      ...m,
-      fixed: m.fixed.map((e) => (e.id === id ? { ...e, [field]: val } : e)),
-    }));
-  };
 
   const newMonth = () => {
     const keys = sortMonthKeys(Object.keys(months));
@@ -549,40 +475,6 @@ export default function HogarManager() {
   };
 
   const sortedMonthKeys = useMemo(() => sortMonthKeys(Object.keys(months)), [months]);
-  const otherMonths = sortedMonthKeys.filter((k) => k !== activeMonth);
-  const activeExpenses = activeData.expenses;
-  const activeFixed = activeData.fixed;
-  const unpaidFixed = activeFixed.filter((e) => !e.paid);
-  const paidFixed = activeFixed.filter((e) => e.paid);
-  const paidVariable = activeExpenses.filter((e) => e.paid);
-  const paidCount = paidFixed.length + paidVariable.length;
-  const totalFijos = allActiveExpenses.filter((e) => e.type === "fijo").reduce((s, e) => s + effectiveAmount(e, activeDaysRemaining), 0);
-  const totalRecurring = allActiveExpenses.filter((e) => e.recurring).reduce((s, e) => s + effectiveAmount(e, activeDaysRemaining), 0);
-  const pagados = allActiveExpenses.filter((e) => e.paid).length;
-  const sortedExpenses = useMemo(() => {
-    let list = activeExpenses.filter((e) => !e.paid);
-    if (expSearch) {
-      const q = expSearch.toLowerCase();
-      list = list.filter((e) => e.name.toLowerCase().includes(q));
-    }
-    if (expCategoryFilter !== "all") {
-      list = list.filter((e) => e.category === expCategoryFilter);
-    }
-    if (expRecurringFilter === "recurring") list = list.filter((e) => e.recurring);
-    if (expRecurringFilter === "onetime") list = list.filter((e) => !e.recurring);
-    switch (expSort) {
-      case "amount": list.sort((a, b) => (Number.parseFloat(a.amount) || 0) - (Number.parseFloat(b.amount) || 0)); break;
-      case "name": list.sort((a, b) => a.name.localeCompare(b.name, "es")); break;
-      case "category": list.sort((a, b) => a.category.localeCompare(b.category)); break;
-      default: list.sort((a, b) => Number(a.paid) - Number(b.paid)); break;
-    }
-    return list;
-  }, [activeExpenses, expSearch, expSort, expCategoryFilter, expRecurringFilter]);
-
-  // Category stats
-  const categoryStats = Object.entries(categoryTotals(activeData, activeDaysRemaining))
-    .sort((a, b) => b[1] - a[1])
-    .map(([cat, total]) => ({ cat: cat as CategoryId, total }));
 
   // Month-over-month comparison (la comida diaria usa días del mes completo)
   const comparison = (() => {
@@ -743,187 +635,8 @@ export default function HogarManager() {
             {/* Resumen multi-mes */}
             <section className={styles.card}>
               <h2>Resumen por mes</h2>
-              <ExpenseMatrix groups={matrixGroups} monthKeys={sortedMonthKeys} activeMonth={activeMonth} onSelectMonth={goToMonth} onSetRowBank={setRowBank} />
-              <p className={styles.note}>Los gastos puntuales no recurrentes no aparecen aquí; consulta el detalle del mes abajo.</p>
-            </section>
-
-            {/* Expenses */}
-            <section className={styles.card} ref={detailSectionRef}>
-              <h2 title={
-                (() => {
-                  const pendAll = allActiveExpenses.filter((e) => !e.paid);
-                  const lines = pendAll.map((e) => `${e.name}: ${currency.format(effectiveAmount(e, activeDaysRemaining))}`);
-                  return lines.length ? `Gastos pendientes del mes:\n${lines.join("\n")}` : "Sin gastos pendientes este mes";
-                })()
-              }>Gastos</h2>
-              {copySource && (
-                <div className={styles.copyBar}>
-                  <span>Copiar «{copySource.name}» a:</span>
-                  <select value={copyTarget} onChange={(e) => setCopyTarget(e.target.value)} aria-label="Mes de destino" className={styles.expenseSelect}>
-                    <option value="">Selecciona mes…</option>
-                    {otherMonths.map((k) => <option key={k} value={k}>{monthLabel(k)}</option>)}
-                  </select>
-                  <button type="button" className={styles.addBtn} onClick={confirmCopy} disabled={!copyTarget}>Copiar</button>
-                  <button type="button" className={styles.removeBtn} onClick={cancelCopy} aria-label="Cancelar copia">✕</button>
-                </div>
-              )}
-              {activeExpenses.length > 0 && (
-                <div className={styles.filterBar}>
-                  <input type="text" value={expSearch} onChange={(ev) => setExpSearch(ev.target.value)} placeholder="Buscar gasto…" className={styles.expenseInput} aria-label="Buscar gasto" style={{ maxWidth: 200 }} />
-                  <select value={expCategoryFilter} onChange={(ev) => setExpCategoryFilter(ev.target.value as CategoryId | "all")} className={styles.expenseSelect} aria-label="Filtrar por categoría">
-                    <option value="all">Todas las categorías</option>
-                    {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
-                  </select>
-                  <select value={expSort} onChange={(ev) => setExpSort(ev.target.value as "paid" | "amount" | "name" | "category")} className={styles.expenseSelect} aria-label="Ordenar por">
-                    <option value="paid">Por estado</option>
-                    <option value="amount">Por importe</option>
-                    <option value="name">Por nombre</option>
-                    <option value="category">Por categoría</option>
-                  </select>
-                  <select value={expRecurringFilter} onChange={(ev) => setExpRecurringFilter(ev.target.value as "all" | "recurring" | "onetime")} className={styles.expenseSelect} aria-label="Filtrar recurrentes">
-                    <option value="all">Todos</option>
-                    <option value="recurring">Recurrentes</option>
-                    <option value="onetime">Puntuales</option>
-                  </select>
-                </div>
-              )}
-              <div className={styles.tableWrap}>
-                <table className={styles.table}>
-                  <thead><tr><th>Concepto</th><th>Importe</th><th>Categoría</th><th>ING</th><th>Santander</th><th>Trade</th><th>Tipo</th><th>Hecho</th><th>Rec</th><th></th></tr></thead>
-                  <tbody>
-                    {unpaidFixed.length > 0 && (
-                      <tr className={styles.fixedHeaderRow}>
-                        <td colSpan={10}>Gastos fijos</td>
-                      </tr>
-                    )}
-                    {unpaidFixed.map((e) => (
-                      <tr key={e.id} className={`${styles.fixedRow} ${e.paid ? styles.done : ""}`}>
-                        <td><span className={styles.fixedName}>{e.name}</span></td>
-                        <td>
-                          <div className={styles.amountCell}>
-                            <input type="text" inputMode="decimal" value={e.amount} onChange={(ev) => { const v = ev.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setFixedField(e.id, "amount", v); }} className={styles.expenseInput} aria-label={`Importe de ${e.name}`} style={{ width: 4 + "rem" }} />
-                            <span className={styles.amountUnit}>{e.daily ? "€/día" : "€"}</span>
-                            {e.daily && <span className={styles.comidaCalc}>= {currency.format(effectiveAmount(e, activeDaysRemaining))}</span>}
-                          </div>
-                        </td>
-                        <td>
-                          <select value={e.category} onChange={(ev) => setFixedField(e.id, "category", ev.target.value as CategoryId)} className={styles.expenseSelect} aria-label={`Categoría de ${e.name}`} style={{ fontSize: "0.8rem" }}>
-                            {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
-                          </select>
-                        </td>
-                        {BANK_IDS.map((b) => (
-                          <td key={b} className={styles.bankCell} onClick={() => setFixedField(e.id, "bank", e.bank === b ? "" : b)}>
-                            {e.bank === b && <span className={styles.bankDot} style={{ background: BANK_COLORS[b] }} />}
-                          </td>
-                        ))}
-                        <td>Fijo</td>
-                        <td className={styles.hechoCell}><input type="checkbox" checked={e.paid} onChange={(ev) => setFixedField(e.id, "paid", ev.target.checked)} aria-label={`Hecho ${e.name}`} /></td>
-                        <td />
-                        <td><button type="button" className={styles.removeBtn} onClick={() => removeFixed(e.id)} aria-label={`Eliminar gasto fijo ${e.name}`}>×</button></td>
-                      </tr>
-                    ))}
-                    {sortedExpenses.map((e) => (
-                      <tr key={e.id} className={e.paid ? styles.done : ""}>
-                        <td><input type="text" value={e.name} onChange={(ev) => setExpField(e.id, "name", ev.target.value)} className={styles.expenseInput} aria-label="Nombre del gasto" /></td>
-                        <td>
-                          <div className={styles.amountCell}>
-                            <input type="text" inputMode="decimal" value={e.amount} onChange={(ev) => { const v = ev.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setExpField(e.id, "amount", v); }} className={styles.expenseInput} aria-label="Importe" style={{ width: 4 + "rem" }} />
-                            <span className={styles.amountUnit}>€</span>
-                          </div>
-                        </td>
-                        <td>
-                          <select value={e.category} onChange={(ev) => setExpField(e.id, "category", ev.target.value as CategoryId)} className={styles.expenseSelect} aria-label="Categoría" style={{ fontSize: "0.8rem" }}>
-                            {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
-                          </select>
-                        </td>
-                        {BANK_IDS.map((b) => (
-                          <td key={b} className={styles.bankCell} onClick={() => setExpField(e.id, "bank", e.bank === b ? "" : b)}>
-                            {e.bank === b && <span className={styles.bankDot} style={{ background: BANK_COLORS[b] }} />}
-                          </td>
-                        ))}
-                        <td><select value={e.type} onChange={(ev) => setExpField(e.id, "type", ev.target.value as "fijo" | "variable")} className={styles.expenseSelect} aria-label="Tipo de gasto"><option value="fijo">Fijo</option><option value="variable">Variable</option></select></td>
-                        <td className={styles.hechoCell}><input type="checkbox" checked={e.paid} onChange={(ev) => setExpField(e.id, "paid", ev.target.checked)} aria-label="Hecho" /></td>
-                        <td>{e.recurring && <span className={styles.recurringBadge} title="Gasto recurrente">↻</span>}</td>
-                        <td>
-                          <button type="button" className={styles.copyBtn} onClick={() => startCopy(e)} disabled={otherMonths.length === 0} aria-label={`Copiar gasto ${e.name} a otro mes`} title="Copiar a otro mes">⧉</button>
-                          <button type="button" className={styles.removeBtn} onClick={() => removeExpense(e.id)} aria-label={`Eliminar gasto ${e.name}`}>×</button>
-                        </td>
-                      </tr>
-                    ))}
-                    <tr className={styles.expenseAddRow}>
-                      <td><input type="text" value={newExpName} onChange={(ev) => {
-                        const v = ev.target.value;
-                        setNewExpName(v);
-                        const m = matchCategory(v, catRules);
-                        if (m) setNewExpCategory(m);
-                      }} placeholder="Nuevo gasto" className={styles.expenseInput} aria-label="Nombre del gasto" /></td>
-                      <td>
-                        <div className={styles.amountCell}>
-                          <input type="text" inputMode="decimal" value={newExpAmount} onChange={(ev) => { const v = ev.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setNewExpAmount(v); }} placeholder="0" className={styles.expenseInput} aria-label="Importe" style={{ width: 4 + "rem" }} />
-                          <span className={styles.amountUnit}>€</span>
-                        </div>
-                      </td>
-                      <td>
-                        <select value={newExpCategory} onChange={(ev) => setNewExpCategory(ev.target.value as CategoryId)} className={styles.expenseSelect} aria-label="Categoría" style={{ fontSize: "0.8rem" }}>
-                          {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
-                        </select>
-                      </td>
-                      <td colSpan={3} />
-                      <td><select value={newExpType} onChange={(ev) => setNewExpType(ev.target.value as "fijo" | "variable")} className={styles.expenseSelect} aria-label="Tipo de gasto"><option value="fijo">Fijo</option><option value="variable">Variable</option></select></td>
-                      <td className={styles.hechoCell}><input type="checkbox" checked={newExpRecurring} onChange={(ev) => setNewExpRecurring(ev.target.checked)} aria-label="Recurrente" title="Recurrente" /></td>
-                      <td><button type="button" className={styles.addBtn} onClick={addExpense}>Añadir</button></td>
-                    </tr>
-                    {paidCount > 0 && (
-                      <tr className={styles.paidHeaderRow} onClick={() => setPaidOpen((v) => !v)} role="button" aria-expanded={paidOpen} tabIndex={0} onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); setPaidOpen((v) => !v); } }}>
-                        <td colSpan={10}>Pagados ({paidCount}) <span className={styles.chevron}>{paidOpen ? "▼" : "▶"}</span></td>
-                      </tr>
-                    )}
-                    {paidOpen && paidFixed.map((e) => (
-                      <tr key={e.id} className={styles.fixedRow}>
-                        <td><span className={styles.fixedName}>{e.name}</span></td>
-                        <td><div className={styles.amountCell}><input type="text" inputMode="decimal" value={e.amount} onChange={(ev) => { const v = ev.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setFixedField(e.id, "amount", v); }} className={styles.expenseInput} aria-label={`Importe de ${e.name}`} style={{ width: 4 + "rem" }} /><span className={styles.amountUnit}>{e.daily ? "€/día" : "€"}</span>{e.daily && <span className={styles.comidaCalc}>= {currency.format(effectiveAmount(e, activeDaysRemaining))}</span>}</div></td>
-                        <td><select value={e.category} onChange={(ev) => setFixedField(e.id, "category", ev.target.value as CategoryId)} className={styles.expenseSelect} aria-label={`Categoría de ${e.name}`} style={{ fontSize: "0.8rem" }}>{CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}</select></td>
-                        {BANK_IDS.map((b) => (<td key={b} className={styles.bankCell} onClick={() => setFixedField(e.id, "bank", e.bank === b ? "" : b)}>{e.bank === b && <span className={styles.bankDot} style={{ background: BANK_COLORS[b] }} />}</td>))}
-                        <td>Fijo</td>
-                        <td className={styles.hechoCell}><input type="checkbox" checked={e.paid} onChange={(ev) => setFixedField(e.id, "paid", ev.target.checked)} aria-label={`Hecho ${e.name}`} /></td>
-                        <td />
-                        <td><button type="button" className={styles.removeBtn} onClick={() => removeFixed(e.id)} aria-label={`Eliminar gasto fijo ${e.name}`}>×</button></td>
-                      </tr>
-                    ))}
-                    {paidOpen && paidVariable.map((e) => (
-                      <tr key={e.id}>
-                        <td><input type="text" value={e.name} onChange={(ev) => setExpField(e.id, "name", ev.target.value)} className={styles.expenseInput} aria-label="Nombre del gasto" /></td>
-                        <td><div className={styles.amountCell}><input type="text" inputMode="decimal" value={e.amount} onChange={(ev) => { const v = ev.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setExpField(e.id, "amount", v); }} className={styles.expenseInput} aria-label="Importe" style={{ width: 4 + "rem" }} /><span className={styles.amountUnit}>€</span></div></td>
-                        <td><select value={e.category} onChange={(ev) => setExpField(e.id, "category", ev.target.value as CategoryId)} className={styles.expenseSelect} aria-label="Categoría" style={{ fontSize: "0.8rem" }}>{CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}</select></td>
-                        {BANK_IDS.map((b) => (<td key={b} className={styles.bankCell} onClick={() => setExpField(e.id, "bank", e.bank === b ? "" : b)}>{e.bank === b && <span className={styles.bankDot} style={{ background: BANK_COLORS[b] }} />}</td>))}
-                        <td><select value={e.type} onChange={(ev) => setExpField(e.id, "type", ev.target.value as "fijo" | "variable")} className={styles.expenseSelect} aria-label="Tipo de gasto"><option value="fijo">Fijo</option><option value="variable">Variable</option></select></td>
-                        <td className={styles.hechoCell}><input type="checkbox" checked={e.paid} onChange={(ev) => setExpField(e.id, "paid", ev.target.checked)} aria-label="Hecho" /></td>
-                        <td>{e.recurring && <span className={styles.recurringBadge} title="Gasto recurrente">↻</span>}</td>
-                        <td>
-                          <button type="button" className={styles.copyBtn} onClick={() => startCopy(e)} disabled={otherMonths.length === 0} aria-label={`Copiar gasto ${e.name} a otro mes`} title="Copiar a otro mes">⧉</button>
-                          <button type="button" className={styles.removeBtn} onClick={() => removeExpense(e.id)} aria-label={`Eliminar gasto ${e.name}`}>×</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className={styles.expenseSummary}>
-                <span>Total: {currency.format(totalExpenses)}</span>
-                {activeExpenses.length > 0 && <span>Fijos: {currency.format(totalFijos)}</span>}
-                {totalRecurring > 0 && <span>Recurrencia: {currency.format(totalRecurring)}</span>}
-                {allActiveExpenses.length > 0 && <span>Pagados: {pagados}/{allActiveExpenses.length}</span>}
-              </div>
-              {categoryStats.length > 0 && (
-                <div className={styles.categoryStats}>
-                  {categoryStats.map(({ cat, total }) => (
-                    <span key={cat} className={styles.categoryBadge}>
-                      <span className={styles.dot} style={{ background: CATEGORY_COLORS[cat] }} />
-                      {CATEGORY_LABELS[cat]}: {currency.format(total)}
-                    </span>
-                  ))}
-                </div>
-              )}
+              <ExpenseMatrix groups={matrixGroups} monthKeys={sortedMonthKeys} activeMonth={activeMonth} onSelectMonth={setActiveMonth} onSetRowBank={setRowBank} />
+              <p className={styles.note}>Los gastos puntuales no recurrentes no aparecen aquí.</p>
             </section>
 
             {/* Banks */}
