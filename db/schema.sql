@@ -5,6 +5,16 @@
 -- si diverge del código, el código manda.
 
 -- Fila única (id = 1) con todo el estado de Finanzas.
+--
+-- OJO con las columnas camelCase (fixedExpenses, catRules, planTargets,
+-- rowOrder): Postgres pliega los identificadores sin comillas a
+-- minúsculas, así que se guardan como fixedexpenses/catrules/plantargets/
+-- roworder. Un SELECT sin alias entre comillas (p.ej. `SELECT planTargets`)
+-- devuelve la fila con la clave en minúsculas, no en camelCase — si el
+-- código JS lee `row.planTargets` sin más, siempre sale undefined y ese
+-- campo se resetea a su valor por defecto en cada carga. Hay que aliasar
+-- explícitamente en el SELECT (`planTargets AS "planTargets"`), como hace
+-- app/api/state/route.ts.
 CREATE TABLE IF NOT EXISTS portfolio_state (
   id integer PRIMARY KEY CHECK (id = 1),
   assets jsonb NOT NULL,
@@ -17,6 +27,7 @@ CREATE TABLE IF NOT EXISTS portfolio_state (
   fixedExpenses jsonb NOT NULL DEFAULT '[]'::jsonb,
   catRules jsonb NOT NULL DEFAULT '[]'::jsonb,
   planTargets jsonb NOT NULL DEFAULT '{}'::jsonb,
+  rowOrder jsonb NOT NULL DEFAULT '[]'::jsonb,
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 

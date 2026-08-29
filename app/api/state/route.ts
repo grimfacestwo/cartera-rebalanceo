@@ -35,6 +35,7 @@ async function ensureTable() {
   await sql`ALTER TABLE portfolio_state ADD COLUMN IF NOT EXISTS fixedExpenses jsonb NOT NULL DEFAULT '[]'::jsonb`;
   await sql`ALTER TABLE portfolio_state ADD COLUMN IF NOT EXISTS catRules jsonb NOT NULL DEFAULT '[]'::jsonb`;
   await sql`ALTER TABLE portfolio_state ADD COLUMN IF NOT EXISTS planTargets jsonb NOT NULL DEFAULT '{}'::jsonb`;
+  await sql`ALTER TABLE portfolio_state ADD COLUMN IF NOT EXISTS rowOrder jsonb NOT NULL DEFAULT '[]'::jsonb`;
   ensured = true;
 }
 
@@ -55,7 +56,14 @@ export async function GET() {
       fixedExpenses: unknown;
       catRules: unknown;
       planTargets: unknown;
-    }>`SELECT assets, values, contribution, banks, expenses, months, goals, fixedExpenses, catRules, planTargets FROM portfolio_state WHERE id = 1`;
+      rowOrder: unknown;
+    }>`SELECT
+        assets, values, contribution, banks, expenses, months, goals,
+        fixedExpenses AS "fixedExpenses",
+        catRules AS "catRules",
+        planTargets AS "planTargets",
+        rowOrder AS "rowOrder"
+      FROM portfolio_state WHERE id = 1`;
     if (rows.length === 0) {
       return NextResponse.json({ state: DEFAULT_STATE });
     }
@@ -89,7 +97,7 @@ export async function PUT(request: Request) {
   try {
     await ensureTable();
     await sql`
-      INSERT INTO portfolio_state (id, assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, updated_at)
+      INSERT INTO portfolio_state (id, assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder, updated_at)
       VALUES (
         1,
         ${JSON.stringify(state.assets)}::jsonb,
@@ -100,6 +108,7 @@ export async function PUT(request: Request) {
         ${JSON.stringify(state.fixedExpenses)}::jsonb,
         ${JSON.stringify(state.catRules)}::jsonb,
         ${JSON.stringify(state.planTargets)}::jsonb,
+        ${JSON.stringify(state.rowOrder)}::jsonb,
         now()
       )
       ON CONFLICT (id) DO UPDATE SET
@@ -111,6 +120,7 @@ export async function PUT(request: Request) {
         fixedExpenses = EXCLUDED.fixedExpenses,
         catRules = EXCLUDED.catRules,
         planTargets = EXCLUDED.planTargets,
+        rowOrder = EXCLUDED.rowOrder,
         updated_at = now()
     `;
     return NextResponse.json({ ok: true });

@@ -121,6 +121,7 @@ export type PortfolioState = {
   fixedExpenses: FixedExpense[];
   catRules: CategoryRule[];
   planTargets: Record<string, string>;
+  rowOrder: string[];
 };
 
 export const DEFAULT_ASSETS: AssetDef[] = [
@@ -144,6 +145,7 @@ export const DEFAULT_STATE: PortfolioState = {
   fixedExpenses: DEFAULT_FIXED_EXPENSES,
   catRules: [],
   planTargets: { ...PLAN_TARGETS_DEFAULT },
+  rowOrder: [],
 };
 
 export const PALETTE = [
@@ -388,6 +390,11 @@ export function parsePlanTargets(raw: unknown): Record<string, string> {
   return out;
 }
 
+export function parseRowOrder(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((v): v is string => typeof v === "string");
+}
+
 function parseMonthData(raw: unknown): MonthData | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const o = raw as Record<string, unknown>;
@@ -486,5 +493,6 @@ export function parseState(raw: unknown): PortfolioState {
     fixedExpenses,
     catRules: parseCatRules(o.catRules),
     planTargets: parsePlanTargets(o.planTargets),
+    rowOrder: parseRowOrder(o.rowOrder),
   };
 }
