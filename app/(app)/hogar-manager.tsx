@@ -623,6 +623,12 @@ export default function HogarManager() {
       .reduce((s, e) => s + effectiveAmount(e, activeDaysRemaining), 0);
   };
 
+  const bankPagado = (bankId: BankId) => {
+    return allActiveExpenses
+      .filter((e) => e.bank === bankId && e.paid)
+      .reduce((s, e) => s + effectiveAmount(e, activeDaysRemaining), 0);
+  };
+
   const bankTotal = BANK_IDS.reduce((s, id) => s + (Number.parseFloat(activeData.banks[id]) || 0), 0);
   const planTotals = categoryTotals(activeData, activeDaysRemaining);
   const expensesByCategory = CATEGORIES.reduce((acc, c) => {
@@ -632,6 +638,7 @@ export default function HogarManager() {
     return acc;
   }, {} as Record<CategoryId, { name: string; amount: number; paid: boolean }[]>);
   const totalPendientes = allActiveExpenses.filter((e) => !e.paid).reduce((s, e) => s + effectiveAmount(e, activeDaysRemaining), 0);
+  const totalPagado = allActiveExpenses.filter((e) => e.paid).reduce((s, e) => s + effectiveAmount(e, activeDaysRemaining), 0);
   const remaining = bankTotal - totalPendientes;
 
   const sortedMonthKeys = useMemo(() => sortMonthKeys(Object.keys(months)), [months]);
@@ -975,20 +982,25 @@ export default function HogarManager() {
               <h2>Bancos</h2>
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
-                  <thead><tr><th>Banco</th><th>Saldo</th><th>Gastos</th><th>Disponible</th></tr></thead>
+                  <thead><tr><th>Banco</th><th>Saldo</th><th>Pagado</th><th>Pendiente</th><th>Disponible</th></tr></thead>
                   <tbody>
                     {BANK_IDS.map((id) => {
                       const saldo = Number.parseFloat(activeData.banks[id]) || 0;
-                      const gastos = bankPendientes(id);
-                      const rest = saldo - gastos;
+                      const pendiente = bankPendientes(id);
+                      const pagado = bankPagado(id);
+                      const rest = saldo - pendiente;
                       const pendItems = allActiveExpenses.filter((e) => e.bank === id && !e.paid);
                       const pendLines = pendItems.map((e) => `${e.name}: ${currency.format(effectiveAmount(e, activeDaysRemaining))}`);
-                      const bankTitle = pendLines.length ? `Pendientes en ${BANK_LABELS[id]}:\n${pendLines.join("\n")}` : `Sin pendientes en ${BANK_LABELS[id]}`;
+                      const pendingTitle = pendLines.length ? `Pendientes en ${BANK_LABELS[id]}:\n${pendLines.join("\n")}` : `Sin pendientes en ${BANK_LABELS[id]}`;
+                      const paidItems = allActiveExpenses.filter((e) => e.bank === id && e.paid);
+                      const paidLines = paidItems.map((e) => `${e.name}: ${currency.format(effectiveAmount(e, activeDaysRemaining))}`);
+                      const paidTitle = paidLines.length ? `Pagados en ${BANK_LABELS[id]}:\n${paidLines.join("\n")}` : `Sin pagados en ${BANK_LABELS[id]}`;
                       return (
                         <tr key={id}>
                           <td className={styles.cellName}>{BANK_LABELS[id]}</td>
                           <td><input type="text" inputMode="decimal" value={activeData.banks[id]} onChange={(e) => setBank(id, e.target.value)} placeholder="0" className={styles.expenseInput} aria-label={`Saldo ${BANK_LABELS[id]}`} /></td>
-                          <td title={bankTitle}>{currency.format(gastos)}</td>
+                          <td title={paidTitle}>{currency.format(pagado)}</td>
+                          <td title={pendingTitle}>{currency.format(pendiente)}</td>
                           <td className={rest >= 0 ? styles.inject : styles.negative}>{currency.format(rest)}</td>
                         </tr>
                       );
@@ -996,6 +1008,7 @@ export default function HogarManager() {
                     <tr className={styles.totalRow}>
                       <td>Total</td>
                       <td>{currency.format(bankTotal)}</td>
+                      <td>{currency.format(totalPagado)}</td>
                       <td>{currency.format(totalPendientes)}</td>
                       <td className={remaining >= 0 ? styles.inject : styles.negative}>{currency.format(remaining)}</td>
                     </tr>
