@@ -282,8 +282,8 @@ export default function HogarManager() {
   }, [trendsData]);
 
   const matrixGroups = useMemo(
-    () => buildExpenseMatrix(months, sortedMonthKeys, planTargets, rowOrder),
-    [months, sortedMonthKeys, planTargets, rowOrder],
+    () => buildExpenseMatrix(months, sortedMonthKeys, planTargets, rowOrder, activeMonth),
+    [months, sortedMonthKeys, planTargets, rowOrder, activeMonth],
   );
 
   const [matrixBankFilter, setMatrixBankFilter] = useState<BankId | "all">("all");

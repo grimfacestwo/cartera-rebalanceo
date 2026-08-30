@@ -45,14 +45,17 @@ function cellFor(e: Expense | undefined, monthKey: string): SummaryCell {
  * Filas variables: solo `recurring === true` (los puntuales no aportan a una
  * vista comparativa multi-mes); como cambian de `id` cada mes, se agrupan
  * por nombre normalizado.
- * Los campos mostrados (importe/banco/categoría) son los del avistamiento
- * más reciente de esa fila entre los meses dados.
+ * Los campos mostrados (importe/banco/categoría/mensualidad) son los del
+ * mes activo si el gasto existe ese mes; si no, los del avistamiento más
+ * reciente entre los meses dados (para que una fila sin datos en el mes
+ * activo siga mostrando algo razonable).
  */
 export function buildExpenseMatrix(
   months: Record<string, MonthData>,
   monthKeys: string[],
   planTargets: Record<string, string>,
   rowOrder: string[] = [],
+  activeMonth?: string,
 ): SummaryCategoryGroup[] {
   const fixedRows = new Map<string, SummaryRow>();
   const variableRows = new Map<string, SummaryRow>();
@@ -101,6 +104,29 @@ export function buildExpenseMatrix(
   for (const row of allRows) {
     for (const key of monthKeys) {
       if (!(key in row.cells)) row.cells[key] = cellFor(undefined, key);
+    }
+  }
+
+  // Si el gasto existe en el mes activo, sus campos mostrados (banco/importe/
+  // categoría/mensualidad) se toman de ESE mes en vez del avistamiento más
+  // reciente — si no, un gasto cuyo banco cambió solo en meses futuros se
+  // veía en el resumen con un banco distinto al que usan de verdad los
+  // cálculos (Bancos, Plan de hogar) para el mes que se está viendo.
+  const activeData = activeMonth ? months[activeMonth] : undefined;
+  if (activeData) {
+    for (const row of allRows) {
+      const match =
+        row.kind === "fixed"
+          ? activeData.fixed.find((e) => e.id === row.key)
+          : activeData.expenses.find((e) => e.recurring && e.name.trim().toLowerCase() === row.key);
+      if (match) {
+        row.name = match.name;
+        row.amount = match.amount;
+        row.bank = match.bank;
+        row.category = match.category;
+        row.months = match.months ?? "";
+        row.daily = match.daily === true;
+      }
     }
   }
 

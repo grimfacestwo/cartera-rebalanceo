@@ -110,6 +110,29 @@ describe("buildExpenseMatrix", () => {
     expect(row!.daily).toBe(true);
   });
 
+  it("con activeMonth, muestra banco/importe/categoría del mes activo en vez del avistamiento más reciente", () => {
+    const months: Record<string, MonthData> = {
+      "2026-01": month({ fixed: [expense({ id: "comida", name: "Comida", bank: "trade", amount: "40", category: "gastos" })] }),
+      "2026-02": month({ fixed: [expense({ id: "comida", name: "Comida", bank: "ing", amount: "45", category: "disfrute" })] }),
+    };
+    const keys = ["2026-01", "2026-02"];
+    const groups = buildExpenseMatrix(months, keys, {}, [], "2026-01");
+    const row = groups.flatMap((g) => g.rows).find((r) => r.key === "comida");
+    expect(row!.bank).toBe("trade");
+    expect(row!.amount).toBe("40");
+    expect(row!.category).toBe("gastos");
+  });
+
+  it("sin activeMonth (u otro mes activo sin ese gasto), sigue usando el avistamiento más reciente", () => {
+    const months: Record<string, MonthData> = {
+      "2026-01": month({ fixed: [expense({ id: "comida", name: "Comida", bank: "trade" })] }),
+      "2026-02": month({ fixed: [expense({ id: "comida", name: "Comida", bank: "ing" })] }),
+    };
+    const keys = ["2026-01", "2026-02"];
+    expect(buildExpenseMatrix(months, keys, {}).flatMap((g) => g.rows).find((r) => r.key === "comida")!.bank).toBe("ing");
+    expect(buildExpenseMatrix(months, keys, {}, [], "2099-12").flatMap((g) => g.rows).find((r) => r.key === "comida")!.bank).toBe("ing");
+  });
+
   it("con mensualidad personalizada marca 'na' los meses que no coinciden aunque el gasto exista ese mes", () => {
     const months: Record<string, MonthData> = {
       "2026-01": month({ fixed: [expense({ id: "seguro", name: "Seguro", months: "1,7", paid: true })] }),
