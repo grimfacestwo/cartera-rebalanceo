@@ -1722,6 +1722,20 @@
   user-select: none;
 }
 
+/* La etiqueta de categoría se queda fija junto con Acciones/Concepto/
+   Mensualidad/Importe/Banco al hacer scroll horizontal, igual que esas
+   columnas — antes se desplazaba con los meses porque era una única celda
+   que abarcaba toda la fila. El resto de la fila (franja de color bajo los
+   meses) sigue en una celda aparte que sí se desplaza. */
+.summaryCatRow td.summaryCatSticky {
+  box-sizing: border-box;
+  width: 44rem;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: #fff;
+}
+
 .summaryCatRow .chevron {
   display: inline-block;
   margin-right: 0.4rem;
@@ -1828,6 +1842,10 @@
 
 [data-theme="dark"] .summaryCatRow td {
   color: #cbd5e1;
+}
+
+[data-theme="dark"] .summaryCatRow td.summaryCatSticky {
+  background: #1e293b;
 }
 
 [data-theme="dark"] .summaryCellNa {

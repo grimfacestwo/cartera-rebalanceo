@@ -66,7 +66,6 @@ export function ExpenseMatrix({
 
   const visibleGroups = groups.filter((g) => g.rows.length > 0);
   if (monthKeys.length === 0) return null;
-  const colCount = 5 + monthKeys.length;
 
   const submitAdd = () => {
     const name = newName.trim();
@@ -120,7 +119,11 @@ export function ExpenseMatrix({
                 onClick={() => onToggleCategory(group.category)}
                 onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); onToggleCategory(group.category); } }}
               >
-                <td colSpan={colCount} style={{ background: `${CATEGORY_COLORS[group.category]}1a` }}>
+                <td
+                  colSpan={5}
+                  className={styles.summaryCatSticky}
+                  style={{ boxShadow: `inset 0 0 0 999px ${CATEGORY_COLORS[group.category]}1a` }}
+                >
                   <span className={styles.chevron}>{collapsed ? "▶" : "▼"}</span>
                   {CATEGORY_LABELS[group.category].toUpperCase()}
                   <span className={styles.summaryTargetWrap} onClick={(ev) => ev.stopPropagation()}>
@@ -136,6 +139,7 @@ export function ExpenseMatrix({
                     %
                   </span>
                 </td>
+                <td colSpan={monthKeys.length} style={{ background: `${CATEGORY_COLORS[group.category]}1a` }} />
               </tr>
               {!collapsed && group.rows.map((row, idx) => (
                 <tr key={`${group.category}-${row.kind}-${row.key}`}>
