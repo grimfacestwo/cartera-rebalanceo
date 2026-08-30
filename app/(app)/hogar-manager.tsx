@@ -518,7 +518,6 @@ export default function HogarManager() {
   const [planTargets, setPlanTargets] = useState<Record<string, string>>({ ...PLAN_TARGETS_DEFAULT });
   const [rowOrder, setRowOrder] = useState<string[]>([]);
   const skipOnce = useRef(true);
-  const activeTabRef = useRef<HTMLButtonElement>(null);
   const pendingSaveRef = useRef<string | null>(null);
 
   // --- Load ---
@@ -611,11 +610,6 @@ export default function HogarManager() {
   }, []);
 
   const retryLoad = () => { setLoadError(false); setLoading(true); setReloadKey((k) => k + 1); };
-
-  // Keep the active month tab visible in the scrollable strip
-  useEffect(() => {
-    activeTabRef.current?.scrollIntoView({ inline: "center", block: "nearest" });
-  }, [activeMonth]);
 
   // --- Months helpers ---
   const updateMonth = (patch: (m: MonthData) => MonthData) => {
@@ -963,17 +957,6 @@ export default function HogarManager() {
           </section>
         ) : (
           <>
-            {/* Month selector */}
-            <div className={styles.monthTabs}>
-              {sortedMonthKeys.map((key) => (
-                <button key={key} type="button" ref={key === activeMonth ? activeTabRef : undefined} className={`${styles.monthTab} ${key === activeMonth ? styles.monthTabActive : ""}`} onClick={() => setActiveMonth(key)}>
-                  {monthLabel(key)}
-                  {key === activeMonth && activeMonth === currentMonthKey() && <span className={styles.daysLeft}> · {activeDaysRemaining} días restantes</span>}
-                </button>
-              ))}
-              <button type="button" className={styles.newMonthBtn} onClick={newMonth}>+ Nuevo mes</button>
-            </div>
-
             {/* Resumen multi-mes */}
             <section className={styles.card}>
               <h2>Resumen por mes</h2>
@@ -997,6 +980,7 @@ export default function HogarManager() {
                   <option value="paid">Solo pagados ({monthShortLabel(activeMonth)})</option>
                   <option value="pending">Solo pendientes ({monthShortLabel(activeMonth)})</option>
                 </select>
+                <button type="button" className={styles.newMonthBtn} onClick={newMonth}>+ Nuevo mes</button>
               </div>
               <ExpenseMatrix
                 groups={filteredMatrixGroups}
