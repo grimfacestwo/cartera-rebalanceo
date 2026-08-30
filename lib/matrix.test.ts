@@ -99,4 +99,16 @@ describe("buildExpenseMatrix", () => {
     const gastos = groups.find((g) => g.category === "gastos")!;
     expect(gastos.rows.map((r) => r.key)).toEqual(["c", "a", "b"]);
   });
+
+  it("con mensualidad personalizada marca 'na' los meses que no coinciden aunque el gasto exista ese mes", () => {
+    const months: Record<string, MonthData> = {
+      "2026-01": month({ fixed: [expense({ id: "seguro", name: "Seguro", months: "1,7", paid: true })] }),
+      "2026-02": month({ fixed: [expense({ id: "seguro", name: "Seguro", months: "1,7", paid: false })] }),
+    };
+    const keys = ["2026-01", "2026-02"];
+    const groups = buildExpenseMatrix(months, keys, {});
+    const row = groups.flatMap((g) => g.rows).find((r) => r.key === "seguro");
+    expect(row!.cells["2026-01"].status).toBe("paid");
+    expect(row!.cells["2026-02"].status).toBe("na");
+  });
 });

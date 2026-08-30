@@ -1,4 +1,4 @@
-import { CATEGORIES, type BankId, type CategoryId, type Expense, type MonthData } from "./state";
+import { CATEGORIES, parseMonthsSpec, type BankId, type CategoryId, type Expense, type MonthData } from "./state";
 
 export type SummaryCellStatus = "paid" | "pending" | "na";
 
@@ -14,6 +14,7 @@ export type SummaryRow = {
   amount: string;
   bank: BankId | "";
   category: CategoryId;
+  months: string;
   cells: Record<string, SummaryCell>;
 };
 
@@ -23,8 +24,19 @@ export type SummaryCategoryGroup = {
   rows: SummaryRow[];
 };
 
-function cellFor(e: Expense | undefined): SummaryCell {
+function calendarMonthOf(monthKey: string): number {
+  return Number.parseInt(monthKey.slice(5, 7), 10) || 0;
+}
+
+// Si el gasto tiene mensualidad personalizada (p.ej. "1,4,7,10"), los meses
+// que no coinciden se marcan "na" aunque el gasto exista ese mes (se siembra
+// en todos los meses por defecto, ver parseState) — la mensualidad manda.
+function cellFor(e: Expense | undefined, monthKey: string): SummaryCell {
   if (!e) return { status: "na", amount: 0 };
+  const months = parseMonthsSpec(e.months);
+  if (months.length > 0 && !months.includes(calendarMonthOf(monthKey))) {
+    return { status: "na", amount: 0 };
+  }
   const amount = Number.parseFloat(e.amount) || 0;
   return { status: e.paid ? "paid" : "pending", amount };
 }
@@ -56,15 +68,16 @@ export function buildExpenseMatrix(
     for (const e of month.fixed) {
       let row = fixedRows.get(e.id);
       if (!row) {
-        row = { kind: "fixed", key: e.id, name: e.name, amount: e.amount, bank: e.bank, category: e.category, cells: {} };
+        row = { kind: "fixed", key: e.id, name: e.name, amount: e.amount, bank: e.bank, category: e.category, months: e.months ?? "", cells: {} };
         fixedRows.set(e.id, row);
       } else {
         row.name = e.name;
         row.amount = e.amount;
         row.bank = e.bank;
         row.category = e.category;
+        row.months = e.months ?? "";
       }
-      row.cells[key] = cellFor(e);
+      row.cells[key] = cellFor(e, key);
     }
 
     for (const e of month.expenses) {
@@ -73,22 +86,23 @@ export function buildExpenseMatrix(
       if (!normalized) continue;
       let row = variableRows.get(normalized);
       if (!row) {
-        row = { kind: "variable", key: normalized, name: e.name, amount: e.amount, bank: e.bank, category: e.category, cells: {} };
+        row = { kind: "variable", key: normalized, name: e.name, amount: e.amount, bank: e.bank, category: e.category, months: e.months ?? "", cells: {} };
         variableRows.set(normalized, row);
       } else {
         row.name = e.name;
         row.amount = e.amount;
         row.bank = e.bank;
         row.category = e.category;
+        row.months = e.months ?? "";
       }
-      row.cells[key] = cellFor(e);
+      row.cells[key] = cellFor(e, key);
     }
   }
 
   const allRows = [...fixedRows.values(), ...variableRows.values()];
   for (const row of allRows) {
     for (const key of monthKeys) {
-      if (!(key in row.cells)) row.cells[key] = cellFor(undefined);
+      if (!(key in row.cells)) row.cells[key] = cellFor(undefined, key);
     }
   }
 

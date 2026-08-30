@@ -36,6 +36,8 @@ export type Expense = {
   category: CategoryId;
   recurring: boolean;
   daily?: boolean;
+  /** Mensualidad tal cual la escribe el usuario ("1,4,7,10" o "Ene, Abr, Jul, Oct"); vacío/ausente = mensual (todos los meses). Ver parseMonthsSpec. */
+  months?: string;
 };
 
 export type Goal = {
@@ -55,6 +57,8 @@ export type FixedExpense = {
   bank: BankId | "";
   category: CategoryId;
   daily?: boolean;
+  /** Igual que Expense.months: plantilla de mensualidad que se copia a cada mes sembrado. */
+  months?: string;
 };
 
 export type CategoryRule = {
@@ -185,6 +189,33 @@ export function monthLabel(key: string): string {
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
+const MONTH_ABBR_TO_NUM: Record<string, number> = {
+  ene: 1, feb: 2, mar: 3, abr: 4, may: 5, jun: 6,
+  jul: 7, ago: 8, sep: 9, set: 9, oct: 10, nov: 11, dic: 12,
+};
+
+/**
+ * Interpreta la mensualidad tal cual la escribe el usuario ("1,4,7,10",
+ * "Ene, Abr, Jul, Oct", "mensual"…) como el conjunto de meses (1-12) en los
+ * que aplica ese gasto. Vacío o no reconocible = [] = mensual (todos).
+ */
+export function parseMonthsSpec(spec: string | undefined): number[] {
+  if (!spec) return [];
+  const trimmed = spec.trim().toLowerCase();
+  if (!trimmed || trimmed === "mensual" || trimmed === "todos") return [];
+  const out = new Set<number>();
+  for (const tok of trimmed.split(/[^a-z0-9]+/).filter(Boolean)) {
+    if (/^\d{1,2}$/.test(tok)) {
+      const n = Number.parseInt(tok, 10);
+      if (n >= 1 && n <= 12) out.add(n);
+    } else {
+      const n = MONTH_ABBR_TO_NUM[tok.slice(0, 3)];
+      if (n) out.add(n);
+    }
+  }
+  return Array.from(out).sort((a, b) => a - b);
+}
+
 export function sortMonthKeys(keys: string[]): string[] {
   return [...keys].sort();
 }
@@ -304,6 +335,7 @@ export function parseExpenses(raw: unknown): Expense[] {
             : "gastos",
           recurring: o.recurring === true,
           ...(o.daily === true ? { daily: true } : {}),
+          ...(typeof o.months === "string" && o.months.trim() !== "" ? { months: o.months } : {}),
         });
       }
     }
@@ -329,6 +361,7 @@ export function parseFixedExpenses(raw: unknown): FixedExpense[] {
             ? (o.category as CategoryId)
             : "gastos",
           ...(o.daily === true ? { daily: true } : {}),
+          ...(typeof o.months === "string" && o.months.trim() !== "" ? { months: o.months } : {}),
         });
       }
     }
@@ -478,7 +511,7 @@ export function parseState(raw: unknown): PortfolioState {
     const seeded = [...m.fixed];
     for (const f of tmpl) {
       if (!present.has(f.id)) {
-        seeded.push({ id: f.id, name: f.name, amount: f.amount, type: "fijo", bank: f.bank, paid: false, category: f.category, recurring: true, daily: f.daily });
+        seeded.push({ id: f.id, name: f.name, amount: f.amount, type: "fijo", bank: f.bank, paid: false, category: f.category, recurring: true, daily: f.daily, ...(f.months ? { months: f.months } : {}) });
       }
     }
     months[key] = { ...m, fixed: seeded };

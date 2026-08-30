@@ -230,6 +230,7 @@ function ExpenseMatrix({
   onSetRowBank,
   onSetRowName,
   onSetRowAmount,
+  onSetRowMonths,
   onToggleCell,
   onToggleCategory,
   onSetPlanTarget,
@@ -245,29 +246,32 @@ function ExpenseMatrix({
   onSetRowBank: (row: SummaryRow, bank: BankId | "") => void;
   onSetRowName: (row: SummaryRow, name: string) => void;
   onSetRowAmount: (row: SummaryRow, amount: string) => void;
+  onSetRowMonths: (row: SummaryRow, months: string) => void;
   onToggleCell: (row: SummaryRow, monthKey: string) => void;
   onToggleCategory: (cat: CategoryId) => void;
   onSetPlanTarget: (cat: CategoryId, value: string) => void;
   onMoveRow: (row: SummaryRow, direction: "up" | "down") => void;
   onDeleteRow: (row: SummaryRow) => void;
-  onAddRow: (input: { name: string; amount: string; bank: BankId | ""; category: CategoryId }) => void;
+  onAddRow: (input: { name: string; amount: string; bank: BankId | ""; category: CategoryId; months: string }) => void;
 }) {
   const [newName, setNewName] = useState("");
   const [newAmount, setNewAmount] = useState("");
   const [newBank, setNewBank] = useState<BankId | "">("");
   const [newCategory, setNewCategory] = useState<CategoryId>("gastos");
+  const [newMonths, setNewMonths] = useState("");
 
   const visibleGroups = groups.filter((g) => g.rows.length > 0);
   if (monthKeys.length === 0) return null;
-  const colCount = 4 + monthKeys.length;
+  const colCount = 5 + monthKeys.length;
 
   const submitAdd = () => {
     const name = newName.trim();
     if (!name) return;
-    onAddRow({ name, amount: newAmount, bank: newBank, category: newCategory });
+    onAddRow({ name, amount: newAmount, bank: newBank, category: newCategory, months: newMonths });
     setNewName("");
     setNewAmount("");
     setNewBank("");
+    setNewMonths("");
   };
 
   return (
@@ -277,6 +281,7 @@ function ExpenseMatrix({
           <tr>
             <th className={styles.summaryActionsHeader} />
             <th className={styles.summaryConceptHeader}>Concepto</th>
+            <th>Mensualidad</th>
             <th>Importe</th>
             <th>Banco</th>
             {monthKeys.map((key) => (
@@ -340,6 +345,18 @@ function ExpenseMatrix({
                       aria-label={`Concepto de ${row.name}`}
                     />
                   </td>
+                  <td className={styles.summaryMonthsCell}>
+                    <input
+                      type="text"
+                      value={row.months}
+                      onChange={(ev) => onSetRowMonths(row, ev.target.value)}
+                      placeholder="Mensual"
+                      className={styles.expenseInput}
+                      aria-label={`Mensualidad de ${row.name}`}
+                      title="Vacío = mensual. Si no, indica los meses en los que se paga (p.ej. 1,4,7,10 o Ene, Abr, Jul, Oct)."
+                      style={{ width: "6rem" }}
+                    />
+                  </td>
                   <td className={styles.summaryAmountCell}>
                     <div className={styles.amountCell}>
                       <input
@@ -391,6 +408,19 @@ function ExpenseMatrix({
                 placeholder="Nuevo gasto"
                 className={styles.expenseInput}
                 aria-label="Nombre del nuevo gasto"
+                onKeyDown={(ev) => { if (ev.key === "Enter") submitAdd(); }}
+              />
+            </td>
+            <td className={styles.summaryMonthsCell}>
+              <input
+                type="text"
+                value={newMonths}
+                onChange={(ev) => setNewMonths(ev.target.value)}
+                placeholder="Mensual"
+                className={styles.expenseInput}
+                aria-label="Mensualidad del nuevo gasto"
+                title="Vacío = mensual. Si no, indica los meses en los que se paga (p.ej. 1,4,7,10 o Ene, Abr, Jul, Oct)."
+                style={{ width: "6rem" }}
                 onKeyDown={(ev) => { if (ev.key === "Enter") submitAdd(); }}
               />
             </td>
@@ -725,6 +755,13 @@ export default function HogarManager() {
     setMonths((prev) => patchRowInMonths(prev, row, (e) => ({ ...e, amount })));
   };
 
+  const setRowMonths = (row: SummaryRow, monthsSpec: string) => {
+    if (row.kind === "fixed") {
+      setFixedExpenses((prev) => prev.map((f) => (f.id === row.key ? { ...f, months: monthsSpec } : f)));
+    }
+    setMonths((prev) => patchRowInMonths(prev, row, (e) => ({ ...e, months: monthsSpec })));
+  };
+
   // Alterna pagado/pendiente de un gasto en un mes concreto (no afecta a
   // los demás meses de la fila, a diferencia de banco/nombre/importe).
   const toggleCellPaid = (row: SummaryRow, monthKey: string) => {
@@ -747,14 +784,14 @@ export default function HogarManager() {
   // Añade un gasto fijo nuevo: entra en la plantilla y se siembra al
   // instante en todos los meses ya creados (igual que hace parseState al
   // cargar), para que la nueva fila aparezca ya en el resumen sin recargar.
-  const addFixedRow = ({ name, amount, bank, category }: { name: string; amount: string; bank: BankId | ""; category: CategoryId }) => {
+  const addFixedRow = ({ name, amount, bank, category, months }: { name: string; amount: string; bank: BankId | ""; category: CategoryId; months: string }) => {
     const id = newId();
-    setFixedExpenses((prev) => [...prev, { id, name, amount, bank, category, daily: false }]);
+    setFixedExpenses((prev) => [...prev, { id, name, amount, bank, category, daily: false, ...(months.trim() !== "" ? { months } : {}) }]);
     setMonths((prev) => {
       const next: Record<string, MonthData> = {};
       for (const [key, m] of Object.entries(prev)) {
         if (m.fixed.some((e) => e.id === id)) { next[key] = m; continue; }
-        next[key] = { ...m, fixed: [...m.fixed, { id, name, amount, type: "fijo", bank, paid: false, category, recurring: true, daily: false }] };
+        next[key] = { ...m, fixed: [...m.fixed, { id, name, amount, type: "fijo", bank, paid: false, category, recurring: true, daily: false, ...(months.trim() !== "" ? { months } : {}) }] };
       }
       return next;
     });
@@ -928,6 +965,7 @@ export default function HogarManager() {
                 onSetRowBank={setRowBank}
                 onSetRowName={setRowName}
                 onSetRowAmount={setRowAmount}
+                onSetRowMonths={setRowMonths}
                 onToggleCell={toggleCellPaid}
                 onToggleCategory={toggleCategory}
                 onSetPlanTarget={setPlanTarget}
