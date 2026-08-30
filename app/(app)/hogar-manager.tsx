@@ -222,6 +222,15 @@ function BankPicker({
   );
 }
 
+// Anchos de columna del resumen (deben coincidir con los `width` de
+// hogar.module.css: .summaryActionsHeader/Cell, .summaryConceptHeader/Cell,
+// .summaryMonthsHeader/Cell, .summaryAmountHeader/Cell, .summaryBankHeader/Cell
+// y .summaryMonthHeader/.summaryCell). Con table-layout:fixed el ancho total
+// de la tabla debe fijarse explícitamente (en rem) o el navegador reparte el
+// 100% del contenedor entre columnas en vez de respetar estos valores.
+const FIXED_COLS_REM = 4.5 + 9 + 19.5 + 6.5 + 4.5; // acciones + concepto + mensualidad + importe + banco
+const MONTH_COL_REM = 4.5;
+
 const MONTH_SHORT = ["E", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];
 const MONTH_FULL = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -319,14 +328,17 @@ function ExpenseMatrix({
 
   return (
     <div className={styles.summaryWrap}>
-      <table className={styles.summaryTable}>
+      <table
+        className={styles.summaryTable}
+        style={{ width: `${FIXED_COLS_REM + MONTH_COL_REM * monthKeys.length}rem` }}
+      >
         <thead>
           <tr>
             <th className={styles.summaryActionsHeader} />
             <th className={styles.summaryConceptHeader}>Concepto</th>
-            <th>Mensualidad</th>
-            <th>Importe</th>
-            <th>Banco</th>
+            <th className={styles.summaryMonthsHeader}>Mensualidad</th>
+            <th className={styles.summaryAmountHeader}>Importe</th>
+            <th className={styles.summaryBankHeader}>Banco</th>
             {monthKeys.map((key) => (
               <th
                 key={key}
@@ -654,7 +666,7 @@ export default function HogarManager() {
       .filter((e) => e.recurring)
       .map((e) => ({ ...e, id: newId(), paid: false }));
     const tmpl = fixedExpenses.length > 0 ? fixedExpenses : DEFAULT_FIXED_EXPENSES;
-    const seededFixed: Expense[] = tmpl.map((f) => ({ id: f.id, name: f.name, amount: f.amount, type: "fijo", bank: f.bank, paid: false, category: f.category, recurring: true, daily: f.daily }));
+    const seededFixed: Expense[] = tmpl.map((f) => ({ id: f.id, name: f.name, amount: f.amount, type: "fijo", bank: f.bank, paid: false, category: f.category, recurring: true, daily: f.daily, ...(f.months ? { months: f.months } : {}) }));
     setMonths((p) => ({
       ...p,
       [nextKey]: { banks, expenses: carriedExpenses, fixed: seededFixed },

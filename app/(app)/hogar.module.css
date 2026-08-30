@@ -1628,8 +1628,12 @@
 }
 
 .summaryTable {
-  border-collapse: collapse;
-  width: 100%;
+  /* separate (no collapse) evita que las celdas sticky dejen ver el
+     contenido que se desplaza por debajo — border-collapse + sticky es
+     una combinación con artefactos de pintado conocidos en varios motores. */
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
   font-size: 0.82rem;
 }
 
@@ -1643,8 +1647,14 @@
 
 .summaryActionsHeader,
 .summaryActionsCell {
+  box-sizing: border-box;
+  width: 4.5rem;
+  position: sticky;
+  left: 0;
+  background: #fff;
   white-space: nowrap;
   text-align: left;
+  z-index: 1;
 }
 
 .moveBtn {
@@ -1670,12 +1680,13 @@
 
 .summaryConceptHeader,
 .summaryConceptCell {
+  box-sizing: border-box;
+  width: 9rem;
   position: sticky;
-  left: 0;
+  left: 4.5rem;
   background: #fff;
   text-align: left;
   z-index: 1;
-  width: 9rem;
 }
 
 .summaryConceptHeader {
@@ -1687,12 +1698,41 @@
   font-weight: 500;
 }
 
-.summaryAmountCell,
+.summaryMonthsHeader,
+.summaryMonthsCell {
+  box-sizing: border-box;
+  width: 19.5rem;
+  position: sticky;
+  left: 13.5rem;
+  background: #fff;
+  z-index: 1;
+}
+
+.summaryAmountHeader,
+.summaryAmountCell {
+  box-sizing: border-box;
+  width: 6.5rem;
+  position: sticky;
+  left: 33rem;
+  background: #fff;
+  z-index: 1;
+  color: #64748b;
+}
+
+.summaryBankHeader,
 .summaryBankCell {
+  box-sizing: border-box;
+  width: 4.5rem;
+  position: sticky;
+  left: 39.5rem;
+  background: #fff;
+  z-index: 1;
   color: #64748b;
 }
 
 .summaryMonthHeader {
+  box-sizing: border-box;
+  width: 4.5rem;
   background: none;
   border: none;
   padding: 0.3rem 0.6rem;
@@ -1786,6 +1826,8 @@
 }
 
 .summaryCell {
+  box-sizing: border-box;
+  width: 4.5rem;
   cursor: pointer;
 }
 
@@ -1808,8 +1850,16 @@
   border-bottom-color: #334155;
 }
 
+[data-theme="dark"] .summaryActionsHeader,
+[data-theme="dark"] .summaryActionsCell,
 [data-theme="dark"] .summaryConceptHeader,
-[data-theme="dark"] .summaryConceptCell {
+[data-theme="dark"] .summaryConceptCell,
+[data-theme="dark"] .summaryMonthsHeader,
+[data-theme="dark"] .summaryMonthsCell,
+[data-theme="dark"] .summaryAmountHeader,
+[data-theme="dark"] .summaryAmountCell,
+[data-theme="dark"] .summaryBankHeader,
+[data-theme="dark"] .summaryBankCell {
   background: #1e293b;
 }
 
