@@ -100,6 +100,16 @@ describe("buildExpenseMatrix", () => {
     expect(gastos.rows.map((r) => r.key)).toEqual(["c", "a", "b"]);
   });
 
+  it("propaga el flag 'daily' del avistamiento más reciente", () => {
+    const months: Record<string, MonthData> = {
+      "2026-01": month({ fixed: [expense({ id: "comida", name: "Comida", daily: true })] }),
+    };
+    const keys = ["2026-01"];
+    const groups = buildExpenseMatrix(months, keys, {});
+    const row = groups.flatMap((g) => g.rows).find((r) => r.key === "comida");
+    expect(row!.daily).toBe(true);
+  });
+
   it("con mensualidad personalizada marca 'na' los meses que no coinciden aunque el gasto exista ese mes", () => {
     const months: Record<string, MonthData> = {
       "2026-01": month({ fixed: [expense({ id: "seguro", name: "Seguro", months: "1,7", paid: true })] }),

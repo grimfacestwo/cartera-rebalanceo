@@ -15,6 +15,7 @@ export type SummaryRow = {
   bank: BankId | "";
   category: CategoryId;
   months: string;
+  daily: boolean;
   cells: Record<string, SummaryCell>;
 };
 
@@ -68,7 +69,7 @@ export function buildExpenseMatrix(
     for (const e of month.fixed) {
       let row = fixedRows.get(e.id);
       if (!row) {
-        row = { kind: "fixed", key: e.id, name: e.name, amount: e.amount, bank: e.bank, category: e.category, months: e.months ?? "", cells: {} };
+        row = { kind: "fixed", key: e.id, name: e.name, amount: e.amount, bank: e.bank, category: e.category, months: e.months ?? "", daily: e.daily === true, cells: {} };
         fixedRows.set(e.id, row);
       } else {
         row.name = e.name;
@@ -76,6 +77,7 @@ export function buildExpenseMatrix(
         row.bank = e.bank;
         row.category = e.category;
         row.months = e.months ?? "";
+        row.daily = e.daily === true;
       }
       row.cells[key] = cellFor(e, key);
     }
@@ -86,7 +88,7 @@ export function buildExpenseMatrix(
       if (!normalized) continue;
       let row = variableRows.get(normalized);
       if (!row) {
-        row = { kind: "variable", key: normalized, name: e.name, amount: e.amount, bank: e.bank, category: e.category, months: e.months ?? "", cells: {} };
+        row = { kind: "variable", key: normalized, name: e.name, amount: e.amount, bank: e.bank, category: e.category, months: e.months ?? "", daily: e.daily === true, cells: {} };
         variableRows.set(normalized, row);
       } else {
         row.name = e.name;
@@ -94,6 +96,7 @@ export function buildExpenseMatrix(
         row.bank = e.bank;
         row.category = e.category;
         row.months = e.months ?? "";
+        row.daily = e.daily === true;
       }
       row.cells[key] = cellFor(e, key);
     }

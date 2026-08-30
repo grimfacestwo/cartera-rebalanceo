@@ -275,6 +275,7 @@ function ExpenseMatrix({
   groups,
   monthKeys,
   activeMonth,
+  activeDaysRemaining,
   collapsedCategories,
   onSelectMonth,
   onSetRowBank,
@@ -291,6 +292,7 @@ function ExpenseMatrix({
   groups: SummaryCategoryGroup[];
   monthKeys: string[];
   activeMonth: string;
+  activeDaysRemaining: number;
   collapsedCategories: Set<CategoryId>;
   onSelectMonth: (key: string) => void;
   onSetRowBank: (row: SummaryRow, bank: BankId | "") => void;
@@ -420,6 +422,14 @@ function ExpenseMatrix({
                       />
                       <span className={styles.amountUnit}>€</span>
                     </div>
+                    {row.daily && (
+                      <div
+                        className={styles.dailyEffective}
+                        title={`Tarifa diaria × ${activeDaysRemaining} días restantes de ${monthShortLabel(activeMonth)}`}
+                      >
+                        {currency.format((Number.parseFloat(row.amount) || 0) * activeDaysRemaining)}
+                      </div>
+                    )}
                   </td>
                   <td className={styles.summaryBankCell}>
                     <BankPicker value={row.bank} onChange={(b) => onSetRowBank(row, b)} ariaLabel={`Banco de ${row.name}`} />
@@ -961,6 +971,7 @@ export default function HogarManager() {
                 groups={filteredMatrixGroups}
                 monthKeys={sortedMonthKeys}
                 activeMonth={activeMonth}
+                activeDaysRemaining={activeDaysRemaining}
                 collapsedCategories={collapsedCategories}
                 onSelectMonth={setActiveMonth}
                 onSetRowBank={setRowBank}
