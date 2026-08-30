@@ -9,6 +9,7 @@ import {
   DEFAULT_ASSETS,
   DEFAULT_VALUES,
   effectiveAmount,
+  expenseAppliesToMonth,
   matchCategory,
   monthLabel,
   parseCatRules,
@@ -237,6 +238,22 @@ describe("effectiveAmount", () => {
 
   it("gasto no diario = importe", () => {
     expect(effectiveAmount({ ...comida, daily: false }, 31)).toBe(40);
+  });
+});
+
+describe("expenseAppliesToMonth", () => {
+  const base = { id: "c", name: "Seguro", amount: "40", type: "fijo" as const, bank: "ing" as const, paid: false, category: "gastos" as const, recurring: true };
+
+  it("sin mensualidad (mensual) aplica a cualquier mes", () => {
+    expect(expenseAppliesToMonth(base, "2026-01")).toBe(true);
+    expect(expenseAppliesToMonth(base, "2026-08")).toBe(true);
+  });
+
+  it("con mensualidad personalizada solo aplica a los meses listados", () => {
+    const seguro = { ...base, months: "1,7" };
+    expect(expenseAppliesToMonth(seguro, "2026-01")).toBe(true);
+    expect(expenseAppliesToMonth(seguro, "2026-07")).toBe(true);
+    expect(expenseAppliesToMonth(seguro, "2026-08")).toBe(false);
   });
 });
 

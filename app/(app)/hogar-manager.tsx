@@ -18,6 +18,7 @@ import {
   daysInMonth,
   daysRemaining,
   effectiveAmount,
+  expenseAppliesToMonth,
   DEFAULT_FIXED_EXPENSES,
   monthLabel,
   parseMonthsSpec,
@@ -624,7 +625,13 @@ export default function HogarManager() {
     }
   };
 
-  const allActiveExpenses = useMemo(() => [...activeData.fixed, ...activeData.expenses], [activeData]);
+  // Los gastos con mensualidad personalizada que no aplican este mes (ver
+  // columna "Mensualidad" del resumen) no cuentan para pagado/pendiente/
+  // disponible de este mes, igual que en el resumen se marcan "na".
+  const allActiveExpenses = useMemo(
+    () => [...activeData.fixed, ...activeData.expenses].filter((e) => expenseAppliesToMonth(e, activeMonth)),
+    [activeData, activeMonth],
+  );
   const activeDaysRemaining = daysRemaining(activeMonth);
 
   const bankPendientes = (bankId: BankId) => {

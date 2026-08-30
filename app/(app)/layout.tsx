@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { parseCochesState, pendingAlerts, type Alerts } from "@/lib/coches";
-import { parseState, BANK_IDS, currentMonthKey, daysRemaining, effectiveAmount, type Expense } from "@/lib/state";
+import { parseState, BANK_IDS, currentMonthKey, daysRemaining, effectiveAmount, expenseAppliesToMonth, type Expense } from "@/lib/state";
 import { parseUiPrefs } from "@/lib/ui-prefs";
 import styles from "./layout.module.css";
 
@@ -117,9 +117,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         const curKey = currentMonthKey();
         const active = state.months[curKey] ?? { banks: {} as Record<string, string>, expenses: [], fixed: [] };
         const days = daysRemaining(curKey);
-        const allExp: Array<{ paid?: boolean; amount: string; daily?: boolean }> = [...(active.fixed ?? []), ...active.expenses];
+        const allExp: Expense[] = [...(active.fixed ?? []), ...active.expenses];
         const bankTotal = BANK_IDS.reduce((s, id) => s + (Number.parseFloat(active.banks[id]) || 0), 0);
-        const pendientes = allExp.filter((e) => !e.paid).reduce((s, e) => s + effectiveAmount(e as Expense, days), 0);
+        const pendientes = allExp
+          .filter((e) => !e.paid && expenseAppliesToMonth(e, curKey))
+          .reduce((s, e) => s + effectiveAmount(e, days), 0);
         if (!cancelled) setDisponible(bankTotal - pendientes);
       } catch {
         if (!cancelled) setDisponible(null);

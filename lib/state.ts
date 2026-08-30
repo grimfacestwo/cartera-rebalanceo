@@ -216,6 +216,15 @@ export function parseMonthsSpec(spec: string | undefined): number[] {
   return Array.from(out).sort((a, b) => a - b);
 }
 
+// Si el gasto tiene mensualidad personalizada, solo "aplica" en los meses
+// de esa lista; vacío/mensual aplica siempre. `monthKey` en formato "YYYY-MM".
+export function expenseAppliesToMonth(e: Expense, monthKey: string): boolean {
+  const months = parseMonthsSpec(e.months);
+  if (months.length === 0) return true;
+  const m = Number.parseInt(monthKey.slice(5, 7), 10) || 0;
+  return months.includes(m);
+}
+
 export function sortMonthKeys(keys: string[]): string[] {
   return [...keys].sort();
 }

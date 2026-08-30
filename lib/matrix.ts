@@ -1,4 +1,4 @@
-import { CATEGORIES, parseMonthsSpec, type BankId, type CategoryId, type Expense, type MonthData } from "./state";
+import { CATEGORIES, expenseAppliesToMonth, type BankId, type CategoryId, type Expense, type MonthData } from "./state";
 
 export type SummaryCellStatus = "paid" | "pending" | "na";
 
@@ -25,17 +25,12 @@ export type SummaryCategoryGroup = {
   rows: SummaryRow[];
 };
 
-function calendarMonthOf(monthKey: string): number {
-  return Number.parseInt(monthKey.slice(5, 7), 10) || 0;
-}
-
 // Si el gasto tiene mensualidad personalizada (p.ej. "1,4,7,10"), los meses
 // que no coinciden se marcan "na" aunque el gasto exista ese mes (se siembra
 // en todos los meses por defecto, ver parseState) — la mensualidad manda.
 function cellFor(e: Expense | undefined, monthKey: string): SummaryCell {
   if (!e) return { status: "na", amount: 0 };
-  const months = parseMonthsSpec(e.months);
-  if (months.length > 0 && !months.includes(calendarMonthOf(monthKey))) {
+  if (!expenseAppliesToMonth(e, monthKey)) {
     return { status: "na", amount: 0 };
   }
   const amount = Number.parseFloat(e.amount) || 0;
