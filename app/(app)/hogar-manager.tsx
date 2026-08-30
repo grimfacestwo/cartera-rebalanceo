@@ -386,6 +386,7 @@ function ExpenseMatrix({
                       onChange={(ev) => onSetRowName(row, ev.target.value)}
                       className={styles.expenseInput}
                       aria-label={`Concepto de ${row.name}`}
+                      style={{ width: "8rem" }}
                     />
                   </td>
                   <td className={styles.summaryMonthsCell}>
@@ -446,6 +447,7 @@ function ExpenseMatrix({
                 placeholder="Nuevo gasto"
                 className={styles.expenseInput}
                 aria-label="Nombre del nuevo gasto"
+                style={{ width: "8rem" }}
                 onKeyDown={(ev) => { if (ev.key === "Enter") submitAdd(); }}
               />
             </td>

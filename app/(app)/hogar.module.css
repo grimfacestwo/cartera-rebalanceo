@@ -1675,6 +1675,7 @@
   background: #fff;
   text-align: left;
   z-index: 1;
+  width: 9rem;
 }
 
 .summaryConceptHeader {
