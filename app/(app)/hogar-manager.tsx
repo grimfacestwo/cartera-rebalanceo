@@ -1,12 +1,21 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { AssetDef } from "@/lib/rebalance";
-import { buildExpenseMatrix, type SummaryCategoryGroup, type SummaryRow } from "@/lib/matrix";
+import { buildExpenseMatrix, type SummaryRow } from "@/lib/matrix";
+import {
+  addFixedRowToTemplate,
+  computeMovedRowOrder,
+  deleteRowFromMonths,
+  deleteRowFromTemplate,
+  patchRowInMonths,
+  patchRowTemplate,
+  seedFixedRowIntoMonths,
+  toggleCellPaid as toggleCellPaidInMonths,
+} from "@/lib/rows";
 import {
   BANK_IDS,
   BANK_LABELS,
-  BANK_COLORS,
   CATEGORY_LABELS,
   CATEGORY_COLORS,
   CATEGORIES,
@@ -21,19 +30,20 @@ import {
   expenseAppliesToMonth,
   DEFAULT_FIXED_EXPENSES,
   monthLabel,
-  parseMonthsSpec,
+  monthShortLabel,
   parseState,
   PLAN_TARGETS_DEFAULT,
   sortMonthKeys,
   type BankId,
   type CategoryId,
   type CategoryRule,
-  type Expense,
   type FixedExpense,
   type Goal,
   type MonthData,
   type PortfolioValues,
 } from "@/lib/state";
+import { PlanDonut } from "./hogar-plan-donut";
+import { ExpenseMatrix } from "./hogar-expense-matrix";
 import styles from "./hogar.module.css";
 
 const currency = new Intl.NumberFormat("es-ES", {
@@ -53,453 +63,6 @@ function newId(): string {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
     : `n${Date.now()}`;
-}
-
-function monthShortLabel(key: string): string {
-  const year = key.slice(2, 4);
-  return `${monthLabel(key).slice(0, 3)} ${year}`;
-}
-
-const PLAN_TOLERANCE = 5;
-
-function planCompliant(cat: string, actualPct: number, target: number): boolean {
-  if (cat === "inversion" || cat === "crecimiento") return actualPct >= target - PLAN_TOLERANCE;
-  return actualPct <= target + PLAN_TOLERANCE;
-}
-
-function PlanDonut({
-  totals,
-  planTargets,
-  breakdown,
-  currency,
-}: {
-  totals: Record<string, number>;
-  planTargets: Record<string, string>;
-  breakdown: Record<CategoryId, { name: string; amount: number; paid: boolean }[]>;
-  currency: Intl.NumberFormat;
-}) {
-  const [openCat, setOpenCat] = useState<CategoryId | null>(null);
-  const amounts = CATEGORIES.map((cat) => ({ cat, amount: totals[cat] || 0 }));
-  const total = amounts.reduce((s, a) => s + a.amount, 0);
-  const size = 180;
-  const stroke = 22;
-  const r = (size - stroke) / 2;
-  const center = size / 2;
-  const C = 2 * Math.PI * r;
-  let offset = 0;
-
-  const buildTooltip = (cat: CategoryId) => {
-    const items = breakdown[cat] || [];
-    const head = `${CATEGORY_LABELS[cat]}: ${currency.format(totals[cat] || 0)}`;
-    if (!items.length) return `${head}\nSin gastos`;
-    const lines = items.map((it) => `· ${it.name}: ${currency.format(it.amount)}${it.paid ? " (pagado)" : ""}`);
-    return `${head}\n${lines.join("\n")}`;
-  };
-
-  return (
-    <div className={styles.planWrap}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-label="Reparto del plan de hogar">
-        <circle cx={center} cy={center} r={r} fill="none" stroke="#f1f5f9" strokeWidth={stroke} />
-        {total > 0 &&
-          amounts.map(({ cat, amount }) => {
-            const frac = amount / total;
-            const seg = frac * C;
-            const el = (
-              <circle
-                key={cat}
-                cx={center}
-                cy={center}
-                r={r}
-                fill="none"
-                stroke={CATEGORY_COLORS[cat as CategoryId]}
-                strokeWidth={stroke}
-                strokeDasharray={`${seg} ${C - seg}`}
-                strokeDashoffset={-offset}
-                transform={`rotate(-90 ${center} ${center})`}
-              >
-                <title>{buildTooltip(cat)}</title>
-              </circle>
-            );
-            offset += seg;
-            return el;
-          })}
-        {total > 0 && (
-          <text x={center} y={center - 4} textAnchor="middle" className={styles.donutTotal}>
-            {currency.format(total)}
-          </text>
-        )}
-        {total > 0 && (
-          <text x={center} y={center + 16} textAnchor="middle" className={styles.donutSub}>
-            Total mes
-          </text>
-        )}
-      </svg>
-      <ul className={styles.planLegend}>
-        {CATEGORIES.map((cat) => {
-          const amount = totals[cat] || 0;
-          const actualPct = total > 0 ? (amount / total) * 100 : 0;
-          const target = Number.parseFloat(planTargets[cat] || "0") || 0;
-          const ok = total > 0 && planCompliant(cat, actualPct, target);
-          const items = breakdown[cat] || [];
-          const open = openCat === cat;
-          return (
-            <li key={cat} className={styles.planLegendItem}>
-              <button
-                type="button"
-                className={styles.planLegendRow}
-                onClick={() => setOpenCat(open ? null : cat)}
-                aria-expanded={open}
-                title={buildTooltip(cat)}
-              >
-                <span className={styles.dot} style={{ background: CATEGORY_COLORS[cat] }} />
-                <span className={styles.planLegendName}>{CATEGORY_LABELS[cat]}</span>
-                <span className={styles.planLegendPct}>
-                  {actualPct.toFixed(0)}% <span className={styles.planLegendTarget}>/ {target}%</span>
-                </span>
-                <span
-                  className={ok ? styles.planOk : styles.planBad}
-                  title={ok ? "Dentro del plan" : "Fuera del plan"}
-                  aria-label={ok ? "Dentro del plan" : "Fuera del plan"}
-                />
-              </button>
-              {open && (
-                <ul className={styles.planLegendBreakdown}>
-                  {items.length === 0 ? (
-                    <li className={styles.planLegendEmpty}>Sin gastos este mes</li>
-                  ) : (
-                    items.map((it, i) => (
-                      <li key={i} className={styles.planLegendBreakdownRow}>
-                        <span className={styles.planLegendBreakdownName}>
-                          <span className={it.paid ? styles.planPaidMark : styles.planPendingMark} aria-hidden="true">
-                            {it.paid ? "✓" : "•"}
-                          </span>
-                          <span className={it.paid ? styles.planLegendPaid : ""}>{it.name}</span>
-                        </span>
-                        <span className={it.paid ? styles.planLegendPaid : ""}>{currency.format(it.amount)}</span>
-                      </li>
-                    ))
-                  )}
-                  <li className={styles.planLegendBreakdownTotal}>
-                    <span>Total</span>
-                    <span>{currency.format(amount)}</span>
-                  </li>
-                </ul>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}
-
-function BankPicker({
-  value,
-  onChange,
-  ariaLabel,
-}: {
-  value: BankId | "";
-  onChange: (b: BankId | "") => void;
-  ariaLabel: string;
-}) {
-  return (
-    <div className={styles.fixedBankPick} role="group" aria-label={ariaLabel}>
-      {BANK_IDS.map((b) => (
-        <button
-          type="button"
-          key={b}
-          className={styles.bankPickDot}
-          onClick={() => onChange(value === b ? "" : b)}
-          aria-label={BANK_LABELS[b]}
-          aria-pressed={value === b}
-          title={BANK_LABELS[b]}
-        >
-          <span className={styles.bankDot} style={{ background: value === b ? BANK_COLORS[b] : "#cbd5e1" }} />
-        </button>
-      ))}
-    </div>
-  );
-}
-
-// Anchos de columna del resumen (deben coincidir con los `width` de
-// hogar.module.css: .summaryActionsHeader/Cell, .summaryConceptHeader/Cell,
-// .summaryMonthsHeader/Cell, .summaryAmountHeader/Cell, .summaryBankHeader/Cell
-// y .summaryMonthHeader/.summaryCell). Con table-layout:fixed el ancho total
-// de la tabla debe fijarse explícitamente (en rem) o el navegador reparte el
-// 100% del contenedor entre columnas en vez de respetar estos valores.
-const FIXED_COLS_REM = 4.5 + 9 + 19.5 + 6.5 + 4.5; // acciones + concepto + mensualidad + importe + banco
-const MONTH_COL_REM = 4.5;
-
-const MONTH_SHORT = ["E", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];
-const MONTH_FULL = [
-  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
-];
-
-function MonthChips({
-  value,
-  onChange,
-  ariaLabel,
-}: {
-  value: string;
-  onChange: (spec: string) => void;
-  ariaLabel: string;
-}) {
-  const active = parseMonthsSpec(value);
-  const toggle = (num: number) => {
-    const next = active.includes(num) ? active.filter((m) => m !== num) : [...active, num].sort((a, b) => a - b);
-    onChange(next.join(","));
-  };
-  return (
-    <div className={styles.monthChips} role="group" aria-label={ariaLabel}>
-      {MONTH_SHORT.map((label, i) => {
-        const num = i + 1;
-        const isActive = active.includes(num);
-        return (
-          <button
-            type="button"
-            key={num}
-            className={isActive ? styles.monthChipActive : styles.monthChip}
-            onClick={() => toggle(num)}
-            aria-pressed={isActive}
-            title={MONTH_FULL[i]}
-          >
-            {label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function ExpenseMatrix({
-  groups,
-  monthKeys,
-  activeMonth,
-  activeDaysRemaining,
-  collapsedCategories,
-  onSelectMonth,
-  onSetRowBank,
-  onSetRowName,
-  onSetRowAmount,
-  onSetRowMonths,
-  onToggleCell,
-  onToggleCategory,
-  onSetPlanTarget,
-  onMoveRow,
-  onDeleteRow,
-  onAddRow,
-}: {
-  groups: SummaryCategoryGroup[];
-  monthKeys: string[];
-  activeMonth: string;
-  activeDaysRemaining: number;
-  collapsedCategories: Set<CategoryId>;
-  onSelectMonth: (key: string) => void;
-  onSetRowBank: (row: SummaryRow, bank: BankId | "") => void;
-  onSetRowName: (row: SummaryRow, name: string) => void;
-  onSetRowAmount: (row: SummaryRow, amount: string) => void;
-  onSetRowMonths: (row: SummaryRow, months: string) => void;
-  onToggleCell: (row: SummaryRow, monthKey: string) => void;
-  onToggleCategory: (cat: CategoryId) => void;
-  onSetPlanTarget: (cat: CategoryId, value: string) => void;
-  onMoveRow: (row: SummaryRow, direction: "up" | "down") => void;
-  onDeleteRow: (row: SummaryRow) => void;
-  onAddRow: (input: { name: string; amount: string; bank: BankId | ""; category: CategoryId; months: string }) => void;
-}) {
-  const [newName, setNewName] = useState("");
-  const [newAmount, setNewAmount] = useState("");
-  const [newBank, setNewBank] = useState<BankId | "">("");
-  const [newCategory, setNewCategory] = useState<CategoryId>("gastos");
-  const [newMonths, setNewMonths] = useState("");
-
-  const visibleGroups = groups.filter((g) => g.rows.length > 0);
-  if (monthKeys.length === 0) return null;
-  const colCount = 5 + monthKeys.length;
-
-  const submitAdd = () => {
-    const name = newName.trim();
-    if (!name) return;
-    onAddRow({ name, amount: newAmount, bank: newBank, category: newCategory, months: newMonths });
-    setNewName("");
-    setNewAmount("");
-    setNewBank("");
-    setNewMonths("");
-  };
-
-  return (
-    <>
-    <div className={styles.summaryWrap}>
-      <table
-        className={styles.summaryTable}
-        style={{ width: `${FIXED_COLS_REM + MONTH_COL_REM * monthKeys.length}rem` }}
-      >
-        <thead>
-          <tr>
-            <th className={styles.summaryActionsHeader} />
-            <th className={styles.summaryConceptHeader}>Concepto</th>
-            <th className={styles.summaryMonthsHeader}>Mensualidad</th>
-            <th className={styles.summaryAmountHeader}>Importe</th>
-            <th className={styles.summaryBankHeader}>Banco</th>
-            {monthKeys.map((key) => (
-              <th
-                key={key}
-                role="button"
-                tabIndex={0}
-                title={monthLabel(key)}
-                className={`${styles.summaryMonthHeader} ${key === activeMonth ? styles.summaryMonthHeaderActive : ""}`}
-                onClick={() => onSelectMonth(key)}
-                onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); onSelectMonth(key); } }}
-              >
-                {monthShortLabel(key)}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {visibleGroups.map((group) => {
-            const collapsed = collapsedCategories.has(group.category);
-            return (
-            <Fragment key={group.category}>
-              <tr
-                className={styles.summaryCatRow}
-                role="button"
-                tabIndex={0}
-                aria-expanded={!collapsed}
-                onClick={() => onToggleCategory(group.category)}
-                onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); onToggleCategory(group.category); } }}
-              >
-                <td colSpan={colCount} style={{ background: `${CATEGORY_COLORS[group.category]}1a` }}>
-                  <span className={styles.chevron}>{collapsed ? "▶" : "▼"}</span>
-                  {CATEGORY_LABELS[group.category].toUpperCase()}
-                  <span className={styles.summaryTargetWrap} onClick={(ev) => ev.stopPropagation()}>
-                    {" · "}
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={group.targetPct}
-                      onChange={(ev) => { const v = ev.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) onSetPlanTarget(group.category, v); }}
-                      className={styles.summaryTargetInput}
-                      aria-label={`Objetivo de ${CATEGORY_LABELS[group.category]} en porcentaje`}
-                    />
-                    %
-                  </span>
-                </td>
-              </tr>
-              {!collapsed && group.rows.map((row, idx) => (
-                <tr key={`${group.category}-${row.kind}-${row.key}`}>
-                  <td className={styles.summaryActionsCell}>
-                    <button type="button" className={styles.moveBtn} onClick={() => onMoveRow(row, "up")} disabled={idx === 0} aria-label={`Subir ${row.name}`} title="Subir">▲</button>
-                    <button type="button" className={styles.moveBtn} onClick={() => onMoveRow(row, "down")} disabled={idx === group.rows.length - 1} aria-label={`Bajar ${row.name}`} title="Bajar">▼</button>
-                    <button type="button" className={styles.removeBtn} onClick={() => onDeleteRow(row)} aria-label={`Eliminar ${row.name}`} title="Eliminar">×</button>
-                  </td>
-                  <td className={styles.summaryConceptCell}>
-                    <input
-                      type="text"
-                      value={row.name}
-                      onChange={(ev) => onSetRowName(row, ev.target.value)}
-                      className={styles.expenseInput}
-                      aria-label={`Concepto de ${row.name}`}
-                      style={{ width: "8rem" }}
-                    />
-                  </td>
-                  <td className={styles.summaryMonthsCell}>
-                    <MonthChips
-                      value={row.months}
-                      onChange={(spec) => onSetRowMonths(row, spec)}
-                      ariaLabel={`Mensualidad de ${row.name}`}
-                    />
-                  </td>
-                  <td className={styles.summaryAmountCell}>
-                    <div className={styles.amountCell}>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={row.amount}
-                        onChange={(ev) => { const v = ev.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) onSetRowAmount(row, v); }}
-                        className={styles.expenseInput}
-                        aria-label={`Importe de ${row.name}`}
-                        style={{ width: "4rem" }}
-                      />
-                      <span className={styles.amountUnit}>€</span>
-                    </div>
-                    {row.daily && (
-                      <div
-                        className={styles.dailyEffective}
-                        title={`Tarifa diaria × ${activeDaysRemaining} días restantes de ${monthShortLabel(activeMonth)}`}
-                      >
-                        {currency.format((Number.parseFloat(row.amount) || 0) * activeDaysRemaining)}
-                      </div>
-                    )}
-                  </td>
-                  <td className={styles.summaryBankCell}>
-                    <BankPicker value={row.bank} onChange={(b) => onSetRowBank(row, b)} ariaLabel={`Banco de ${row.name}`} />
-                  </td>
-                  {monthKeys.map((key) => {
-                    const cell = row.cells[key];
-                    const cls =
-                      cell.status === "paid" ? styles.summaryCellPaid : cell.status === "pending" ? styles.summaryCellPending : styles.summaryCellNa;
-                    const na = cell.status === "na";
-                    return (
-                      <td
-                        key={key}
-                        className={`${styles.summaryCell} ${cls}`}
-                        role={na ? undefined : "button"}
-                        tabIndex={na ? undefined : 0}
-                        onClick={na ? undefined : () => onToggleCell(row, key)}
-                        onKeyDown={na ? undefined : (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); onToggleCell(row, key); } }}
-                        title={na ? "No aplica este mes" : `${cell.status === "paid" ? "Pagado" : "Pendiente"} · ${currency.format(cell.amount)}`}
-                      >
-                        {cell.status === "paid" ? "✓" : cell.status === "pending" ? "•" : "—"}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </Fragment>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-    <div className={styles.addExpenseBar}>
-      <input
-        type="text"
-        value={newName}
-        onChange={(ev) => setNewName(ev.target.value)}
-        placeholder="Nuevo gasto"
-        className={styles.expenseInput}
-        aria-label="Nombre del nuevo gasto"
-        style={{ width: "9rem" }}
-        onKeyDown={(ev) => { if (ev.key === "Enter") submitAdd(); }}
-      />
-      <MonthChips value={newMonths} onChange={setNewMonths} ariaLabel="Mensualidad del nuevo gasto" />
-      <div className={styles.amountCell}>
-        <input
-          type="text"
-          inputMode="decimal"
-          value={newAmount}
-          onChange={(ev) => { const v = ev.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setNewAmount(v); }}
-          placeholder="0"
-          className={styles.expenseInput}
-          aria-label="Importe del nuevo gasto"
-          style={{ width: "4rem" }}
-        />
-        <span className={styles.amountUnit}>€</span>
-      </div>
-      <BankPicker value={newBank} onChange={setNewBank} ariaLabel="Banco del nuevo gasto" />
-      <select
-        value={newCategory}
-        onChange={(ev) => setNewCategory(ev.target.value as CategoryId)}
-        className={styles.expenseSelect}
-        aria-label="Categoría del nuevo gasto"
-      >
-        {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
-      </select>
-      <button type="button" className={styles.addBtn} onClick={submitAdd}>+ Añadir</button>
-    </div>
-    </>
-  );
 }
 
 export default function HogarManager() {
@@ -733,142 +296,61 @@ export default function HogarManager() {
     }));
   }, [matrixGroups, matrixBankFilter, matrixPaidFilter, activeMonth]);
 
-  // Cambiar el banco de una fila del resumen actualiza el gasto en TODOS los
-  // meses donde aparece (por id si es fijo, por nombre si es variable
-  // recurrente), y además la plantilla si es un gasto fijo, para que los
-  // próximos meses se sigan sembrando con el banco elegido.
-  // Aplica `patch` al gasto de una fila del resumen en TODOS los meses donde
-  // aparece (por id si es fijo, por nombre si es variable recurrente).
-  const patchRowInMonths = (
-    prev: Record<string, MonthData>,
-    row: SummaryRow,
-    patch: (e: Expense) => Expense,
-  ): Record<string, MonthData> => {
-    const next: Record<string, MonthData> = {};
-    for (const [key, m] of Object.entries(prev)) {
-      if (row.kind === "fixed") {
-        next[key] = m.fixed.some((e) => e.id === row.key)
-          ? { ...m, fixed: m.fixed.map((e) => (e.id === row.key ? patch(e) : e)) }
-          : m;
-      } else {
-        const norm = row.key;
-        next[key] = m.expenses.some((e) => e.recurring && e.name.trim().toLowerCase() === norm)
-          ? { ...m, expenses: m.expenses.map((e) => (e.recurring && e.name.trim().toLowerCase() === norm ? patch(e) : e)) }
-          : m;
-      }
-    }
-    return next;
-  };
-
+  // Cambiar el banco/nombre/importe/mensualidad de una fila del resumen
+  // actualiza el gasto en TODOS los meses donde aparece (por id si es fijo,
+  // por nombre si es variable recurrente), y además la plantilla si es un
+  // gasto fijo, para que los próximos meses se sigan sembrando igual. La
+  // lógica pura vive en lib/rows.ts (testeada ahí); aquí solo se conecta al
+  // estado de React.
   const setRowBank = (row: SummaryRow, bank: BankId | "") => {
-    if (row.kind === "fixed") {
-      setFixedExpenses((prev) => prev.map((f) => (f.id === row.key ? { ...f, bank } : f)));
-    }
+    setFixedExpenses((prev) => patchRowTemplate(prev, row, (f) => ({ ...f, bank })));
     setMonths((prev) => patchRowInMonths(prev, row, (e) => ({ ...e, bank })));
   };
 
   const setRowName = (row: SummaryRow, name: string) => {
-    if (row.kind === "fixed") {
-      setFixedExpenses((prev) => prev.map((f) => (f.id === row.key ? { ...f, name } : f)));
-    }
+    setFixedExpenses((prev) => patchRowTemplate(prev, row, (f) => ({ ...f, name })));
     setMonths((prev) => patchRowInMonths(prev, row, (e) => ({ ...e, name })));
   };
 
   const setRowAmount = (row: SummaryRow, amount: string) => {
-    if (row.kind === "fixed") {
-      setFixedExpenses((prev) => prev.map((f) => (f.id === row.key ? { ...f, amount } : f)));
-    }
+    setFixedExpenses((prev) => patchRowTemplate(prev, row, (f) => ({ ...f, amount })));
     setMonths((prev) => patchRowInMonths(prev, row, (e) => ({ ...e, amount })));
   };
 
   const setRowMonths = (row: SummaryRow, monthsSpec: string) => {
-    if (row.kind === "fixed") {
-      setFixedExpenses((prev) => prev.map((f) => (f.id === row.key ? { ...f, months: monthsSpec } : f)));
-    }
+    setFixedExpenses((prev) => patchRowTemplate(prev, row, (f) => ({ ...f, months: monthsSpec })));
     setMonths((prev) => patchRowInMonths(prev, row, (e) => ({ ...e, months: monthsSpec })));
   };
 
   // Alterna pagado/pendiente de un gasto en un mes concreto (no afecta a
   // los demás meses de la fila, a diferencia de banco/nombre/importe).
   const toggleCellPaid = (row: SummaryRow, monthKey: string) => {
-    setMonths((prev) => {
-      const m = prev[monthKey];
-      if (!m) return prev;
-      if (row.kind === "fixed") {
-        if (!m.fixed.some((e) => e.id === row.key)) return prev;
-        return { ...prev, [monthKey]: { ...m, fixed: m.fixed.map((e) => (e.id === row.key ? { ...e, paid: !e.paid } : e)) } };
-      }
-      const norm = row.key;
-      if (!m.expenses.some((e) => e.recurring && e.name.trim().toLowerCase() === norm)) return prev;
-      return {
-        ...prev,
-        [monthKey]: { ...m, expenses: m.expenses.map((e) => (e.recurring && e.name.trim().toLowerCase() === norm ? { ...e, paid: !e.paid } : e)) },
-      };
-    });
+    setMonths((prev) => toggleCellPaidInMonths(prev, row, monthKey));
   };
 
   // Añade un gasto fijo nuevo: entra en la plantilla y se siembra al
   // instante en todos los meses ya creados (igual que hace parseState al
   // cargar), para que la nueva fila aparezca ya en el resumen sin recargar.
-  const addFixedRow = ({ name, amount, bank, category, months }: { name: string; amount: string; bank: BankId | ""; category: CategoryId; months: string }) => {
-    const id = newId();
-    setFixedExpenses((prev) => [...prev, { id, name, amount, bank, category, daily: false, ...(months.trim() !== "" ? { months } : {}) }]);
-    setMonths((prev) => {
-      const next: Record<string, MonthData> = {};
-      for (const [key, m] of Object.entries(prev)) {
-        if (m.fixed.some((e) => e.id === id)) { next[key] = m; continue; }
-        next[key] = { ...m, fixed: [...m.fixed, { id, name, amount, type: "fijo", bank, paid: false, category, recurring: true, daily: false, ...(months.trim() !== "" ? { months } : {}) }] };
-      }
-      return next;
-    });
+  const addFixedRow = (input: { name: string; amount: string; bank: BankId | ""; category: CategoryId; months: string }) => {
+    const newRow = { id: newId(), ...input };
+    setFixedExpenses((prev) => addFixedRowToTemplate(prev, newRow));
+    setMonths((prev) => seedFixedRowIntoMonths(prev, newRow));
   };
 
   // Elimina el gasto de una fila del resumen de TODOS los meses donde
   // aparece (y de la plantilla si es fijo), igual que las demás ediciones
   // "globales" de fila (banco/nombre/importe).
   const deleteRow = (row: SummaryRow) => {
-    if (row.kind === "fixed") {
-      setFixedExpenses((prev) => prev.filter((f) => f.id !== row.key));
-    }
-    setMonths((prev) => {
-      const next: Record<string, MonthData> = {};
-      for (const [key, m] of Object.entries(prev)) {
-        if (row.kind === "fixed") {
-          next[key] = m.fixed.some((e) => e.id === row.key)
-            ? { ...m, fixed: m.fixed.filter((e) => e.id !== row.key) }
-            : m;
-        } else {
-          const norm = row.key;
-          next[key] = m.expenses.some((e) => e.recurring && e.name.trim().toLowerCase() === norm)
-            ? { ...m, expenses: m.expenses.filter((e) => !(e.recurring && e.name.trim().toLowerCase() === norm)) }
-            : m;
-        }
-      }
-      return next;
-    });
+    setFixedExpenses((prev) => deleteRowFromTemplate(prev, row));
+    setMonths((prev) => deleteRowFromMonths(prev, row));
     setRowOrder((prev) => prev.filter((k) => k !== row.key));
   };
 
-  // Mueve una fila un puesto arriba/abajo dentro de su categoría. Se
-  // normaliza el orden completo actual (matrixGroups, sin filtrar) y se
-  // guarda como `rowOrder` para que persista entre sesiones.
+  // Mueve una fila un puesto arriba/abajo dentro de su categoría; ver
+  // computeMovedRowOrder en lib/rows.ts para la lógica de qué vecino usar.
   const moveRow = (row: SummaryRow, direction: "up" | "down") => {
-    // Se mueve respecto al vecino VISIBLE (según los filtros activos), pero
-    // el intercambio se aplica sobre el orden maestro completo para no
-    // perder la posición de las filas que los filtros dejan ocultas.
-    const group = filteredMatrixGroups.find((g) => g.category === row.category);
-    if (!group) return;
-    const idx = group.rows.findIndex((r) => r.key === row.key);
-    const targetIdx = direction === "up" ? idx - 1 : idx + 1;
-    if (idx === -1 || targetIdx < 0 || targetIdx >= group.rows.length) return;
-    const neighborKey = group.rows[targetIdx].key;
-    const fullOrder = matrixGroups.flatMap((g) => g.rows.map((r) => r.key));
-    const ia = fullOrder.indexOf(row.key);
-    const ib = fullOrder.indexOf(neighborKey);
-    if (ia === -1 || ib === -1) return;
-    const newOrder = [...fullOrder];
-    [newOrder[ia], newOrder[ib]] = [newOrder[ib], newOrder[ia]];
-    setRowOrder(newOrder);
+    const newOrder = computeMovedRowOrder(matrixGroups, filteredMatrixGroups, row, direction);
+    if (newOrder) setRowOrder(newOrder);
   };
 
   const [collapsedCategories, setCollapsedCategories] = useState<Set<CategoryId>>(new Set());

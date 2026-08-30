@@ -189,6 +189,11 @@ export function monthLabel(key: string): string {
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
+export function monthShortLabel(key: string): string {
+  const year = key.slice(2, 4);
+  return `${monthLabel(key).slice(0, 3)} ${year}`;
+}
+
 const MONTH_ABBR_TO_NUM: Record<string, number> = {
   ene: 1, feb: 2, mar: 3, abr: 4, may: 5, jun: 6,
   jul: 7, ago: 8, sep: 9, set: 9, oct: 10, nov: 11, dic: 12,

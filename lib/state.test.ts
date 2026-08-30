@@ -12,6 +12,7 @@ import {
   expenseAppliesToMonth,
   matchCategory,
   monthLabel,
+  monthShortLabel,
   parseCatRules,
   parseExpenses,
   parseFixedExpenses,
@@ -174,6 +175,11 @@ describe("month helpers", () => {
     expect(monthLabel("2026-08")).toContain("Agosto");
     expect(monthLabel("2026-08")).toContain("2026");
     expect(monthLabel("2026-01")).toContain("Enero");
+  });
+
+  it("monthShortLabel abrevia mes + año de 2 dígitos", () => {
+    expect(monthShortLabel("2026-08")).toBe("Ago 26");
+    expect(monthShortLabel("2027-01")).toBe("Ene 27");
   });
 
   it("sortMonthKeys ordena ascendente", () => {
