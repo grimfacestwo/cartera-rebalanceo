@@ -586,22 +586,6 @@
   gap: 0.5rem;
 }
 
-.newMonthBtn {
-  padding: 0.45rem 0.9rem;
-  border-radius: 8px;
-  border: 1px solid #f59e0b;
-  background: rgba(245, 158, 11, 0.08);
-  color: #b45309;
-  font-family: inherit;
-  font-weight: 600;
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-
-.newMonthBtn:hover {
-  background: rgba(245, 158, 11, 0.15);
-}
-
 .expenseSummary {
   display: flex;
   flex-wrap: wrap;
@@ -653,48 +637,6 @@
 .tabActive {
   color: #0f172a;
   border-bottom-color: #3b82f6;
-}
-
-.monthTabs {
-  display: flex;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  max-width: 100%;
-  scrollbar-width: thin;
-  gap: 0.4rem;
-  margin-bottom: 1rem;
-  align-items: center;
-  padding-bottom: 0.2rem;
-}
-
-.monthTab {
-  flex: 0 0 auto;
-  padding: 0.4rem 0.9rem;
-  border-radius: 20px;
-  border: 1px solid #e2e8f0;
-  background: #fff;
-  color: #475569;
-  font-family: inherit;
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
-}
-
-.monthTab:hover {
-  color: #0f172a;
-  border-color: #cbd5e1;
-}
-
-.monthTabActive {
-  background: #3b82f6;
-  border-color: #3b82f6;
-  color: #fff;
-}
-
-.daysLeft {
-  font-size: 0.75rem;
-  opacity: 0.7;
-  font-weight: 400;
 }
 
 .comidaRow {
@@ -1097,23 +1039,6 @@
 
 [data-theme="dark"] .goalInput:focus {
   background: #334155;
-}
-
-[data-theme="dark"] .monthTab {
-  background: #1e293b;
-  border-color: #334155;
-  color: #94a3b8;
-}
-
-[data-theme="dark"] .monthTab:hover {
-  border-color: #475569;
-  color: #e2e8f0;
-}
-
-[data-theme="dark"] .monthTabActive {
-  background: #3b82f6;
-  border-color: #3b82f6;
-  color: #fff;
 }
 
 [data-theme="dark"] .comidaRow {

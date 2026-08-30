@@ -13,8 +13,6 @@ import {
   DEFAULT_ASSETS,
   DEFAULT_VALUES,
   DEFAULT_BANKS,
-  addMonth,
-  bankRemaining,
   categoryTotals,
   currentMonthKey,
   daysInMonth,
@@ -645,29 +643,6 @@ export default function HogarManager() {
   const totalPendientes = allActiveExpenses.filter((e) => !e.paid).reduce((s, e) => s + effectiveAmount(e, activeDaysRemaining), 0);
   const remaining = bankTotal - totalPendientes;
 
-  const newMonth = () => {
-    const keys = sortMonthKeys(Object.keys(months));
-    const lastKey = keys[keys.length - 1];
-    const nextKey = lastKey ? addMonth(lastKey) : currentMonthKey();
-    if (months[nextKey]) { setActiveMonth(nextKey); return; }
-    const prev = months[lastKey] ?? { ...EMPTY_MONTH };
-    const banks: Record<BankId, string> = { ...DEFAULT_BANKS };
-    for (const id of BANK_IDS) {
-      const r = bankRemaining(prev, id);
-      banks[id] = r > 0 ? String(r) : "";
-    }
-    const carriedExpenses = prev.expenses
-      .filter((e) => e.recurring)
-      .map((e) => ({ ...e, id: newId(), paid: false }));
-    const tmpl = fixedExpenses.length > 0 ? fixedExpenses : DEFAULT_FIXED_EXPENSES;
-    const seededFixed: Expense[] = tmpl.map((f) => ({ id: f.id, name: f.name, amount: f.amount, type: "fijo", bank: f.bank, paid: false, category: f.category, recurring: true, daily: f.daily, ...(f.months ? { months: f.months } : {}) }));
-    setMonths((p) => ({
-      ...p,
-      [nextKey]: { banks, expenses: carriedExpenses, fixed: seededFixed },
-    }));
-    setActiveMonth(nextKey);
-  };
-
   const sortedMonthKeys = useMemo(() => sortMonthKeys(Object.keys(months)), [months]);
 
   // Month-over-month comparison (la comida diaria usa días del mes completo)
@@ -980,7 +955,6 @@ export default function HogarManager() {
                   <option value="paid">Solo pagados ({monthShortLabel(activeMonth)})</option>
                   <option value="pending">Solo pendientes ({monthShortLabel(activeMonth)})</option>
                 </select>
-                <button type="button" className={styles.newMonthBtn} onClick={newMonth}>+ Nuevo mes</button>
               </div>
               <ExpenseMatrix
                 groups={filteredMatrixGroups}
