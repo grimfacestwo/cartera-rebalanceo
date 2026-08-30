@@ -22,6 +22,7 @@ import {
   effectiveAmount,
   DEFAULT_FIXED_EXPENSES,
   monthLabel,
+  parseMonthsSpec,
   parseState,
   PLAN_TARGETS_DEFAULT,
   sortMonthKeys,
@@ -221,6 +222,48 @@ function BankPicker({
   );
 }
 
+const MONTH_SHORT = ["E", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];
+const MONTH_FULL = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+];
+
+function MonthChips({
+  value,
+  onChange,
+  ariaLabel,
+}: {
+  value: string;
+  onChange: (spec: string) => void;
+  ariaLabel: string;
+}) {
+  const active = parseMonthsSpec(value);
+  const toggle = (num: number) => {
+    const next = active.includes(num) ? active.filter((m) => m !== num) : [...active, num].sort((a, b) => a - b);
+    onChange(next.join(","));
+  };
+  return (
+    <div className={styles.monthChips} role="group" aria-label={ariaLabel}>
+      {MONTH_SHORT.map((label, i) => {
+        const num = i + 1;
+        const isActive = active.includes(num);
+        return (
+          <button
+            type="button"
+            key={num}
+            className={isActive ? styles.monthChipActive : styles.monthChip}
+            onClick={() => toggle(num)}
+            aria-pressed={isActive}
+            title={MONTH_FULL[i]}
+          >
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function ExpenseMatrix({
   groups,
   monthKeys,
@@ -346,15 +389,10 @@ function ExpenseMatrix({
                     />
                   </td>
                   <td className={styles.summaryMonthsCell}>
-                    <input
-                      type="text"
+                    <MonthChips
                       value={row.months}
-                      onChange={(ev) => onSetRowMonths(row, ev.target.value)}
-                      placeholder="Mensual"
-                      className={styles.expenseInput}
-                      aria-label={`Mensualidad de ${row.name}`}
-                      title="Vacío = mensual. Si no, indica los meses en los que se paga (p.ej. 1,4,7,10 o Ene, Abr, Jul, Oct)."
-                      style={{ width: "6rem" }}
+                      onChange={(spec) => onSetRowMonths(row, spec)}
+                      ariaLabel={`Mensualidad de ${row.name}`}
                     />
                   </td>
                   <td className={styles.summaryAmountCell}>
@@ -412,17 +450,7 @@ function ExpenseMatrix({
               />
             </td>
             <td className={styles.summaryMonthsCell}>
-              <input
-                type="text"
-                value={newMonths}
-                onChange={(ev) => setNewMonths(ev.target.value)}
-                placeholder="Mensual"
-                className={styles.expenseInput}
-                aria-label="Mensualidad del nuevo gasto"
-                title="Vacío = mensual. Si no, indica los meses en los que se paga (p.ej. 1,4,7,10 o Ene, Abr, Jul, Oct)."
-                style={{ width: "6rem" }}
-                onKeyDown={(ev) => { if (ev.key === "Enter") submitAdd(); }}
-              />
+              <MonthChips value={newMonths} onChange={setNewMonths} ariaLabel="Mensualidad del nuevo gasto" />
             </td>
             <td className={styles.summaryAmountCell}>
               <div className={styles.amountCell}>

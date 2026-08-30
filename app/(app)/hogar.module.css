@@ -1752,6 +1752,38 @@
   outline: 2px solid rgba(59, 130, 246, 0.4);
 }
 
+.monthChips {
+  display: inline-flex;
+  gap: 0.15rem;
+  flex-wrap: nowrap;
+}
+
+.monthChip,
+.monthChipActive {
+  width: 1.3rem;
+  height: 1.3rem;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-family: inherit;
+  color: #64748b;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.monthChip:hover {
+  background: rgba(100, 116, 139, 0.1);
+}
+
+.monthChipActive {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: #fff;
+  font-weight: 700;
+}
+
 .summaryCell {
   cursor: pointer;
 }
@@ -1811,4 +1843,14 @@
 
 [data-theme="dark"] .moveBtn:disabled {
   color: #334155;
+}
+
+[data-theme="dark"] .monthChip {
+  background: transparent;
+  border-color: #334155;
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .monthChip:hover {
+  background: rgba(148, 163, 184, 0.15);
 }
