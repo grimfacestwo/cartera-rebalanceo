@@ -934,7 +934,10 @@ export default function HogarManager() {
           <>
             {/* Resumen multi-mes */}
             <section className={styles.card}>
-              <h2>Resumen por mes</h2>
+              <h2>
+                Resumen por mes
+                {activeMonth === currentMonthKey() && ` (${activeDaysRemaining} días restantes)`}
+              </h2>
               <div className={styles.filterBar}>
                 <select
                   value={matrixBankFilter}
