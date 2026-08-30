@@ -468,6 +468,8 @@
 .totalRow td {
   font-weight: 700;
   color: #0f172a;
+  border-top: 2px solid #e2e8f0;
+  padding-top: 0.8rem;
 }
 
 .inject {
@@ -1006,6 +1008,7 @@
 }
 
 [data-theme="dark"] .totalRow td {
+  border-top-color: #334155;
 }
 
 [data-theme="dark"] .note {
