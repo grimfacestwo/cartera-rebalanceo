@@ -109,7 +109,10 @@ function BankPicker({
           aria-pressed={value === b}
           title={BANK_LABELS[b]}
         >
-          <span className={styles.bankDot} style={{ background: value === b ? BANK_COLORS[b] : "#cbd5e1" }} />
+          <span
+            className={`${styles.bankDot}${value === b && b === "trade" ? ` ${styles.bankDotTradeActive}` : ""}`}
+            style={{ background: value === b ? BANK_COLORS[b] : "#cbd5e1" }}
+          />
         </button>
       ))}
     </div>

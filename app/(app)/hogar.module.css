@@ -706,6 +706,13 @@
   border-radius: 50%;
 }
 
+/* El gris de Trade Republic (BANK_COLORS.trade) es más oscuro que el gris de
+   "no seleccionado" (#cbd5e1) — en modo oscuro parecía "apagado" en vez de
+   activo. Aquí se aclara solo para ese caso, sin tocar el resto. */
+[data-theme="dark"] .bankDotTradeActive {
+  background: #e2e8f0 !important;
+}
+
 .fixedBankPick {
   display: inline-flex;
   align-items: center;
