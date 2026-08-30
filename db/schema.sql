@@ -28,7 +28,13 @@ CREATE TABLE IF NOT EXISTS portfolio_state (
   catRules jsonb NOT NULL DEFAULT '[]'::jsonb,
   planTargets jsonb NOT NULL DEFAULT '{}'::jsonb,
   rowOrder jsonb NOT NULL DEFAULT '[]'::jsonb,
-  updated_at timestamptz NOT NULL DEFAULT now()
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  -- Control de concurrencia optimista (ver app/api/state/route.ts): cada PUT
+  -- manda el `version` que cargó y solo se aplica si sigue coincidiendo con
+  -- el de la fila, si no se rechaza con 409 en vez de pisar en silencio lo
+  -- que haya guardado otra pestaña/página de por medio. Un entero, no
+  -- updated_at, porque el timestamptz pierde precisión al pasar por JSON.
+  version integer NOT NULL DEFAULT 1
 );
 
 -- Tabla clave-valor genérica para el resto de secciones, indexada por

@@ -36,6 +36,12 @@ async function ensureTable() {
   await sql`ALTER TABLE portfolio_state ADD COLUMN IF NOT EXISTS catRules jsonb NOT NULL DEFAULT '[]'::jsonb`;
   await sql`ALTER TABLE portfolio_state ADD COLUMN IF NOT EXISTS planTargets jsonb NOT NULL DEFAULT '{}'::jsonb`;
   await sql`ALTER TABLE portfolio_state ADD COLUMN IF NOT EXISTS rowOrder jsonb NOT NULL DEFAULT '[]'::jsonb`;
+  // Contador de versión para control de concurrencia optimista (ver PUT).
+  // Se usa un entero en vez de comparar updated_at porque el timestamptz de
+  // Postgres tiene precisión de microsegundos y se trunca a milisegundos al
+  // pasar por JSON, así que una comparación de igualdad por timestamp casi
+  // nunca coincide aunque nadie más haya guardado.
+  await sql`ALTER TABLE portfolio_state ADD COLUMN IF NOT EXISTS version integer NOT NULL DEFAULT 1`;
   ensured = true;
 }
 
@@ -57,18 +63,21 @@ export async function GET() {
       catRules: unknown;
       planTargets: unknown;
       rowOrder: unknown;
+      version: number;
     }>`SELECT
         assets, values, contribution, banks, expenses, months, goals,
         fixedExpenses AS "fixedExpenses",
         catRules AS "catRules",
         planTargets AS "planTargets",
-        rowOrder AS "rowOrder"
+        rowOrder AS "rowOrder",
+        version
       FROM portfolio_state WHERE id = 1`;
     if (rows.length === 0) {
-      return NextResponse.json({ state: DEFAULT_STATE });
+      return NextResponse.json({ state: DEFAULT_STATE, version: null });
     }
     return NextResponse.json({
       state: parseState(rows[0]),
+      version: rows[0].version,
     });
   } catch {
     return NextResponse.json(
@@ -85,8 +94,12 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
   let raw: unknown;
+  let expectedVersion: number | null = null;
   try {
     raw = await readJsonLimited(request, MAX_BODY_BYTES);
+    if (raw && typeof raw === "object" && typeof (raw as { expectedVersion?: unknown }).expectedVersion === "number") {
+      expectedVersion = (raw as { expectedVersion: number }).expectedVersion;
+    }
   } catch (e) {
     if (e instanceof BodyTooLargeError) {
       return NextResponse.json({ error: "Cuerpo demasiado grande" }, { status: 413 });
@@ -96,8 +109,13 @@ export async function PUT(request: Request) {
   const state = parseState(raw);
   try {
     await ensureTable();
-    await sql`
-      INSERT INTO portfolio_state (id, assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder, updated_at)
+    // Control de concurrencia optimista: si se manda expectedVersion, la fila
+    // solo se actualiza si nadie más ha guardado desde que este cliente
+    // cargó el estado (evita que dos pestañas/sesiones/páginas se pisen en
+    // silencio con "el último que guarda gana"). Sin expectedVersion (primer
+    // guardado tras crear la fila) siempre se aplica.
+    const { rows } = await sql<{ version: number }>`
+      INSERT INTO portfolio_state (id, assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder, updated_at, version)
       VALUES (
         1,
         ${JSON.stringify(state.assets)}::jsonb,
@@ -109,7 +127,8 @@ export async function PUT(request: Request) {
         ${JSON.stringify(state.catRules)}::jsonb,
         ${JSON.stringify(state.planTargets)}::jsonb,
         ${JSON.stringify(state.rowOrder)}::jsonb,
-        now()
+        now(),
+        1
       )
       ON CONFLICT (id) DO UPDATE SET
         assets = EXCLUDED.assets,
@@ -121,9 +140,31 @@ export async function PUT(request: Request) {
         catRules = EXCLUDED.catRules,
         planTargets = EXCLUDED.planTargets,
         rowOrder = EXCLUDED.rowOrder,
-        updated_at = now()
+        updated_at = now(),
+        version = portfolio_state.version + 1
+      WHERE ${expectedVersion}::int IS NULL OR portfolio_state.version = ${expectedVersion}::int
+      RETURNING version
     `;
-    return NextResponse.json({ ok: true });
+    if (rows.length === 0) {
+      // Conflicto: alguien guardó de por medio. Se devuelve el estado actual
+      // para que el cliente se resincronice en vez de perder datos en
+      // silencio.
+      const current = await sql`
+        SELECT
+          assets, values, contribution, banks, expenses, months, goals,
+          fixedExpenses AS "fixedExpenses",
+          catRules AS "catRules",
+          planTargets AS "planTargets",
+          rowOrder AS "rowOrder",
+          version
+        FROM portfolio_state WHERE id = 1
+      `;
+      return NextResponse.json(
+        { error: "conflict", state: parseState(current.rows[0]), version: current.rows[0].version },
+        { status: 409 }
+      );
+    }
+    return NextResponse.json({ ok: true, version: rows[0].version });
   } catch {
     return NextResponse.json(
       { error: "No se pudo guardar el estado" },

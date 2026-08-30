@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { computePlan, type AssetDef, type Row } from "@/lib/rebalance";
+import { putState } from "@/lib/persist";
 import {
   BANK_IDS,
   BANK_LABELS,
@@ -24,6 +25,7 @@ import {
   type FixedExpense,
   type Goal,
   type MonthData,
+  type PortfolioState,
   type PortfolioValues,
 } from "@/lib/state";
 import styles from "./page.module.css";
@@ -37,7 +39,7 @@ const currency = new Intl.NumberFormat("es-ES", {
 
 const pct = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 });
 
-type SaveStatus = "idle" | "saving" | "saved" | "error";
+type SaveStatus = "idle" | "saving" | "saved" | "error" | "conflict";
 type TabId = "cartera" | "objetivos";
 
 function nextColor(assets: AssetDef[]): string {
@@ -138,6 +140,10 @@ export default function Home() {
   const [newFixedAmount, setNewFixedAmount] = useState("");
   const [newFixedCategory, setNewFixedCategory] = useState<CategoryId>("gastos");
   const [planTargets, setPlanTargets] = useState<Record<string, string>>({ ...PLAN_TARGETS_DEFAULT });
+  // rowOrder no tiene UI propia aquí (se edita en /hogar) pero hay que
+  // cargarlo y reenviarlo tal cual al guardar — si no, cada guardado desde
+  // esta página lo resetea a vacío y se pierde el orden personalizado.
+  const [rowOrder, setRowOrder] = useState<string[]>([]);
   const [newFixedBank, setNewFixedBank] = useState<BankId | "">("");
   const [goalName, setGoalName] = useState("");
   const [goalTarget, setGoalTarget] = useState("");
@@ -145,7 +151,25 @@ export default function Home() {
   const [goalBank, setGoalBank] = useState<BankId | "">("");
   const [goalRate, setGoalRate] = useState("");
   const skipOnce = useRef(true);
-  const pendingSaveRef = useRef<string | null>(null);
+  const pendingStateRef = useRef<PortfolioState | null>(null);
+  // Última versión conocida del estado en el servidor. Viaja en cada
+  // guardado para detectar si otra pestaña/página (p.ej. /hogar) guardó de
+  // por medio (ver lib/persist.ts y app/api/state/route.ts) — evita que "el
+  // último que guarda gana" pise ediciones ajenas en silencio.
+  const lastVersionRef = useRef<number | null>(null);
+
+  const applyServerState = (state: PortfolioState) => {
+    setAssets(state.assets);
+    setValues(state.values);
+    setContribution(state.contribution);
+    setMonths(state.months);
+    setGoals(state.goals);
+    setFixedExpenses(state.fixedExpenses);
+    setCatRules(state.catRules);
+    setPlanTargets(state.planTargets);
+    setRowOrder(state.rowOrder);
+    skipOnce.current = true;
+  };
 
   // --- Load ---
   useEffect(() => {
@@ -154,18 +178,11 @@ export default function Home() {
       try {
         const res = await fetch("/api/state");
         if (!res.ok) throw new Error("estado no disponible");
-        const data = (await res.json()) as { state?: unknown };
+        const data = (await res.json()) as { state?: unknown; version?: number | null };
         const state = parseState(data.state);
         if (!cancelled) {
-          setAssets(state.assets);
-          setValues(state.values);
-          setContribution(state.contribution);
-          setMonths(state.months);
-          setGoals(state.goals);
-          setFixedExpenses(state.fixedExpenses);
-          setCatRules(state.catRules);
-          setPlanTargets(state.planTargets);
-          skipOnce.current = true;
+          applyServerState(state);
+          lastVersionRef.current = data.version ?? null;
           setLoadError(false);
         }
       } catch {
@@ -181,44 +198,37 @@ export default function Home() {
   useEffect(() => {
     if (loading || loadError) return;
     if (skipOnce.current) { skipOnce.current = false; return; }
-    const body = JSON.stringify({ assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets });
-    pendingSaveRef.current = body;
+    const state: PortfolioState = { assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder };
+    pendingStateRef.current = state;
     const timer = setTimeout(async () => {
       setSaveStatus("saving");
-      let ok = false;
-      for (let i = 0; i < 2 && !ok; i++) {
-        try {
-          const res = await fetch("/api/state", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body,
-          });
-          ok = res.ok;
-        } catch {
-          ok = false;
-        }
+      let result = await putState(state, lastVersionRef.current);
+      if (result.kind === "error") result = await putState(state, lastVersionRef.current); // 1 reintento
+      if (result.kind === "ok") {
+        lastVersionRef.current = result.version;
+        setSaveStatus("saved");
+      } else if (result.kind === "conflict") {
+        // Alguien más guardó de por medio (p.ej. /hogar): se adopta su
+        // versión en vez de sobrescribirla, y se avisa.
+        applyServerState(result.state);
+        lastVersionRef.current = result.version;
+        setSaveStatus("conflict");
+      } else {
+        setSaveStatus("error");
       }
-      setSaveStatus(ok ? "saved" : "error");
     }, 500);
     return () => clearTimeout(timer);
-  }, [assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, loading, loadError]);
+  }, [assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder, loading, loadError]);
 
   // Flush the último estado antes de cerrar/refrescar para no perder ediciones
   // que queden dentro de la ventana de debounce de 500 ms.
   useEffect(() => {
     const flush = () => {
-      const body = pendingSaveRef.current;
-      if (!body) return;
-      try {
-        fetch("/api/state", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body,
-          keepalive: true,
-        });
-      } catch {
-        /* ignore */
-      }
+      const state = pendingStateRef.current;
+      if (!state) return;
+      putState(state, lastVersionRef.current, { keepalive: true }).then((result) => {
+        if (result.kind === "ok" || result.kind === "conflict") lastVersionRef.current = result.version;
+      });
     };
     const onVisibility = () => {
       if (document.visibilityState === "hidden") flush();
@@ -320,7 +330,7 @@ export default function Home() {
 
   // Export/Import
   const handleExport = () => {
-    const payload = { assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets };
+    const payload = { assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -342,6 +352,10 @@ export default function Home() {
         try {
           const data = JSON.parse(reader.result as string);
           const state = parseState(data);
+          // No se reutiliza applyServerState: ese helper marca skipOnce
+          // (pensado para cuando el estado ya viene sincronizado del
+          // servidor) y aquí lo que se importa es justo lo que hay que
+          // guardar a continuación.
           setAssets(state.assets);
           setValues(state.values);
           setContribution(state.contribution);
@@ -349,6 +363,8 @@ export default function Home() {
           setGoals(state.goals);
           setFixedExpenses(state.fixedExpenses);
           setCatRules(state.catRules);
+          setPlanTargets(state.planTargets);
+          setRowOrder(state.rowOrder);
         } catch {
           alert("Error al importar: archivo no válido.");
         }
@@ -398,7 +414,13 @@ export default function Home() {
           <h1>Cartera Rebalanceo</h1>
           {saveStatus !== "idle" && (
             <p className={styles.saveStatus} role="status">
-              {saveStatus === "saving" ? "Guardando…" : saveStatus === "saved" ? "Guardado" : "Error al guardar"}
+              {saveStatus === "saving"
+                ? "Guardando…"
+                : saveStatus === "saved"
+                  ? "Guardado"
+                  : saveStatus === "conflict"
+                    ? "Actualizado desde otra pestaña — se descartó el cambio sin guardar"
+                    : "Error al guardar"}
             </p>
           )}
         </header>

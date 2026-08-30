@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { AssetDef } from "@/lib/rebalance";
 import { buildExpenseMatrix, type SummaryRow } from "@/lib/matrix";
+import { putState } from "@/lib/persist";
 import {
   addFixedRowToTemplate,
   computeMovedRowOrder,
@@ -40,6 +41,7 @@ import {
   type FixedExpense,
   type Goal,
   type MonthData,
+  type PortfolioState,
   type PortfolioValues,
 } from "@/lib/state";
 import { PlanDonut } from "./hogar-plan-donut";
@@ -55,7 +57,7 @@ const currency = new Intl.NumberFormat("es-ES", {
 
 const pct = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 });
 
-type SaveStatus = "idle" | "saving" | "saved" | "error";
+type SaveStatus = "idle" | "saving" | "saved" | "error" | "conflict";
 
 const EMPTY_MONTH: MonthData = { banks: { ...DEFAULT_BANKS }, expenses: [], fixed: [] };
 
@@ -81,7 +83,25 @@ export default function HogarManager() {
   const [planTargets, setPlanTargets] = useState<Record<string, string>>({ ...PLAN_TARGETS_DEFAULT });
   const [rowOrder, setRowOrder] = useState<string[]>([]);
   const skipOnce = useRef(true);
-  const pendingSaveRef = useRef<string | null>(null);
+  const pendingStateRef = useRef<PortfolioState | null>(null);
+  // Última versión conocida del estado en el servidor. Viaja en cada
+  // guardado para detectar si otra pestaña/página guardó de por medio (ver
+  // lib/persist.ts y app/api/state/route.ts) — evita que "el último que
+  // guarda gana" pise ediciones ajenas en silencio.
+  const lastVersionRef = useRef<number | null>(null);
+
+  const applyServerState = (state: PortfolioState) => {
+    setAssets(state.assets);
+    setValues(state.values);
+    setContribution(state.contribution);
+    setMonths(state.months);
+    setGoals(state.goals);
+    setFixedExpenses(state.fixedExpenses);
+    setCatRules(state.catRules);
+    setPlanTargets(state.planTargets);
+    setRowOrder(state.rowOrder);
+    skipOnce.current = true;
+  };
 
   // --- Load ---
   useEffect(() => {
@@ -90,23 +110,15 @@ export default function HogarManager() {
       try {
         const res = await fetch("/api/state");
         if (!res.ok) throw new Error("estado no disponible");
-        const data = (await res.json()) as { state?: unknown };
+        const data = (await res.json()) as { state?: unknown; version?: number | null };
         const state = parseState(data.state);
         if (!cancelled) {
-          setAssets(state.assets);
-          setValues(state.values);
-          setContribution(state.contribution);
-          setMonths(state.months);
-          setGoals(state.goals);
-          setFixedExpenses(state.fixedExpenses);
-          setCatRules(state.catRules);
-          setPlanTargets(state.planTargets);
-          setRowOrder(state.rowOrder);
+          applyServerState(state);
+          lastVersionRef.current = data.version ?? null;
           const keys = sortMonthKeys(Object.keys(state.months));
           if (keys.includes(currentMonthKey())) setActiveMonth(currentMonthKey());
           else if (keys.length > 0) setActiveMonth(keys[keys.length - 1]);
           else setActiveMonth(currentMonthKey());
-          skipOnce.current = true;
           setLoadError(false);
         }
       } catch {
@@ -122,24 +134,25 @@ export default function HogarManager() {
   useEffect(() => {
     if (loading || loadError) return;
     if (skipOnce.current) { skipOnce.current = false; return; }
-    const body = JSON.stringify({ assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder });
-    pendingSaveRef.current = body;
+    const state: PortfolioState = { assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder };
+    pendingStateRef.current = state;
     const timer = setTimeout(async () => {
       setSaveStatus("saving");
-      let ok = false;
-      for (let i = 0; i < 2 && !ok; i++) {
-        try {
-          const res = await fetch("/api/state", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body,
-          });
-          ok = res.ok;
-        } catch {
-          ok = false;
-        }
+      let result = await putState(state, lastVersionRef.current);
+      if (result.kind === "error") result = await putState(state, lastVersionRef.current); // 1 reintento
+      if (result.kind === "ok") {
+        lastVersionRef.current = result.version;
+        setSaveStatus("saved");
+      } else if (result.kind === "conflict") {
+        // Alguien más guardó de por medio: se adopta su versión en vez de
+        // sobrescribirla, y se avisa — más honesto que perder datos ajenos
+        // en silencio.
+        applyServerState(result.state);
+        lastVersionRef.current = result.version;
+        setSaveStatus("conflict");
+      } else {
+        setSaveStatus("error");
       }
-      setSaveStatus(ok ? "saved" : "error");
     }, 500);
     return () => clearTimeout(timer);
   }, [assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder, loading, loadError]);
@@ -148,18 +161,11 @@ export default function HogarManager() {
   // que queden dentro de la ventana de debounce de 500 ms.
   useEffect(() => {
     const flush = () => {
-      const body = pendingSaveRef.current;
-      if (!body) return;
-      try {
-        fetch("/api/state", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body,
-          keepalive: true,
-        });
-      } catch {
-        /* ignore */
-      }
+      const state = pendingStateRef.current;
+      if (!state) return;
+      putState(state, lastVersionRef.current, { keepalive: true }).then((result) => {
+        if (result.kind === "ok" || result.kind === "conflict") lastVersionRef.current = result.version;
+      });
     };
     const onVisibility = () => {
       if (document.visibilityState === "hidden") flush();
@@ -407,7 +413,13 @@ export default function HogarManager() {
           <h1>Hogar</h1>
           {saveStatus !== "idle" && (
             <p className={styles.saveStatus} role="status">
-              {saveStatus === "saving" ? "Guardando…" : saveStatus === "saved" ? "Guardado" : "Error al guardar"}
+              {saveStatus === "saving"
+                ? "Guardando…"
+                : saveStatus === "saved"
+                  ? "Guardado"
+                  : saveStatus === "conflict"
+                    ? "Actualizado desde otra pestaña — se descartó el cambio sin guardar"
+                    : "Error al guardar"}
             </p>
           )}
           {notifSupported && !notifEnabled && Notification.permission !== "denied" && (
