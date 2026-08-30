@@ -325,6 +325,7 @@ function ExpenseMatrix({
   };
 
   return (
+    <>
     <div className={styles.summaryWrap}>
       <table
         className={styles.summaryTable}
@@ -447,56 +448,46 @@ function ExpenseMatrix({
             </Fragment>
             );
           })}
-          <tr className={styles.expenseAddRow}>
-            <td />
-            <td className={styles.summaryConceptCell}>
-              <input
-                type="text"
-                value={newName}
-                onChange={(ev) => setNewName(ev.target.value)}
-                placeholder="Nuevo gasto"
-                className={styles.expenseInput}
-                aria-label="Nombre del nuevo gasto"
-                style={{ width: "8rem" }}
-                onKeyDown={(ev) => { if (ev.key === "Enter") submitAdd(); }}
-              />
-            </td>
-            <td className={styles.summaryMonthsCell}>
-              <MonthChips value={newMonths} onChange={setNewMonths} ariaLabel="Mensualidad del nuevo gasto" />
-            </td>
-            <td className={styles.summaryAmountCell}>
-              <div className={styles.amountCell}>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={newAmount}
-                  onChange={(ev) => { const v = ev.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setNewAmount(v); }}
-                  placeholder="0"
-                  className={styles.expenseInput}
-                  aria-label="Importe del nuevo gasto"
-                  style={{ width: "4rem" }}
-                />
-                <span className={styles.amountUnit}>€</span>
-              </div>
-            </td>
-            <td className={styles.summaryBankCell}>
-              <BankPicker value={newBank} onChange={setNewBank} ariaLabel="Banco del nuevo gasto" />
-            </td>
-            <td colSpan={monthKeys.length}>
-              <select
-                value={newCategory}
-                onChange={(ev) => setNewCategory(ev.target.value as CategoryId)}
-                className={styles.expenseSelect}
-                aria-label="Categoría del nuevo gasto"
-              >
-                {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
-              </select>
-              <button type="button" className={styles.addBtn} onClick={submitAdd}>+ Añadir</button>
-            </td>
-          </tr>
         </tbody>
       </table>
     </div>
+    <div className={styles.addExpenseBar}>
+      <input
+        type="text"
+        value={newName}
+        onChange={(ev) => setNewName(ev.target.value)}
+        placeholder="Nuevo gasto"
+        className={styles.expenseInput}
+        aria-label="Nombre del nuevo gasto"
+        style={{ width: "9rem" }}
+        onKeyDown={(ev) => { if (ev.key === "Enter") submitAdd(); }}
+      />
+      <MonthChips value={newMonths} onChange={setNewMonths} ariaLabel="Mensualidad del nuevo gasto" />
+      <div className={styles.amountCell}>
+        <input
+          type="text"
+          inputMode="decimal"
+          value={newAmount}
+          onChange={(ev) => { const v = ev.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setNewAmount(v); }}
+          placeholder="0"
+          className={styles.expenseInput}
+          aria-label="Importe del nuevo gasto"
+          style={{ width: "4rem" }}
+        />
+        <span className={styles.amountUnit}>€</span>
+      </div>
+      <BankPicker value={newBank} onChange={setNewBank} ariaLabel="Banco del nuevo gasto" />
+      <select
+        value={newCategory}
+        onChange={(ev) => setNewCategory(ev.target.value as CategoryId)}
+        className={styles.expenseSelect}
+        aria-label="Categoría del nuevo gasto"
+      >
+        {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
+      </select>
+      <button type="button" className={styles.addBtn} onClick={submitAdd}>+ Añadir</button>
+    </div>
+    </>
   );
 }
 
