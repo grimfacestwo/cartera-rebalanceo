@@ -246,7 +246,18 @@ export default function HogarManager() {
       .reduce((s, e) => s + effectiveAmount(e, activeDaysRemaining), 0);
   };
 
-  const bankTotal = BANK_IDS.reduce((s, id) => s + (Number.parseFloat(activeData.banks[id]) || 0), 0);
+  // El saldo de Trade Republic que se ve en el banco incluye el Fondo de
+  // emergencia (un objetivo de ahorro de Finanzas, no dinero realmente
+  // disponible), así que se descuenta de ese banco al calcular Disponible.
+  const emergencyFundAmount = Number.parseFloat(
+    goals.find((g) => g.name.trim().toLowerCase() === "fondo de emergencia")?.current ?? "",
+  ) || 0;
+  const bankSaldo = (bankId: BankId) => {
+    const raw = Number.parseFloat(activeData.banks[bankId]) || 0;
+    return bankId === "trade" ? raw - emergencyFundAmount : raw;
+  };
+
+  const bankTotal = BANK_IDS.reduce((s, id) => s + bankSaldo(id), 0);
   const planTotals = categoryTotals(activeData, activeDaysRemaining);
   const expensesByCategory = CATEGORIES.reduce((acc, c) => {
     acc[c] = allActiveExpenses
@@ -542,16 +553,27 @@ export default function HogarManager() {
                   <thead><tr><th>Banco</th><th>Saldo</th><th>Pendiente</th><th>Disponible</th></tr></thead>
                   <tbody>
                     {BANK_IDS.map((id) => {
-                      const saldo = Number.parseFloat(activeData.banks[id]) || 0;
+                      const saldo = bankSaldo(id);
                       const pendiente = bankPendientes(id);
                       const rest = saldo - pendiente;
                       const pendItems = allActiveExpenses.filter((e) => e.bank === id && !e.paid);
                       const pendLines = pendItems.map((e) => `${e.name}: ${currency.format(effectiveAmount(e, activeDaysRemaining))}`);
                       const pendingTitle = pendLines.length ? `Pendientes en ${BANK_LABELS[id]}:\n${pendLines.join("\n")}` : `Sin pendientes en ${BANK_LABELS[id]}`;
+                      const hasEmergencyAdjustment = id === "trade" && emergencyFundAmount > 0;
                       return (
                         <tr key={id}>
                           <td className={styles.cellName}>{BANK_LABELS[id]}</td>
-                          <td><input type="text" inputMode="decimal" value={activeData.banks[id]} onChange={(e) => setBank(id, e.target.value)} placeholder="0" className={styles.expenseInput} aria-label={`Saldo ${BANK_LABELS[id]}`} /></td>
+                          <td>
+                            <input type="text" inputMode="decimal" value={activeData.banks[id]} onChange={(e) => setBank(id, e.target.value)} placeholder="0" className={styles.expenseInput} aria-label={`Saldo ${BANK_LABELS[id]}`} />
+                            {hasEmergencyAdjustment && (
+                              <div
+                                className={styles.dailyEffective}
+                                title={`Saldo introducido: ${currency.format(Number.parseFloat(activeData.banks[id]) || 0)}\nFondo de emergencia: −${currency.format(emergencyFundAmount)}`}
+                              >
+                                − {currency.format(emergencyFundAmount)} = {currency.format(saldo)}
+                              </div>
+                            )}
+                          </td>
                           <td title={pendingTitle}>{currency.format(pendiente)}</td>
                           <td className={rest >= 0 ? styles.inject : styles.negative}>{currency.format(rest)}</td>
                         </tr>
