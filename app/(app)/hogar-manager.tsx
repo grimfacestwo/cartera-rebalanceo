@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { AssetDef } from "@/lib/rebalance";
 import { buildExpenseMatrix, type SummaryRow } from "@/lib/matrix";
 import { putState } from "@/lib/persist";
-import { parseHogarUiPrefs } from "@/lib/hogar-ui-prefs";
+import { DEFAULT_HOGAR_UI_PREFS, parseHogarUiPrefs, type HogarUiPrefs } from "@/lib/hogar-ui-prefs";
 import {
   addFixedRowToTemplate,
   computeMovedRowOrder,
@@ -131,8 +131,11 @@ export default function HogarManager() {
     return () => { cancelled = true; };
   }, [reloadKey]);
 
-  // --- Preferencias de UI (columna Mensualidad contraída) ---
-  const [mensualidadCollapsed, setMensualidadCollapsed] = useState(false);
+  // --- Preferencias de UI (columna Mensualidad contraída, meses pasados
+  // ocultos). Se guardan como un único objeto: el endpoint de section_state
+  // sobrescribe `data` entero en cada PUT, así que cada toggle debe enviar
+  // siempre el objeto completo o pisaría el otro campo.
+  const [uiPrefs, setUiPrefs] = useState<HogarUiPrefs>(DEFAULT_HOGAR_UI_PREFS);
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -141,7 +144,7 @@ export default function HogarManager() {
         if (!res.ok) throw new Error("no data");
         const { data } = (await res.json()) as { data?: unknown };
         const prefs = parseHogarUiPrefs(data);
-        if (!cancelled) setMensualidadCollapsed(prefs.mensualidadCollapsed);
+        if (!cancelled) setUiPrefs(prefs);
       } catch {
         /* mantener default */
       }
@@ -149,17 +152,20 @@ export default function HogarManager() {
     return () => { cancelled = true; };
   }, []);
 
-  const toggleMensualidadCollapsed = () => {
-    setMensualidadCollapsed((c) => {
-      const next = !c;
+  const updateUiPrefs = (patch: Partial<HogarUiPrefs>) => {
+    setUiPrefs((prev) => {
+      const next = { ...prev, ...patch };
       fetch("/api/section/hogar-ui-prefs", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mensualidadCollapsed: next }),
+        body: JSON.stringify(next),
       }).catch(() => { /* best-effort */ });
       return next;
     });
   };
+
+  const toggleMensualidadCollapsed = () => updateUiPrefs({ mensualidadCollapsed: !uiPrefs.mensualidadCollapsed });
+  const togglePastMonthsHidden = () => updateUiPrefs({ pastMonthsHidden: !uiPrefs.pastMonthsHidden });
 
   // --- Save ---
   useEffect(() => {
@@ -252,6 +258,15 @@ export default function HogarManager() {
   const remaining = bankTotal - totalPendientes;
 
   const sortedMonthKeys = useMemo(() => sortMonthKeys(Object.keys(months)), [months]);
+
+  // Meses anteriores al mes de calendario actual ocultos en Resumen por mes
+  // (no en los cálculos: matrixGroups sigue usando sortedMonthKeys entero).
+  const hasPastMonths = useMemo(() => sortedMonthKeys.some((k) => k < currentMonthKey()), [sortedMonthKeys]);
+  const boundaryMonthKey = useMemo(() => sortedMonthKeys.find((k) => k >= currentMonthKey()) ?? null, [sortedMonthKeys]);
+  const visibleMonthKeys = useMemo(
+    () => (uiPrefs.pastMonthsHidden ? sortedMonthKeys.filter((k) => k >= currentMonthKey()) : sortedMonthKeys),
+    [sortedMonthKeys, uiPrefs.pastMonthsHidden],
+  );
 
   // Month-over-month comparison (la comida diaria usa días del mes completo)
   const comparison = (() => {
@@ -494,12 +509,16 @@ export default function HogarManager() {
               </div>
               <ExpenseMatrix
                 groups={filteredMatrixGroups}
-                monthKeys={sortedMonthKeys}
+                monthKeys={visibleMonthKeys}
                 activeMonth={activeMonth}
                 activeDaysRemaining={activeDaysRemaining}
                 collapsedCategories={collapsedCategories}
-                mensualidadCollapsed={mensualidadCollapsed}
+                mensualidadCollapsed={uiPrefs.mensualidadCollapsed}
                 onToggleMensualidadCollapsed={toggleMensualidadCollapsed}
+                pastMonthsHidden={uiPrefs.pastMonthsHidden}
+                hasPastMonths={hasPastMonths}
+                boundaryMonthKey={boundaryMonthKey}
+                onTogglePastMonthsHidden={togglePastMonthsHidden}
                 onSelectMonth={setActiveMonth}
                 onSetRowBank={setRowBank}
                 onSetRowName={setRowName}

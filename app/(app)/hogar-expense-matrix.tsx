@@ -33,6 +33,10 @@ export function ExpenseMatrix({
   collapsedCategories,
   mensualidadCollapsed,
   onToggleMensualidadCollapsed,
+  pastMonthsHidden,
+  hasPastMonths,
+  boundaryMonthKey,
+  onTogglePastMonthsHidden,
   onSelectMonth,
   onSetRowBank,
   onSetRowName,
@@ -52,6 +56,10 @@ export function ExpenseMatrix({
   collapsedCategories: Set<CategoryId>;
   mensualidadCollapsed: boolean;
   onToggleMensualidadCollapsed: () => void;
+  pastMonthsHidden: boolean;
+  hasPastMonths: boolean;
+  boundaryMonthKey: string | null;
+  onTogglePastMonthsHidden: () => void;
   onSelectMonth: (key: string) => void;
   onSetRowBank: (row: SummaryRow, bank: BankId | "") => void;
   onSetRowName: (row: SummaryRow, name: string) => void;
@@ -117,19 +125,32 @@ export function ExpenseMatrix({
             </th>
             <th className={amountHeaderCls}>Importe</th>
             <th className={bankHeaderCls}>Banco</th>
-            {monthKeys.map((key) => (
-              <th
-                key={key}
-                role="button"
-                tabIndex={0}
-                title={monthLabel(key)}
-                className={`${styles.summaryMonthHeader} ${key === activeMonth ? styles.summaryMonthHeaderActive : ""}`}
-                onClick={() => onSelectMonth(key)}
-                onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); onSelectMonth(key); } }}
-              >
-                {monthShortLabel(key)}
-              </th>
-            ))}
+            {monthKeys.map((key) => {
+              const isBoundary = hasPastMonths && key === boundaryMonthKey;
+              return (
+                <th
+                  key={key}
+                  role="button"
+                  tabIndex={0}
+                  title={monthLabel(key)}
+                  className={`${styles.summaryMonthHeader} ${key === activeMonth ? styles.summaryMonthHeaderActive : ""} ${isBoundary ? styles.summaryMonthHeaderBoundary : ""}`}
+                  onClick={() => onSelectMonth(key)}
+                  onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); onSelectMonth(key); } }}
+                >
+                  {isBoundary && (
+                    <button
+                      type="button"
+                      className={styles.pastMonthsChevron}
+                      title={pastMonthsHidden ? "Mostrar meses anteriores" : "Ocultar meses anteriores"}
+                      onClick={(ev) => { ev.stopPropagation(); onTogglePastMonthsHidden(); }}
+                    >
+                      {pastMonthsHidden ? "«" : "»"}
+                    </button>
+                  )}
+                  {monthShortLabel(key)}
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>

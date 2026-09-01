@@ -10,13 +10,23 @@ describe("parseHogarUiPrefs", () => {
     expect(parseHogarUiPrefs(42)).toEqual(DEFAULT_HOGAR_UI_PREFS);
   });
 
-  it("reconoce mensualidadCollapsed true/false", () => {
-    expect(parseHogarUiPrefs({ mensualidadCollapsed: true })).toEqual({ mensualidadCollapsed: true });
-    expect(parseHogarUiPrefs({ mensualidadCollapsed: false })).toEqual({ mensualidadCollapsed: false });
+  it("reconoce mensualidadCollapsed y pastMonthsHidden true/false", () => {
+    expect(parseHogarUiPrefs({ mensualidadCollapsed: true, pastMonthsHidden: false })).toEqual({
+      mensualidadCollapsed: true,
+      pastMonthsHidden: false,
+    });
+    expect(parseHogarUiPrefs({ mensualidadCollapsed: false, pastMonthsHidden: true })).toEqual({
+      mensualidadCollapsed: false,
+      pastMonthsHidden: true,
+    });
   });
 
   it("ignora campos con tipo inesperado y campos extra", () => {
     expect(parseHogarUiPrefs({ mensualidadCollapsed: "true" })).toEqual(DEFAULT_HOGAR_UI_PREFS);
-    expect(parseHogarUiPrefs({ mensualidadCollapsed: true, otro: "x" })).toEqual({ mensualidadCollapsed: true });
+    expect(parseHogarUiPrefs({ pastMonthsHidden: "false" })).toEqual(DEFAULT_HOGAR_UI_PREFS);
+    expect(parseHogarUiPrefs({ mensualidadCollapsed: true, otro: "x" })).toEqual({
+      mensualidadCollapsed: true,
+      pastMonthsHidden: true,
+    });
   });
 });
