@@ -1666,6 +1666,46 @@
   z-index: 1;
 }
 
+.summaryMonthsHeader {
+  cursor: pointer;
+  user-select: none;
+}
+
+.summaryMonthsHeader .chevron {
+  display: inline-block;
+  margin-right: 0.4rem;
+  font-size: 0.7rem;
+}
+
+/* Variante contraída: la columna Mensualidad se estrecha a solo el
+   icono, y las columnas siguientes (Importe/Banco) y la etiqueta de
+   categoría (summaryCatSticky) se desplazan para cerrar el hueco. */
+.summaryMonthsHeaderCollapsed,
+.summaryMonthsCellCollapsed {
+  box-sizing: border-box;
+  width: 3rem;
+  position: sticky;
+  left: 13.5rem;
+  background: #fff;
+  z-index: 1;
+  text-align: center;
+}
+
+.summaryMonthsHeaderCollapsed {
+  cursor: pointer;
+  user-select: none;
+}
+
+.summaryMonthsHeaderCollapsed .chevron {
+  margin-right: 0;
+  font-size: 0.7rem;
+}
+
+.mensualidadCollapsedMark {
+  color: #cbd5e1;
+  font-weight: 700;
+}
+
 .summaryAmountHeader,
 .summaryAmountCell {
   box-sizing: border-box;
@@ -1677,12 +1717,34 @@
   color: #64748b;
 }
 
+.summaryAmountHeaderCollapsed,
+.summaryAmountCellCollapsed {
+  box-sizing: border-box;
+  width: 6.5rem;
+  position: sticky;
+  left: 16.5rem;
+  background: #fff;
+  z-index: 1;
+  color: #64748b;
+}
+
 .summaryBankHeader,
 .summaryBankCell {
   box-sizing: border-box;
   width: 4.5rem;
   position: sticky;
   left: 39.5rem;
+  background: #fff;
+  z-index: 1;
+  color: #64748b;
+}
+
+.summaryBankHeaderCollapsed,
+.summaryBankCellCollapsed {
+  box-sizing: border-box;
+  width: 4.5rem;
+  position: sticky;
+  left: 23rem;
   background: #fff;
   z-index: 1;
   color: #64748b;
@@ -1733,6 +1795,15 @@
 .summaryCatRow td.summaryCatSticky {
   box-sizing: border-box;
   width: 44rem;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: #fff;
+}
+
+.summaryCatRow td.summaryCatStickyCollapsed {
+  box-sizing: border-box;
+  width: 27.5rem;
   position: sticky;
   left: 0;
   z-index: 1;
@@ -1828,11 +1899,21 @@
 [data-theme="dark"] .summaryConceptCell,
 [data-theme="dark"] .summaryMonthsHeader,
 [data-theme="dark"] .summaryMonthsCell,
+[data-theme="dark"] .summaryMonthsHeaderCollapsed,
+[data-theme="dark"] .summaryMonthsCellCollapsed,
 [data-theme="dark"] .summaryAmountHeader,
 [data-theme="dark"] .summaryAmountCell,
+[data-theme="dark"] .summaryAmountHeaderCollapsed,
+[data-theme="dark"] .summaryAmountCellCollapsed,
 [data-theme="dark"] .summaryBankHeader,
-[data-theme="dark"] .summaryBankCell {
+[data-theme="dark"] .summaryBankCell,
+[data-theme="dark"] .summaryBankHeaderCollapsed,
+[data-theme="dark"] .summaryBankCellCollapsed {
   background: #1e293b;
+}
+
+[data-theme="dark"] .mensualidadCollapsedMark {
+  color: #475569;
 }
 
 [data-theme="dark"] .summaryMonthHeader {
@@ -1847,7 +1928,8 @@
   color: #cbd5e1;
 }
 
-[data-theme="dark"] .summaryCatRow td.summaryCatSticky {
+[data-theme="dark"] .summaryCatRow td.summaryCatSticky,
+[data-theme="dark"] .summaryCatRow td.summaryCatStickyCollapsed {
   background: #1e293b;
 }
 

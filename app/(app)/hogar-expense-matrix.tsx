@@ -16,11 +16,13 @@ const currency = new Intl.NumberFormat("es-ES", {
 
 // Anchos de columna del resumen (deben coincidir con los `width` de
 // hogar.module.css: .summaryActionsHeader/Cell, .summaryConceptHeader/Cell,
-// .summaryMonthsHeader/Cell, .summaryAmountHeader/Cell, .summaryBankHeader/Cell
+// .summaryMonthsHeader/Cell (o su variante ...Collapsed), .summaryAmountHeader/Cell
+// (o su variante ...Collapsed), .summaryBankHeader/Cell (o su variante ...Collapsed)
 // y .summaryMonthHeader/.summaryCell). Con table-layout:fixed el ancho total
 // de la tabla debe fijarse explícitamente (en rem) o el navegador reparte el
 // 100% del contenedor entre columnas en vez de respetar estos valores.
-const FIXED_COLS_REM = 4.5 + 9 + 19.5 + 6.5 + 4.5; // acciones + concepto + mensualidad + importe + banco
+const MENSUALIDAD_WIDTH_REM = 19.5;
+const MENSUALIDAD_COLLAPSED_WIDTH_REM = 3;
 const MONTH_COL_REM = 4.5;
 
 export function ExpenseMatrix({
@@ -29,6 +31,8 @@ export function ExpenseMatrix({
   activeMonth,
   activeDaysRemaining,
   collapsedCategories,
+  mensualidadCollapsed,
+  onToggleMensualidadCollapsed,
   onSelectMonth,
   onSetRowBank,
   onSetRowName,
@@ -46,6 +50,8 @@ export function ExpenseMatrix({
   activeMonth: string;
   activeDaysRemaining: number;
   collapsedCategories: Set<CategoryId>;
+  mensualidadCollapsed: boolean;
+  onToggleMensualidadCollapsed: () => void;
   onSelectMonth: (key: string) => void;
   onSetRowBank: (row: SummaryRow, bank: BankId | "") => void;
   onSetRowName: (row: SummaryRow, name: string) => void;
@@ -67,6 +73,16 @@ export function ExpenseMatrix({
   const visibleGroups = groups.filter((g) => g.rows.length > 0);
   if (monthKeys.length === 0) return null;
 
+  const mensualidadWidthRem = mensualidadCollapsed ? MENSUALIDAD_COLLAPSED_WIDTH_REM : MENSUALIDAD_WIDTH_REM;
+  const fixedColsRem = 4.5 + 9 + mensualidadWidthRem + 6.5 + 4.5; // acciones + concepto + mensualidad + importe + banco
+  const monthsHeaderCls = mensualidadCollapsed ? styles.summaryMonthsHeaderCollapsed : styles.summaryMonthsHeader;
+  const monthsCellCls = mensualidadCollapsed ? styles.summaryMonthsCellCollapsed : styles.summaryMonthsCell;
+  const amountHeaderCls = mensualidadCollapsed ? styles.summaryAmountHeaderCollapsed : styles.summaryAmountHeader;
+  const amountCellCls = mensualidadCollapsed ? styles.summaryAmountCellCollapsed : styles.summaryAmountCell;
+  const bankHeaderCls = mensualidadCollapsed ? styles.summaryBankHeaderCollapsed : styles.summaryBankHeader;
+  const bankCellCls = mensualidadCollapsed ? styles.summaryBankCellCollapsed : styles.summaryBankCell;
+  const catStickyCls = mensualidadCollapsed ? styles.summaryCatStickyCollapsed : styles.summaryCatSticky;
+
   const submitAdd = () => {
     const name = newName.trim();
     if (!name) return;
@@ -82,15 +98,25 @@ export function ExpenseMatrix({
     <div className={styles.summaryWrap}>
       <table
         className={styles.summaryTable}
-        style={{ width: `${FIXED_COLS_REM + MONTH_COL_REM * monthKeys.length}rem` }}
+        style={{ width: `${fixedColsRem + MONTH_COL_REM * monthKeys.length}rem` }}
       >
         <thead>
           <tr>
             <th className={styles.summaryActionsHeader} />
             <th className={styles.summaryConceptHeader}>Concepto</th>
-            <th className={styles.summaryMonthsHeader}>Mensualidad</th>
-            <th className={styles.summaryAmountHeader}>Importe</th>
-            <th className={styles.summaryBankHeader}>Banco</th>
+            <th
+              className={monthsHeaderCls}
+              role="button"
+              tabIndex={0}
+              title={mensualidadCollapsed ? "Mostrar mensualidad" : "Contraer columna de mensualidad"}
+              onClick={onToggleMensualidadCollapsed}
+              onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); onToggleMensualidadCollapsed(); } }}
+            >
+              <span className={styles.chevron}>{mensualidadCollapsed ? "▸" : "▾"}</span>
+              {!mensualidadCollapsed && "Mensualidad"}
+            </th>
+            <th className={amountHeaderCls}>Importe</th>
+            <th className={bankHeaderCls}>Banco</th>
             {monthKeys.map((key) => (
               <th
                 key={key}
@@ -121,7 +147,7 @@ export function ExpenseMatrix({
               >
                 <td
                   colSpan={5}
-                  className={styles.summaryCatSticky}
+                  className={catStickyCls}
                   style={{ boxShadow: `inset 0 0 0 999px ${CATEGORY_COLORS[group.category]}1a` }}
                 >
                   <span className={styles.chevron}>{collapsed ? "▶" : "▼"}</span>
@@ -158,14 +184,18 @@ export function ExpenseMatrix({
                       style={{ width: "8rem" }}
                     />
                   </td>
-                  <td className={styles.summaryMonthsCell}>
-                    <MonthChips
-                      value={row.months}
-                      onChange={(spec) => onSetRowMonths(row, spec)}
-                      ariaLabel={`Mensualidad de ${row.name}`}
-                    />
+                  <td className={monthsCellCls}>
+                    {mensualidadCollapsed ? (
+                      <span className={styles.mensualidadCollapsedMark} title={`Mensualidad de ${row.name}`}>···</span>
+                    ) : (
+                      <MonthChips
+                        value={row.months}
+                        onChange={(spec) => onSetRowMonths(row, spec)}
+                        ariaLabel={`Mensualidad de ${row.name}`}
+                      />
+                    )}
                   </td>
-                  <td className={styles.summaryAmountCell}>
+                  <td className={amountCellCls}>
                     <div className={styles.amountCell}>
                       <input
                         type="text"
@@ -187,7 +217,7 @@ export function ExpenseMatrix({
                       </div>
                     )}
                   </td>
-                  <td className={styles.summaryBankCell}>
+                  <td className={bankCellCls}>
                     <BankPicker value={row.bank} onChange={(b) => onSetRowBank(row, b)} ariaLabel={`Banco de ${row.name}`} />
                   </td>
                   {monthKeys.map((key) => {

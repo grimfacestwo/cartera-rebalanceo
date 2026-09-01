@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { AssetDef } from "@/lib/rebalance";
 import { buildExpenseMatrix, type SummaryRow } from "@/lib/matrix";
 import { putState } from "@/lib/persist";
+import { parseHogarUiPrefs } from "@/lib/hogar-ui-prefs";
 import {
   addFixedRowToTemplate,
   computeMovedRowOrder,
@@ -129,6 +130,36 @@ export default function HogarManager() {
     })();
     return () => { cancelled = true; };
   }, [reloadKey]);
+
+  // --- Preferencias de UI (columna Mensualidad contraída) ---
+  const [mensualidadCollapsed, setMensualidadCollapsed] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/section/hogar-ui-prefs");
+        if (!res.ok) throw new Error("no data");
+        const { data } = (await res.json()) as { data?: unknown };
+        const prefs = parseHogarUiPrefs(data);
+        if (!cancelled) setMensualidadCollapsed(prefs.mensualidadCollapsed);
+      } catch {
+        /* mantener default */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const toggleMensualidadCollapsed = () => {
+    setMensualidadCollapsed((c) => {
+      const next = !c;
+      fetch("/api/section/hogar-ui-prefs", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mensualidadCollapsed: next }),
+      }).catch(() => { /* best-effort */ });
+      return next;
+    });
+  };
 
   // --- Save ---
   useEffect(() => {
@@ -474,6 +505,8 @@ export default function HogarManager() {
                 activeMonth={activeMonth}
                 activeDaysRemaining={activeDaysRemaining}
                 collapsedCategories={collapsedCategories}
+                mensualidadCollapsed={mensualidadCollapsed}
+                onToggleMensualidadCollapsed={toggleMensualidadCollapsed}
                 onSelectMonth={setActiveMonth}
                 onSetRowBank={setRowBank}
                 onSetRowName={setRowName}
