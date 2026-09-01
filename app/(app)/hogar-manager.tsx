@@ -136,6 +136,9 @@ export default function HogarManager() {
   // sobrescribe `data` entero en cada PUT, así que cada toggle debe enviar
   // siempre el objeto completo o pisaría el otro campo.
   const [uiPrefs, setUiPrefs] = useState<HogarUiPrefs>(DEFAULT_HOGAR_UI_PREFS);
+  const [matrixBankFilter, setMatrixBankFilter] = useState<BankId | "all">("all");
+  const [matrixPaidFilter, setMatrixPaidFilter] = useState<"all" | "paid" | "pending">("all");
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<CategoryId>>(new Set());
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -144,7 +147,12 @@ export default function HogarManager() {
         if (!res.ok) throw new Error("no data");
         const { data } = (await res.json()) as { data?: unknown };
         const prefs = parseHogarUiPrefs(data);
-        if (!cancelled) setUiPrefs(prefs);
+        if (!cancelled) {
+          setUiPrefs(prefs);
+          setMatrixBankFilter(prefs.defaultBankFilter);
+          setMatrixPaidFilter(prefs.defaultPaidFilter);
+          setCollapsedCategories(new Set(prefs.collapsedCategories));
+        }
       } catch {
         /* mantener default */
       }
@@ -166,6 +174,19 @@ export default function HogarManager() {
 
   const toggleMensualidadCollapsed = () => updateUiPrefs({ mensualidadCollapsed: !uiPrefs.mensualidadCollapsed });
   const togglePastMonthsHidden = () => updateUiPrefs({ pastMonthsHidden: !uiPrefs.pastMonthsHidden });
+
+  // El filtro por defecto solo cambia desde el panel de Opciones (no al
+  // tocar los selectores de arriba, que son solo para esta sesión), y se
+  // aplica también al filtro activo para verlo reflejado al momento.
+  const setDefaultBankFilter = (v: BankId | "all") => {
+    updateUiPrefs({ defaultBankFilter: v });
+    setMatrixBankFilter(v);
+  };
+  const setDefaultPaidFilter = (v: "all" | "paid" | "pending") => {
+    updateUiPrefs({ defaultPaidFilter: v });
+    setMatrixPaidFilter(v);
+  };
+  const [optionsOpen, setOptionsOpen] = useState(false);
 
   // --- Save ---
   useEffect(() => {
@@ -336,9 +357,6 @@ export default function HogarManager() {
     [months, sortedMonthKeys, planTargets, rowOrder, activeMonth],
   );
 
-  const [matrixBankFilter, setMatrixBankFilter] = useState<BankId | "all">("all");
-  const [matrixPaidFilter, setMatrixPaidFilter] = useState<"all" | "paid" | "pending">("all");
-
   // El filtro de pagado/pendiente se evalúa sobre el mes activo (columna
   // resaltada), ya que el estado de pagado es por mes, no por fila.
   const filteredMatrixGroups = useMemo(() => {
@@ -409,12 +427,12 @@ export default function HogarManager() {
     if (newOrder) setRowOrder(newOrder);
   };
 
-  const [collapsedCategories, setCollapsedCategories] = useState<Set<CategoryId>>(new Set());
   const toggleCategory = (cat: CategoryId) => {
     setCollapsedCategories((prev) => {
       const next = new Set(prev);
       if (next.has(cat)) next.delete(cat);
       else next.add(cat);
+      updateUiPrefs({ collapsedCategories: Array.from(next) });
       return next;
     });
   };
@@ -517,6 +535,7 @@ export default function HogarManager() {
                   <option value="paid">Solo pagados ({monthShortLabel(activeMonth)})</option>
                   <option value="pending">Solo pendientes ({monthShortLabel(activeMonth)})</option>
                 </select>
+                <button type="button" className={styles.expenseSelect} onClick={() => setOptionsOpen(true)}>⚙ Opciones</button>
               </div>
               <ExpenseMatrix
                 groups={filteredMatrixGroups}
@@ -660,6 +679,44 @@ export default function HogarManager() {
               </section>
             )}
           </>
+        )}
+
+        {optionsOpen && (
+          <div className={styles.overlay} onClick={() => setOptionsOpen(false)} role="dialog" aria-modal="true" aria-label="Opciones">
+            <div className={styles.modal} onClick={(ev) => ev.stopPropagation()}>
+              <h2>Opciones</h2>
+              <h3>Filtros por defecto de Resumen por mes</h3>
+              <p className={styles.note}>Se aplican cada vez que entras en Hogar. Cambiarlos aquí también actualiza el filtro activo ahora mismo.</p>
+              <div className={styles.settingRow}>
+                <span className={styles.settingName}>Banco</span>
+                <select
+                  value={uiPrefs.defaultBankFilter}
+                  onChange={(ev) => setDefaultBankFilter(ev.target.value as BankId | "all")}
+                  className={styles.expenseSelect}
+                  aria-label="Banco por defecto"
+                >
+                  <option value="all">Todos los bancos</option>
+                  {BANK_IDS.map((b) => <option key={b} value={b}>{BANK_LABELS[b]}</option>)}
+                </select>
+              </div>
+              <div className={styles.settingRow}>
+                <span className={styles.settingName}>Estado</span>
+                <select
+                  value={uiPrefs.defaultPaidFilter}
+                  onChange={(ev) => setDefaultPaidFilter(ev.target.value as "all" | "paid" | "pending")}
+                  className={styles.expenseSelect}
+                  aria-label="Estado por defecto"
+                >
+                  <option value="all">Pagados y pendientes</option>
+                  <option value="paid">Solo pagados</option>
+                  <option value="pending">Solo pendientes</option>
+                </select>
+              </div>
+              <div className={styles.modalFooter}>
+                <button type="button" className={styles.addBtn} onClick={() => setOptionsOpen(false)}>Cerrar</button>
+              </div>
+            </div>
+          </div>
         )}
       </main>
     </div>
