@@ -3,7 +3,7 @@
 import { Fragment, useState } from "react";
 import type { SummaryCategoryGroup, SummaryRow } from "@/lib/matrix";
 import { CATEGORIES, CATEGORY_LABELS, CATEGORY_COLORS, monthLabel, monthShortLabel, type BankId, type CategoryId } from "@/lib/state";
-import { BankPicker } from "./hogar-bank-picker";
+import { BankPicker } from "./bank-picker";
 import { MonthChips } from "./hogar-month-chips";
 import styles from "./hogar.module.css";
 
