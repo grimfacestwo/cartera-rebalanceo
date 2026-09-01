@@ -29,6 +29,7 @@ import {
   daysInMonth,
   daysRemaining,
   effectiveAmount,
+  emergencyFundAmount,
   expenseAppliesToMonth,
   DEFAULT_FIXED_EXPENSES,
   monthLabel,
@@ -270,12 +271,10 @@ export default function HogarManager() {
   // El saldo de Trade Republic que se ve en el banco incluye el Fondo de
   // emergencia (un objetivo de ahorro de Finanzas, no dinero realmente
   // disponible), así que se descuenta de ese banco al calcular Disponible.
-  const emergencyFundAmount = Number.parseFloat(
-    goals.find((g) => g.name.trim().toLowerCase() === "fondo de emergencia")?.current ?? "",
-  ) || 0;
+  const efAmount = emergencyFundAmount(goals);
   const bankSaldo = (bankId: BankId) => {
     const raw = Number.parseFloat(activeData.banks[bankId]) || 0;
-    return bankId === "trade" ? raw - emergencyFundAmount : raw;
+    return bankId === "trade" ? raw - efAmount : raw;
   };
 
   const bankTotal = BANK_IDS.reduce((s, id) => s + bankSaldo(id), 0);
@@ -578,7 +577,7 @@ export default function HogarManager() {
                       const pendItems = allActiveExpenses.filter((e) => e.bank === id && !e.paid);
                       const pendLines = pendItems.map((e) => `${e.name}: ${currency.format(effectiveAmount(e, activeDaysRemaining))}`);
                       const pendingTitle = pendLines.length ? `Pendientes en ${BANK_LABELS[id]}:\n${pendLines.join("\n")}` : `Sin pendientes en ${BANK_LABELS[id]}`;
-                      const hasEmergencyAdjustment = id === "trade" && emergencyFundAmount > 0;
+                      const hasEmergencyAdjustment = id === "trade" && efAmount > 0;
                       return (
                         <tr key={id}>
                           <td className={styles.cellName}>{BANK_LABELS[id]}</td>
@@ -587,9 +586,9 @@ export default function HogarManager() {
                             {hasEmergencyAdjustment && (
                               <div
                                 className={styles.dailyEffective}
-                                title={`Saldo introducido: ${currency.format(Number.parseFloat(activeData.banks[id]) || 0)}\nFondo de emergencia: −${currency.format(emergencyFundAmount)}`}
+                                title={`Saldo introducido: ${currency.format(Number.parseFloat(activeData.banks[id]) || 0)}\nFondo de emergencia: −${currency.format(efAmount)}`}
                               >
-                                − {currency.format(emergencyFundAmount)} = {currency.format(saldo)}
+                                − {currency.format(efAmount)} = {currency.format(saldo)}
                               </div>
                             )}
                           </td>

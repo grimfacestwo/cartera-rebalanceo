@@ -1,14 +1,8 @@
 import { NextResponse } from "next/server";
 import { sql } from "@vercel/postgres";
-import { safeEqual } from "@/lib/auth";
+import { isCronAuthed } from "@/lib/auth";
+import { sendEmail } from "@/lib/email";
 import { DEFAULT_STATE, currentMonthKey, parseState } from "@/lib/state";
-
-function isAuthed(request: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-  const header = request.headers.get("authorization") ?? "";
-  return safeEqual(header, `Bearer ${secret}`);
-}
 
 async function fetchBackupPayload() {
   const { rows } = await sql<{
@@ -38,19 +32,9 @@ async function fetchBackupPayload() {
 // Requiere las variables de entorno RESEND_API_KEY, BACKUP_EMAIL_TO y
 // CRON_SECRET (ver AGENTS.md).
 export async function GET(request: Request) {
-  if (!isAuthed(request)) {
+  if (!isCronAuthed(request)) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
-
-  const apiKey = process.env.RESEND_API_KEY;
-  const to = process.env.BACKUP_EMAIL_TO;
-  if (!apiKey || !to) {
-    return NextResponse.json(
-      { error: "Faltan RESEND_API_KEY o BACKUP_EMAIL_TO" },
-      { status: 500 },
-    );
-  }
-  const from = process.env.BACKUP_EMAIL_FROM || "Cartera Rebalanceo <onboarding@resend.dev>";
 
   let payload: Awaited<ReturnType<typeof fetchBackupPayload>>;
   try {
@@ -62,30 +46,19 @@ export async function GET(request: Request) {
   const dateLabel = currentMonthKey();
   const json = JSON.stringify(payload, null, 2);
 
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from,
-      to,
-      subject: `Backup Cartera Rebalanceo — ${dateLabel}`,
-      text: "Copia de seguridad semanal automática adjunta en JSON.",
-      attachments: [
-        {
-          filename: `cartera-backup-${dateLabel}.json`,
-          content: Buffer.from(json, "utf-8").toString("base64"),
-        },
-      ],
-    }),
+  const result = await sendEmail({
+    subject: `Backup Cartera Rebalanceo — ${dateLabel}`,
+    text: "Copia de seguridad semanal automática adjunta en JSON.",
+    attachments: [
+      {
+        filename: `cartera-backup-${dateLabel}.json`,
+        content: Buffer.from(json, "utf-8").toString("base64"),
+      },
+    ],
   });
 
-  if (!res.ok) {
-    const detail = await res.text().catch(() => "");
-    return NextResponse.json({ error: "Resend rechazó el envío", detail }, { status: 502 });
+  if (!result.ok) {
+    return NextResponse.json({ error: result.error }, { status: 500 });
   }
-
   return NextResponse.json({ ok: true });
 }

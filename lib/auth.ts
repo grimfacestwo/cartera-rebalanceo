@@ -33,3 +33,14 @@ export function safeEqual(a: string, b: string): boolean {
   }
   return diff === 0;
 }
+
+// Autenticación de los endpoints de cron (app/api/cron/*/route.ts). Vercel
+// añade automáticamente `Authorization: Bearer <CRON_SECRET>` en las
+// peticiones que él mismo dispara desde vercel.json — sin la variable de
+// entorno configurada, se rechaza cualquier llamada (fail-closed).
+export function isCronAuthed(request: Request): boolean {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return false;
+  const header = request.headers.get("authorization") ?? "";
+  return safeEqual(header, `Bearer ${secret}`);
+}

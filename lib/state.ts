@@ -234,6 +234,36 @@ export function sortMonthKeys(keys: string[]): string[] {
   return [...keys].sort();
 }
 
+// El saldo de Trade Republic que se ve en el banco incluye el Fondo de
+// emergencia (un objetivo de ahorro, no dinero realmente disponible) — se
+// identifica por nombre porque es el único vínculo entre un Goal y "cuánto
+// del saldo bancario de un banco concreto no cuenta como libre".
+export function emergencyFundAmount(goals: Goal[]): number {
+  return Number.parseFloat(
+    goals.find((g) => g.name.trim().toLowerCase() === "fondo de emergencia")?.current ?? "",
+  ) || 0;
+}
+
+// "Disponible" del mes: saldo de bancos (Trade Republic ya descontado el
+// Fondo de emergencia) menos los gastos pendientes de ese mes. Misma fórmula
+// que "Disponible total" en Hogar — usada también por el aviso por email de
+// disponible negativo (app/api/cron/disponible-alert/route.ts).
+export function computeDisponible(months: Record<string, MonthData>, goals: Goal[], monthKey: string): number {
+  const month = months[monthKey];
+  if (!month) return 0;
+  const days = daysRemaining(monthKey);
+  const allExpenses = [...month.fixed, ...month.expenses].filter((e) => expenseAppliesToMonth(e, monthKey));
+  const totalPendientes = allExpenses
+    .filter((e) => !e.paid)
+    .reduce((s, e) => s + effectiveAmount(e, days), 0);
+  const efAmount = emergencyFundAmount(goals);
+  const bankTotal = BANK_IDS.reduce((s, id) => {
+    const raw = Number.parseFloat(month.banks[id]) || 0;
+    return s + (id === "trade" ? raw - efAmount : raw);
+  }, 0);
+  return bankTotal - totalPendientes;
+}
+
 export function bankRemaining(month: MonthData, bankId: BankId): number {
   const saldo = Number.parseFloat(month.banks[bankId]) || 0;
   const gastos = month.expenses

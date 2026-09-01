@@ -4,11 +4,13 @@ import {
   bankRemaining,
   categoryTotals,
   currentMonthKey,
+  computeDisponible,
   daysInMonth,
   daysRemaining,
   DEFAULT_ASSETS,
   DEFAULT_VALUES,
   effectiveAmount,
+  emergencyFundAmount,
   expenseAppliesToMonth,
   matchCategory,
   monthLabel,
@@ -21,6 +23,7 @@ import {
   parseState,
   PLAN_TARGETS_DEFAULT,
   sortMonthKeys,
+  type Goal,
   type MonthData,
 } from "./state";
 
@@ -462,5 +465,59 @@ describe("parsePlanTargets", () => {
   it("parseState incluye planTargets por defecto", () => {
     const state = parseState({});
     expect(state.planTargets).toEqual(PLAN_TARGETS_DEFAULT);
+  });
+});
+
+function makeGoal(overrides: Partial<Goal> = {}): Goal {
+  return { id: "g1", name: "Fondo de emergencia", target: "6000", current: "2200", bank: "trade", rate: "", notes: "", ...overrides };
+}
+
+describe("emergencyFundAmount", () => {
+  it("devuelve el importe ahorrado del objetivo 'Fondo de emergencia'", () => {
+    expect(emergencyFundAmount([makeGoal()])).toBe(2200);
+  });
+
+  it("no distingue mayúsculas ni espacios en el nombre", () => {
+    expect(emergencyFundAmount([makeGoal({ name: "  FONDO DE EMERGENCIA  " })])).toBe(2200);
+  });
+
+  it("devuelve 0 si no existe ese objetivo o no hay objetivos", () => {
+    expect(emergencyFundAmount([])).toBe(0);
+    expect(emergencyFundAmount([makeGoal({ name: "Vacaciones" })])).toBe(0);
+  });
+});
+
+describe("computeDisponible", () => {
+  const monthKey = currentMonthKey();
+
+  it("Saldo total de bancos menos pendientes, sin objetivos", () => {
+    const months: Record<string, MonthData> = {
+      [monthKey]: {
+        banks: { ing: "1000", santander: "500", trade: "300" },
+        expenses: [
+          { id: "e1", name: "Comida", amount: "200", type: "variable", bank: "ing", paid: false, category: "gastos", recurring: false },
+          { id: "e2", name: "Ya pagado", amount: "999", type: "variable", bank: "ing", paid: true, category: "gastos", recurring: false },
+        ],
+        fixed: [],
+      },
+    };
+    // (1000+500+300) − 200 pendiente (el pagado no cuenta) = 1600
+    expect(computeDisponible(months, [], monthKey)).toBe(1600);
+  });
+
+  it("descuenta el Fondo de emergencia solo del saldo de Trade Republic", () => {
+    const months: Record<string, MonthData> = {
+      [monthKey]: {
+        banks: { ing: "1000", santander: "0", trade: "500" },
+        expenses: [],
+        fixed: [],
+      },
+    };
+    // Trade: 500 − 2200 = −1700; total bancos = 1000 + 0 − 1700 = −700; sin pendientes
+    expect(computeDisponible(months, [makeGoal()], monthKey)).toBe(-700);
+  });
+
+  it("devuelve 0 si el mes no existe", () => {
+    expect(computeDisponible({}, [], monthKey)).toBe(0);
   });
 });
