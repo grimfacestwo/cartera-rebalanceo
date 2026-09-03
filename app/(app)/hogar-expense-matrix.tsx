@@ -21,6 +21,18 @@ const currency = new Intl.NumberFormat("es-ES", {
 // y .summaryMonthHeader/.summaryCell). Con table-layout:fixed el ancho total
 // de la tabla debe fijarse explícitamente (en rem) o el navegador reparte el
 // 100% del contenedor entre columnas en vez de respetar estos valores.
+function Money({ value }: { value: number }) {
+  const formatted = currency.format(value);
+  const idx = formatted.indexOf(",");
+  if (idx === -1) return <>{formatted}</>;
+  return (
+    <>
+      {formatted.slice(0, idx)}
+      <span className={styles.cents}>{formatted.slice(idx)}</span>
+    </>
+  );
+}
+
 const MENSUALIDAD_WIDTH_REM = 19.5;
 const MENSUALIDAD_COLLAPSED_WIDTH_REM = 3;
 const MONTH_COL_REM = 4.5;
@@ -234,7 +246,7 @@ export function ExpenseMatrix({
                         className={styles.dailyEffective}
                         title={`Tarifa diaria × ${activeDaysRemaining} días restantes de ${monthShortLabel(activeMonth)}`}
                       >
-                        {currency.format((Number.parseFloat(row.amount) || 0) * activeDaysRemaining)}
+                        <Money value={(Number.parseFloat(row.amount) || 0) * activeDaysRemaining} />
                       </div>
                     )}
                   </td>
