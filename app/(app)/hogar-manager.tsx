@@ -59,6 +59,18 @@ const currency = new Intl.NumberFormat("es-ES", {
 
 const pct = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 });
 
+function Money({ value }: { value: number }) {
+  const formatted = currency.format(value);
+  const idx = formatted.indexOf(",");
+  if (idx === -1) return <>{formatted}</>;
+  return (
+    <>
+      {formatted.slice(0, idx)}
+      <span className={styles.cents}>{formatted.slice(idx)}</span>
+    </>
+  );
+}
+
 type SaveStatus = "idle" | "saving" | "saved" | "error" | "conflict";
 
 const EMPTY_MONTH: MonthData = { banks: { ...DEFAULT_BANKS }, expenses: [], fixed: [] };
@@ -588,25 +600,25 @@ export default function HogarManager() {
                                 className={styles.dailyEffective}
                                 title={`Saldo introducido: ${currency.format(Number.parseFloat(activeData.banks[id]) || 0)}\nFondo de emergencia: −${currency.format(efAmount)}`}
                               >
-                                − {currency.format(efAmount)} = {currency.format(saldo)}
+                                − <Money value={efAmount} /> = <Money value={saldo} />
                               </div>
                             )}
                           </td>
-                          <td title={pendingTitle}>{currency.format(pendiente)}</td>
-                          <td className={rest >= 0 ? styles.inject : styles.negative}>{currency.format(rest)}</td>
+                          <td title={pendingTitle}><Money value={pendiente} /></td>
+                          <td className={rest >= 0 ? styles.inject : styles.negative}><Money value={rest} /></td>
                         </tr>
                       );
                     })}
                     <tr className={styles.totalRow}>
                       <td>Total</td>
-                      <td>{currency.format(bankTotal)}</td>
-                      <td>{currency.format(totalPendientes)}</td>
-                      <td className={remaining >= 0 ? styles.inject : styles.negative}>{currency.format(remaining)}</td>
+                      <td><Money value={bankTotal} /></td>
+                      <td><Money value={totalPendientes} /></td>
+                      <td className={remaining >= 0 ? styles.inject : styles.negative}><Money value={remaining} /></td>
                     </tr>
                   </tbody>
                 </table>
               </div>
-              <p className={`${styles.disponibleTotal} ${remaining >= 0 ? styles.inject : styles.negative}`}>Disponible total: {currency.format(remaining)} €</p>
+              <p className={`${styles.disponibleTotal} ${remaining >= 0 ? styles.inject : styles.negative}`}>Disponible total: <Money value={remaining} /> €</p>
             </section>
 
             {/* Plan de hogar */}

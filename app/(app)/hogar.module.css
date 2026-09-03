@@ -679,6 +679,10 @@
   white-space: nowrap;
 }
 
+.cents {
+  font-size: 0.72em;
+}
+
 .disponibleTotal {
   margin-top: 0.75rem;
   padding-top: 0.75rem;
