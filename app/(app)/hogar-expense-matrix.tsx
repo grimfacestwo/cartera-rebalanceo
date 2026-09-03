@@ -89,6 +89,7 @@ export function ExpenseMatrix({
   const [newBank, setNewBank] = useState<BankId | "">("");
   const [newCategory, setNewCategory] = useState<CategoryId>("gastos");
   const [newMonths, setNewMonths] = useState("");
+  const [editingAmountId, setEditingAmountId] = useState<string | null>(null);
 
   const visibleGroups = groups.filter((g) => g.rows.length > 0);
   if (monthKeys.length === 0) return null;
@@ -200,8 +201,11 @@ export function ExpenseMatrix({
                 </td>
                 <td colSpan={monthKeys.length} style={{ background: `${CATEGORY_COLORS[group.category]}1a` }} />
               </tr>
-              {!collapsed && group.rows.map((row, idx) => (
-                <tr key={`${group.category}-${row.kind}-${row.key}`}>
+              {!collapsed && group.rows.map((row, idx) => {
+                const rowId = `${group.category}-${row.kind}-${row.key}`;
+                const isEditingAmount = editingAmountId === rowId;
+                return (
+                <tr key={rowId}>
                   <td className={styles.summaryActionsCell}>
                     <button type="button" className={styles.moveBtn} onClick={() => onMoveRow(row, "up")} disabled={idx === 0} aria-label={`Subir ${row.name}`} title="Subir">▲</button>
                     <button type="button" className={styles.moveBtn} onClick={() => onMoveRow(row, "down")} disabled={idx === group.rows.length - 1} aria-label={`Bajar ${row.name}`} title="Bajar">▼</button>
@@ -230,15 +234,29 @@ export function ExpenseMatrix({
                   </td>
                   <td className={amountCellCls}>
                     <div className={styles.amountCell}>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={row.amount}
-                        onChange={(ev) => { const v = ev.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) onSetRowAmount(row, v); }}
-                        className={styles.expenseInput}
-                        aria-label={`Importe de ${row.name}`}
-                        style={{ width: "4rem" }}
-                      />
+                      {isEditingAmount ? (
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={row.amount}
+                          onChange={(ev) => { const v = ev.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) onSetRowAmount(row, v); }}
+                          onBlur={() => setEditingAmountId(null)}
+                          className={styles.expenseInput}
+                          aria-label={`Importe de ${row.name}`}
+                          style={{ width: "4rem" }}
+                          autoFocus
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          className={styles.amountDisplay}
+                          onClick={() => setEditingAmountId(rowId)}
+                          aria-label={`Importe de ${row.name}`}
+                          style={{ width: "4rem" }}
+                        >
+                          <Money value={Number.parseFloat(row.amount) || 0} />
+                        </button>
+                      )}
                       <span className={styles.amountUnit}>€</span>
                     </div>
                     {row.daily && (
@@ -273,7 +291,8 @@ export function ExpenseMatrix({
                     );
                   })}
                 </tr>
-              ))}
+                );
+              })}
             </Fragment>
             );
           })}

@@ -552,6 +552,24 @@
   background: rgba(0, 0, 0, 0.03);
 }
 
+.amountDisplay {
+  box-sizing: border-box;
+  padding: 0.35rem 0.25rem;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  color: #0f172a;
+  font-size: 0.85rem;
+  font-family: inherit;
+  text-align: left;
+  cursor: text;
+  transition: background 0.12s;
+}
+
+.amountDisplay:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
 .expenseSelect {
   padding: 0.35rem 0.25rem;
   border-radius: 6px;
@@ -1032,6 +1050,14 @@
 }
 
 [data-theme="dark"] .expenseInput:focus {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .amountDisplay {
+  color: #e2e8f0;
+}
+
+[data-theme="dark"] .amountDisplay:hover {
   background: rgba(255, 255, 255, 0.05);
 }
 
