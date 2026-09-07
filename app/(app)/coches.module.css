@@ -20,8 +20,10 @@
   font-size: 0.85rem;
 }
 
+.mntTable th,
 .mntTable td {
   vertical-align: middle;
+  border-bottom: 1px solid var(--c-border);
 }
 
 .mntFlatInput {
@@ -97,26 +99,6 @@
   width: 5.5rem;
   position: sticky;
   left: 18.5rem;
-  background: var(--c-card);
-  z-index: 1;
-}
-
-.mntWarnKmHeader,
-.mntWarnKmCell {
-  box-sizing: border-box;
-  width: 5.5rem;
-  position: sticky;
-  left: 24rem;
-  background: var(--c-card);
-  z-index: 1;
-}
-
-.mntWarnMonthsHeader,
-.mntWarnMonthsCell {
-  box-sizing: border-box;
-  width: 5.5rem;
-  position: sticky;
-  left: 29.5rem;
   background: var(--c-card);
   z-index: 1;
 }

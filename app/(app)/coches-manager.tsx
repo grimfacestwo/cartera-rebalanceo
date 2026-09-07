@@ -721,8 +721,6 @@ export default function CochesManager() {
                       <th className={c.mntNameHeader}>Elemento</th>
                       <th className={c.mntIntervalKmHeader}>Cada X km</th>
                       <th className={c.mntIntervalMonthsHeader}>Cada X meses</th>
-                      <th className={c.mntWarnKmHeader}>Avisar km</th>
-                      <th className={c.mntWarnMonthsHeader}>Avisar meses</th>
                       {vehicleRevisions.map((rev, idx) => (
                         <th key={rev.id} className={c.mntRevisionHeader}>
                           <div
@@ -820,26 +818,6 @@ export default function CochesManager() {
                               placeholder="Cada X meses"
                               className={c.mntFlatInput}
                               aria-label="Intervalo en meses"
-                            />
-                          </td>
-                          <td className={c.mntWarnKmCell}>
-                            <input
-                              value={m.warnKm ?? ""}
-                              onChange={(e) => updateMaintenance(m.id, { warnKm: e.target.value })}
-                              placeholder="Avisar a X km"
-                              className={c.mntFlatInput}
-                              aria-label="Avisar a X kilómetros de margen"
-                              title="Con cuántos km de margen pasar a 'próximo' (vacío = 2000)"
-                            />
-                          </td>
-                          <td className={c.mntWarnMonthsCell}>
-                            <input
-                              value={m.warnMonths ?? ""}
-                              onChange={(e) => updateMaintenance(m.id, { warnMonths: e.target.value })}
-                              placeholder="Avisar a X meses"
-                              className={c.mntFlatInput}
-                              aria-label="Avisar a X meses de margen"
-                              title="Con cuántos meses de margen pasar a 'próximo' (vacío = 2)"
                             />
                           </td>
                           {vehicleRevisions.map((rev, idx) => {

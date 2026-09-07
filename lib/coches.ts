@@ -33,8 +33,6 @@ export type MaintenanceItem = {
   intervalKm: string;
   intervalMonths: string;
   revisionDone: Record<string, boolean>;
-  warnKm?: string;
-  warnMonths?: string;
 };
 
 export type MaintenanceRevision = {
@@ -157,8 +155,6 @@ export function parseMaintenanceItems(raw: unknown): MaintenanceItem[] {
           intervalKm: str(o.intervalKm),
           intervalMonths: str(o.intervalMonths),
           revisionDone: parseRevisionDone(o.revisionDone),
-          warnKm: str(o.warnKm),
-          warnMonths: str(o.warnMonths),
         });
       }
     }
@@ -462,10 +458,8 @@ export function maintenanceStatus(
   lastDate: string,
   today: Date = new Date()
 ): MaintenanceStatus {
-  const kmWarn = Number.parseFloat(item.warnKm ?? "") || 2000;
-  const moWarn = Number.parseFloat(item.warnMonths ?? "") || 2;
-  const km = perStatus(maintenanceKmRemaining(item, currentKm, lastKm), kmWarn);
-  const months = perStatus(maintenanceMonthsRemaining(item, lastDate, today), moWarn);
+  const km = perStatus(maintenanceKmRemaining(item, currentKm, lastKm), 2000);
+  const months = perStatus(maintenanceMonthsRemaining(item, lastDate, today), 2);
   const rank: Record<MaintenanceStatus, number> = { unknown: 0, ok: 1, soon: 2, overdue: 3 };
   return rank[months] > rank[km] ? months : km;
 }

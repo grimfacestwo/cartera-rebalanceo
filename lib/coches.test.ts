@@ -506,46 +506,6 @@ describe("parseMaintenanceRevisions", () => {
   });
 });
 
-describe("parseMaintenanceItems warn thresholds", () => {
-  it("parsea warnKm y warnMonths con valores por defecto vacíos", () => {
-    const result = parseMaintenanceItems([
-      { id: "m1", name: "Aceite", warnKm: "500", warnMonths: "1" },
-      { id: "m2", name: "Filtro" },
-    ]);
-    expect(result[0].warnKm).toBe("500");
-    expect(result[0].warnMonths).toBe("1");
-    expect(result[1].warnKm).toBe("");
-    expect(result[1].warnMonths).toBe("");
-  });
-});
-
-describe("maintenanceStatus umbrales configurables", () => {
-  const today = new Date("2026-08-16T12:00:00");
-  const item = (warnKm?: string, warnMonths?: string): MaintenanceItem => ({
-    id: "m1",
-    name: "Aceite",
-    intervalKm: "30000",
-    intervalMonths: "12",
-    revisionDone: {},
-    warnKm,
-    warnMonths,
-  });
-
-  it("usa el umbral por defecto si no se configura", () => {
-    expect(maintenanceStatus(item(), "50000", "22000", "", today)).toBe("soon");
-  });
-
-  it("usa warnKm si se configura", () => {
-    expect(maintenanceStatus(item("10000"), "50000", "48000", "", today)).toBe("ok");
-    expect(maintenanceStatus(item("1000"), "50000", "15000", "", today)).toBe("overdue");
-  });
-
-  it("usa warnMonths si se configura", () => {
-    const lastDate = "2026-08-01";
-    expect(maintenanceStatus(item("", "1"), "50000", "", lastDate, today)).toBe("ok");
-  });
-});
-
 describe("parseDocuments", () => {
   it("parsea documentos válidos y descarta inválidos", () => {
     const result = parseDocuments([
