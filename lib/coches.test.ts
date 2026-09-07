@@ -5,6 +5,7 @@ import {
   DEFAULT_VEHICLES,
   GENERIC_MAINTENANCE,
   effectiveLastKm,
+  lastFilledRevisionKm,
   latestMatchingRepair,
   maintenanceForName,
   maintenanceKmRemaining,
@@ -15,6 +16,7 @@ import {
   parseCochesState,
   parseDocuments,
   parseMaintenanceItems,
+  parseMaintenanceRevisions,
   parseRepairs,
   parseRevisions,
   parseVehicles,
@@ -26,7 +28,7 @@ import {
   revisionStatus,
   vehicleCostPerKm,
 } from "./coches";
-import type { CochesState, MaintenanceItem, Repair } from "./coches";
+import type { CochesState, MaintenanceItem, MaintenanceRevision, Repair } from "./coches";
 
 function mkRepair(
   id: string,
@@ -39,8 +41,12 @@ function mkRepair(
   return { id, vehicleId, date, description, cost: "", km, workshop: "", component };
 }
 
-function mkMaint(name: string, lastKm = ""): MaintenanceItem {
-  return { id: "m1", name, intervalKm: "30000", intervalMonths: "12", lastKm, lastDate: "" };
+function mkRevision(id: string, date = "", vehicleId = "v1"): MaintenanceRevision {
+  return { id, vehicleId, date };
+}
+
+function mkMaint(name: string, revisionKm: Record<string, string> = {}): MaintenanceItem {
+  return { id: "m1", name, intervalKm: "30000", intervalMonths: "12", revisionKm };
 }
 
 describe("parseCochesState", () => {
@@ -104,8 +110,7 @@ describe("parseVehicles", () => {
     expect(result[0].maintenance).toHaveLength(1);
     expect(result[0].maintenance[0].intervalKm).toBe("99999");
     expect(result[0].maintenance[0].intervalMonths).toBe("");
-    expect(result[0].maintenance[0].lastKm).toBe("");
-    expect(result[0].maintenance[0].lastDate).toBe("");
+    expect(result[0].maintenance[0].revisionKm).toEqual({});
   });
 });
 
@@ -235,118 +240,114 @@ describe("parseMaintenanceItems", () => {
 });
 
 describe("maintenanceKmRemaining", () => {
-  const item = (intervalKm: string, lastKm: string): Parameters<typeof maintenanceKmRemaining>[0] => ({
+  const item = (intervalKm: string): MaintenanceItem => ({
     id: "m1",
     name: "Aceite",
     intervalKm,
     intervalMonths: "12",
-    lastKm,
-    lastDate: "",
+    revisionKm: {},
   });
 
   it("calcula km restantes", () => {
-    expect(maintenanceKmRemaining(item("30000", "30000"), "50000")).toBe(10000);
+    expect(maintenanceKmRemaining(item("30000"), "50000", "30000")).toBe(10000);
   });
 
   it("negativo si ya ha pasado el intervalo", () => {
-    expect(maintenanceKmRemaining(item("30000", "10000"), "50000")).toBe(-10000);
+    expect(maintenanceKmRemaining(item("30000"), "50000", "10000")).toBe(-10000);
   });
 
   it("null si falta el km del último cambio", () => {
-    expect(maintenanceKmRemaining(item("30000", ""), "50000")).toBeNull();
+    expect(maintenanceKmRemaining(item("30000"), "50000", "")).toBeNull();
   });
 
   it("null si falta el km actual", () => {
-    expect(maintenanceKmRemaining(item("30000", "30000"), "")).toBeNull();
+    expect(maintenanceKmRemaining(item("30000"), "", "30000")).toBeNull();
   });
 
   it("null si no hay intervalo de km", () => {
-    expect(maintenanceKmRemaining(item("", "30000"), "50000")).toBeNull();
+    expect(maintenanceKmRemaining(item(""), "50000", "30000")).toBeNull();
   });
 });
 
 describe("maintenanceMonthsRemaining", () => {
   const today = new Date("2026-08-16T12:00:00");
-  const item = (intervalMonths: string, lastDate: string): Parameters<typeof maintenanceMonthsRemaining>[0] => ({
+  const item = (intervalMonths: string): MaintenanceItem => ({
     id: "m1",
     name: "Líquido de frenos",
     intervalKm: "",
     intervalMonths,
-    lastKm: "",
-    lastDate,
+    revisionKm: {},
   });
 
   it("calcula meses restantes", () => {
-    expect(maintenanceMonthsRemaining(item("24", "2024-08-10"), today)).toBe(0);
-    expect(maintenanceMonthsRemaining(item("24", "2024-09-10"), today)).toBe(1);
+    expect(maintenanceMonthsRemaining(item("24"), "2024-08-10", today)).toBe(0);
+    expect(maintenanceMonthsRemaining(item("24"), "2024-09-10", today)).toBe(1);
   });
 
   it("negativo si ya ha pasado el intervalo", () => {
-    expect(maintenanceMonthsRemaining(item("24", "2023-01-10"), today)).toBe(-19);
+    expect(maintenanceMonthsRemaining(item("24"), "2023-01-10", today)).toBe(-19);
   });
 
   it("null si falta la fecha del último cambio", () => {
-    expect(maintenanceMonthsRemaining(item("24", ""), today)).toBeNull();
+    expect(maintenanceMonthsRemaining(item("24"), "", today)).toBeNull();
   });
 
   it("null si no hay intervalo de meses", () => {
-    expect(maintenanceMonthsRemaining(item("", "2024-08-10"), today)).toBeNull();
+    expect(maintenanceMonthsRemaining(item(""), "2024-08-10", today)).toBeNull();
   });
 });
 
 describe("maintenanceStatus", () => {
   const today = new Date("2026-08-16T12:00:00");
-  const item = (intervalKm: string, lastKm: string): Parameters<typeof maintenanceStatus>[0] => ({
+  const item = (intervalKm: string): MaintenanceItem => ({
     id: "m1",
     name: "Aceite",
     intervalKm,
     intervalMonths: "",
-    lastKm,
-    lastDate: "",
+    revisionKm: {},
   });
 
   it("unknown si faltan datos", () => {
-    expect(maintenanceStatus(item("30000", ""), "50000", today)).toBe("unknown");
+    expect(maintenanceStatus(item("30000"), "50000", "", "", today)).toBe("unknown");
   });
 
   it("ok si queda margen", () => {
-    expect(maintenanceStatus(item("30000", "30000"), "50000", today)).toBe("ok");
+    expect(maintenanceStatus(item("30000"), "50000", "30000", "", today)).toBe("ok");
   });
 
   it("soon si quedan 2000 km o menos", () => {
-    expect(maintenanceStatus(item("30000", "21000"), "50000", today)).toBe("soon");
-    expect(maintenanceStatus(item("30000", "22000"), "50000", today)).toBe("soon");
+    expect(maintenanceStatus(item("30000"), "50000", "21000", "", today)).toBe("soon");
+    expect(maintenanceStatus(item("30000"), "50000", "22000", "", today)).toBe("soon");
   });
 
   it("overdue si ya pasó", () => {
-    expect(maintenanceStatus(item("30000", "15000"), "50000", today)).toBe("overdue");
+    expect(maintenanceStatus(item("30000"), "50000", "15000", "", today)).toBe("overdue");
   });
 });
 
 describe("maintenanceMessage", () => {
-  const item = (name: string, intervalKm: string, lastKm: string): Parameters<typeof maintenanceMessage>[0] => ({
+  const item = (name: string, intervalKm: string): MaintenanceItem => ({
     id: "m1",
     name,
     intervalKm,
     intervalMonths: "",
-    lastKm,
-    lastDate: "",
+    revisionKm: {},
   });
 
   it("mensaje de km restantes", () => {
-    expect(maintenanceMessage(item("Aceite", "30000", "25000"), "50000")).toBe(
+    expect(maintenanceMessage(item("Aceite", "30000"), "50000", "25000", "")).toBe(
       "Te faltan 5.000 km para cambiar aceite"
     );
   });
 
   it("mensaje de km superado", () => {
-    expect(maintenanceMessage(item("Aceite", "30000", "10000"), "50000")).toBe(
+    expect(maintenanceMessage(item("Aceite", "30000"), "50000", "10000", "")).toBe(
       "Te has pasado 10.000 km: toca cambiar aceite"
     );
   });
 
   it("mensaje cuando faltan datos", () => {
-    expect(maintenanceMessage(item("Aceite", "30000", ""), "50000")).toBe(
+    expect(maintenanceMessage(item("Aceite", "30000"), "50000", "", "")).toBe(
       "Fija el km o la fecha del último cambio de aceite"
     );
   });
@@ -428,7 +429,8 @@ describe("latestMatchingRepair", () => {
 describe("effectiveLastKm", () => {
   it("usa el km de la reparación coincidente (automático)", () => {
     const repairs = [mkRepair("r1", "2026-05-20", "cambio de aceite", "105000")];
-    const res = effectiveLastKm(mkMaint("Aceite", "90000"), repairs, "v1");
+    const revisions = [mkRevision("rev1")];
+    const res = effectiveLastKm(mkMaint("Aceite", { rev1: "90000" }), repairs, "v1", revisions);
     expect(res.km).toBe("105000");
     expect(res.source).toBe("auto");
     expect(res.repair?.id).toBe("r1");
@@ -436,23 +438,63 @@ describe("effectiveLastKm", () => {
 
   it("cae al manual si no hay reparación coincidente", () => {
     const repairs = [mkRepair("r1", "2026-05-20", "pastillas", "105000")];
-    const res = effectiveLastKm(mkMaint("Aceite", "90000"), repairs, "v1");
+    const revisions = [mkRevision("rev1")];
+    const res = effectiveLastKm(mkMaint("Aceite", { rev1: "90000" }), repairs, "v1", revisions);
     expect(res.km).toBe("90000");
     expect(res.source).toBe("manual");
   });
 
   it("vacío si no hay nada", () => {
-    const res = effectiveLastKm(mkMaint("Aceite"), [], "v1");
+    const res = effectiveLastKm(mkMaint("Aceite"), [], "v1", []);
     expect(res.km).toBe("");
     expect(res.source).toBe("none");
   });
 
   it("prefiere el km manual cuando es mayor que el de la reparación", () => {
     const repairs = [mkRepair("r1", "2026-05-20", "cambio de aceite", "105000")];
-    const res = effectiveLastKm(mkMaint("Aceite", "120000"), repairs, "v1");
+    const revisions = [mkRevision("rev1")];
+    const res = effectiveLastKm(mkMaint("Aceite", { rev1: "120000" }), repairs, "v1", revisions);
     expect(res.km).toBe("120000");
     expect(res.source).toBe("manual");
     expect(res.repair).toBeNull();
+  });
+});
+
+describe("lastFilledRevisionKm", () => {
+  it("null si ninguna revisión tiene km", () => {
+    const item = mkMaint("Aceite", {});
+    const revisions = [mkRevision("rev1"), mkRevision("rev2")];
+    expect(lastFilledRevisionKm(item, revisions)).toBeNull();
+  });
+
+  it("toma la única columna rellenada aunque no sea la última del array", () => {
+    const item = mkMaint("Aceite", { rev1: "10000" });
+    const revisions = [mkRevision("rev1"), mkRevision("rev2", "2026-05-01")];
+    expect(lastFilledRevisionKm(item, revisions)).toEqual({ km: "10000", date: "" });
+  });
+
+  it("prioriza la revisión más a la derecha si varias están rellenas", () => {
+    const item = mkMaint("Aceite", { rev1: "10000", rev2: "20000" });
+    const revisions = [mkRevision("rev1"), mkRevision("rev2", "2026-05-01")];
+    expect(lastFilledRevisionKm(item, revisions)).toEqual({ km: "20000", date: "2026-05-01" });
+  });
+});
+
+describe("parseMaintenanceRevisions", () => {
+  it("devuelve [] para datos inválidos", () => {
+    expect(parseMaintenanceRevisions(null)).toEqual([]);
+    expect(parseMaintenanceRevisions("mal")).toEqual([]);
+  });
+
+  it("requiere id y vehicleId, date por defecto vacía", () => {
+    const result = parseMaintenanceRevisions([
+      { id: "rev1", vehicleId: "v1", date: "2026-05-01" },
+      { id: "rev2", vehicleId: "v1" },
+      { vehicleId: "v1" },
+    ]);
+    expect(result).toHaveLength(2);
+    expect(result[0].date).toBe("2026-05-01");
+    expect(result[1].date).toBe("");
   });
 });
 
@@ -471,29 +513,28 @@ describe("parseMaintenanceItems warn thresholds", () => {
 
 describe("maintenanceStatus umbrales configurables", () => {
   const today = new Date("2026-08-16T12:00:00");
-  const item = (lastKm: string, lastDate: string, warnKm?: string, warnMonths?: string) => ({
+  const item = (warnKm?: string, warnMonths?: string): MaintenanceItem => ({
     id: "m1",
     name: "Aceite",
     intervalKm: "30000",
     intervalMonths: "12",
-    lastKm,
-    lastDate,
+    revisionKm: {},
     warnKm,
     warnMonths,
   });
 
   it("usa el umbral por defecto si no se configura", () => {
-    expect(maintenanceStatus(item("22000", ""), "50000", today)).toBe("soon");
+    expect(maintenanceStatus(item(), "50000", "22000", "", today)).toBe("soon");
   });
 
   it("usa warnKm si se configura", () => {
-    expect(maintenanceStatus(item("48000", "", "10000"), "50000", today)).toBe("ok");
-    expect(maintenanceStatus(item("15000", "", "1000"), "50000", today)).toBe("overdue");
+    expect(maintenanceStatus(item("10000"), "50000", "48000", "", today)).toBe("ok");
+    expect(maintenanceStatus(item("1000"), "50000", "15000", "", today)).toBe("overdue");
   });
 
   it("usa warnMonths si se configura", () => {
     const lastDate = "2026-08-01";
-    expect(maintenanceStatus(item("", lastDate, "", "1"), "50000", today)).toBe("ok");
+    expect(maintenanceStatus(item("", "1"), "50000", "", lastDate, today)).toBe("ok");
   });
 });
 
@@ -570,23 +611,29 @@ describe("pendingAlerts", () => {
   function stateWith(
     vehicles: unknown[],
     repairs: Repair[] = [],
-    revisions: unknown[] = []
+    revisions: unknown[] = [],
+    maintenanceRevisions: unknown[] = []
   ): CochesState {
-    return parseCochesState({ vehicles, repairs, revisions, workshops: [], documents: [] });
+    return parseCochesState({ vehicles, repairs, revisions, maintenanceRevisions, workshops: [], documents: [] });
   }
 
   it("cuenta mantenimientos vencidos y próximos", () => {
-    const state = stateWith([
-      {
-        id: "v1",
-        name: "Opel Corsa",
-        currentKm: "50000",
-        maintenance: [
-          { id: "m1", name: "Aceite", intervalKm: "30000", intervalMonths: "", lastKm: "10000", lastDate: "" },
-          { id: "m2", name: "Filtro de aire", intervalKm: "30000", intervalMonths: "", lastKm: "22000", lastDate: "" },
-        ],
-      },
-    ]);
+    const state = stateWith(
+      [
+        {
+          id: "v1",
+          name: "Opel Corsa",
+          currentKm: "50000",
+          maintenance: [
+            { id: "m1", name: "Aceite", intervalKm: "30000", intervalMonths: "", revisionKm: { rev1: "10000" } },
+            { id: "m2", name: "Filtro de aire", intervalKm: "30000", intervalMonths: "", revisionKm: { rev1: "22000" } },
+          ],
+        },
+      ],
+      [],
+      [],
+      [{ id: "rev1", vehicleId: "v1", date: "" }]
+    );
     const alerts = pendingAlerts(state, today);
     expect(alerts.overdue).toBe(1);
     expect(alerts.soon).toBe(1);
@@ -602,7 +649,7 @@ describe("pendingAlerts", () => {
           name: "Opel Corsa",
           currentKm: "50000",
           maintenance: [
-            { id: "m1", name: "Aceite", intervalKm: "30000", intervalMonths: "", lastKm: "", lastDate: "" },
+            { id: "m1", name: "Aceite", intervalKm: "30000", intervalMonths: "", revisionKm: {} },
           ],
         },
       ],

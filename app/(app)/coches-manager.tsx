@@ -7,6 +7,7 @@ import {
   type CarDocument,
   type CochesState,
   type MaintenanceItem,
+  type MaintenanceRevision,
   type MaintenanceStatus,
   type Repair,
   type Revision,
@@ -307,6 +308,9 @@ export default function CochesManager() {
   const yearStats = repairCostByYear(state.repairs, activeId);
   const componentStats = repairCostByComponent(state.repairs, activeId);
   const workshopStats = repairCostByWorkshop(state.repairs, activeId);
+  const vehicleRevisions = active
+    ? state.maintenanceRevisions.filter((r) => r.vehicleId === active.id)
+    : [];
   const perKm = vehicleCostPerKm(state.repairs, activeId, active?.currentKm ?? "");
   const revisions = active
     ? state.revisions
@@ -446,8 +450,7 @@ export default function CochesManager() {
       name: "",
       intervalKm: "",
       intervalMonths: "",
-      lastKm: "",
-      lastDate: "",
+      revisionKm: {},
     };
     setState((s) =>
       s
@@ -475,13 +478,45 @@ export default function CochesManager() {
         : s
     );
 
-  const markMaintenanceDone = (id: string) => {
+  const setRevisionKm = (itemId: string, revisionId: string, km: string) =>
+    setState((s) =>
+      s
+        ? {
+            ...s,
+            vehicles: s.vehicles.map((v) =>
+              v.id === activeId
+                ? {
+                    ...v,
+                    maintenance: v.maintenance.map((i) =>
+                      i.id === itemId ? { ...i, revisionKm: { ...i.revisionKm, [revisionId]: km } } : i
+                    ),
+                  }
+                : v
+            ),
+          }
+        : s
+    );
+
+  const addMaintenanceRevision = () => {
     if (!active) return;
-    updateMaintenance(id, {
-      lastKm: active.currentKm,
-      lastDate: new Date().toISOString().slice(0, 10),
-    });
+    const rev: MaintenanceRevision = { id: uid(), vehicleId: active.id, date: "" };
+    setState((s) => (s ? { ...s, maintenanceRevisions: [...s.maintenanceRevisions, rev] } : s));
   };
+
+  const deleteRevisionColumn = (id: string) =>
+    setState((s) =>
+      s ? { ...s, maintenanceRevisions: s.maintenanceRevisions.filter((r) => r.id !== id) } : s
+    );
+
+  const updateRevisionDate = (id: string, date: string) =>
+    setState((s) =>
+      s
+        ? {
+            ...s,
+            maintenanceRevisions: s.maintenanceRevisions.map((r) => (r.id === id ? { ...r, date } : r)),
+          }
+        : s
+    );
 
   const deleteVehicle = (id: string) => {
     if (!state) return;
@@ -490,6 +525,7 @@ export default function CochesManager() {
       vehicles: state.vehicles.filter((v) => v.id !== id),
       repairs: state.repairs.filter((r) => r.vehicleId !== id),
       revisions: state.revisions.filter((r) => r.vehicleId !== id),
+      maintenanceRevisions: state.maintenanceRevisions.filter((r) => r.vehicleId !== id),
     });
     setActiveId((cur) => {
       if (cur !== id) return cur;
@@ -663,116 +699,156 @@ export default function CochesManager() {
                 + Mantenimiento
               </button>
             </div>
-            {active.maintenance.length === 0 && (
+            {active.maintenance.length === 0 ? (
               <p style={{ color: "var(--c-muted)", fontSize: "0.85rem", margin: 0 }}>
                 Sin elementos de mantenimiento. Añade aceite, filtros, líquido de frenos…
               </p>
+            ) : (
+              <div className={c.mntWrap}>
+                <table className={c.mntTable}>
+                  <thead>
+                    <tr>
+                      <th className={c.mntActionsHeader} />
+                      <th className={c.mntNameHeader}>Elemento</th>
+                      <th className={c.mntIntervalKmHeader}>Cada X km</th>
+                      <th className={c.mntIntervalMonthsHeader}>Cada X meses</th>
+                      <th className={c.mntWarnKmHeader}>Avisar km</th>
+                      <th className={c.mntWarnMonthsHeader}>Avisar meses</th>
+                      {vehicleRevisions.map((rev, idx) => (
+                        <th key={rev.id} className={c.mntRevisionHeader}>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              gap: "0.25rem",
+                              fontWeight: 500,
+                            }}
+                          >
+                            <span>Revisión {idx + 1}</span>
+                            <button
+                              type="button"
+                              onClick={() => deleteRevisionColumn(rev.id)}
+                              style={btnDanger}
+                              aria-label={`Eliminar revisión ${idx + 1}`}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                          <input
+                            type="date"
+                            value={rev.date}
+                            onChange={(e) => updateRevisionDate(rev.id, e.target.value)}
+                            style={{ ...inputStyle, marginTop: "0.25rem" }}
+                            aria-label={`Fecha de revisión ${idx + 1}`}
+                          />
+                        </th>
+                      ))}
+                      <th className={c.mntAddRevisionHeader}>
+                        <button type="button" onClick={addMaintenanceRevision} style={btnStyle}>
+                          + Revisión
+                        </button>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {active.maintenance.map((m) => {
+                      const derived = effectiveLastKm(m, repairs, active.id, vehicleRevisions);
+                      const status = maintenanceStatus(m, active.currentKm, derived.km, derived.date);
+                      const sourceTitle =
+                        derived.source === "auto" && derived.repair
+                          ? `Automático · de la reparación “${derived.repair.description}” (${derived.repair.date || "sin fecha"})`
+                          : derived.source === "manual"
+                            ? "Km de la última revisión rellenada"
+                            : "Sin dato: rellena una revisión o añade una reparación con su km";
+                      return (
+                        <tr key={m.id}>
+                          <td className={c.mntActionsCell}>
+                            <button
+                              type="button"
+                              onClick={() => deleteMaintenance(m.id)}
+                              style={btnDanger}
+                              aria-label="Eliminar mantenimiento"
+                            >
+                              ✕
+                            </button>
+                          </td>
+                          <td className={c.mntNameCell}>
+                            <input
+                              value={m.name}
+                              onChange={(e) => updateMaintenance(m.id, { name: e.target.value })}
+                              placeholder="Elemento (aceite, filtros…)"
+                              style={inputStyle}
+                              aria-label="Nombre del mantenimiento"
+                            />
+                            <p
+                              style={{
+                                color: MNT_STATUS_COLORS[status],
+                                fontSize: "0.75rem",
+                                margin: "0.3rem 0 0",
+                              }}
+                              title={sourceTitle}
+                            >
+                              {maintenanceMessage(m, active.currentKm, derived.km, derived.date)}
+                            </p>
+                          </td>
+                          <td className={c.mntIntervalKmCell}>
+                            <input
+                              value={m.intervalKm}
+                              onChange={(e) => updateMaintenance(m.id, { intervalKm: e.target.value })}
+                              placeholder="Cada X km"
+                              style={inputStyle}
+                              aria-label="Intervalo en kilómetros"
+                            />
+                          </td>
+                          <td className={c.mntIntervalMonthsCell}>
+                            <input
+                              value={m.intervalMonths}
+                              onChange={(e) => updateMaintenance(m.id, { intervalMonths: e.target.value })}
+                              placeholder="Cada X meses"
+                              style={inputStyle}
+                              aria-label="Intervalo en meses"
+                            />
+                          </td>
+                          <td className={c.mntWarnKmCell}>
+                            <input
+                              value={m.warnKm ?? ""}
+                              onChange={(e) => updateMaintenance(m.id, { warnKm: e.target.value })}
+                              placeholder="Avisar a X km"
+                              style={inputStyle}
+                              aria-label="Avisar a X kilómetros de margen"
+                              title="Con cuántos km de margen pasar a 'próximo' (vacío = 2000)"
+                            />
+                          </td>
+                          <td className={c.mntWarnMonthsCell}>
+                            <input
+                              value={m.warnMonths ?? ""}
+                              onChange={(e) => updateMaintenance(m.id, { warnMonths: e.target.value })}
+                              placeholder="Avisar a X meses"
+                              style={inputStyle}
+                              aria-label="Avisar a X meses de margen"
+                              title="Con cuántos meses de margen pasar a 'próximo' (vacío = 2)"
+                            />
+                          </td>
+                          {vehicleRevisions.map((rev, idx) => (
+                            <td key={rev.id} className={c.mntRevisionCell}>
+                              <input
+                                value={m.revisionKm[rev.id] ?? ""}
+                                onChange={(e) => setRevisionKm(m.id, rev.id, e.target.value)}
+                                placeholder="km"
+                                style={inputStyle}
+                                aria-label={`Km de ${m.name || "elemento"} en revisión ${idx + 1}`}
+                              />
+                            </td>
+                          ))}
+                          <td className={c.mntAddRevisionCell} />
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
-            {active.maintenance.map((m) => {
-              const derived = effectiveLastKm(m, repairs, active.id);
-              const effectiveItem = { ...m, lastKm: derived.km };
-              const status = maintenanceStatus(effectiveItem, active.currentKm);
-              return (
-                <div
-                  key={m.id}
-                  style={{
-                    border: "1px solid var(--c-border)",
-                    borderRadius: 8,
-                    padding: "0.5rem",
-                    marginBottom: "0.5rem",
-                  }}
-                >
-                  <div style={{ ...fieldGrid, marginBottom: "0.4rem" }}>
-                    <input
-                      value={m.name}
-                      onChange={(e) => updateMaintenance(m.id, { name: e.target.value })}
-                      placeholder="Elemento (aceite, filtros…)"
-                      style={inputStyle}
-                      aria-label="Nombre del mantenimiento"
-                    />
-                    <input
-                      value={m.intervalKm}
-                      onChange={(e) => updateMaintenance(m.id, { intervalKm: e.target.value })}
-                      placeholder="Cada X km"
-                      style={inputStyle}
-                      aria-label="Intervalo en kilómetros"
-                    />
-                    <input
-                      value={m.intervalMonths}
-                      onChange={(e) => updateMaintenance(m.id, { intervalMonths: e.target.value })}
-                      placeholder="Cada X meses"
-                      style={inputStyle}
-                      aria-label="Intervalo en meses"
-                    />
-                    <input
-                      value={m.warnKm ?? ""}
-                      onChange={(e) => updateMaintenance(m.id, { warnKm: e.target.value })}
-                      placeholder="Avisar a X km"
-                      style={inputStyle}
-                      aria-label="Avisar a X kilómetros de margen"
-                      title="Con cuántos km de margen pasar a 'próximo' (vacío = 2000)"
-                    />
-                    <input
-                      value={m.warnMonths ?? ""}
-                      onChange={(e) => updateMaintenance(m.id, { warnMonths: e.target.value })}
-                      placeholder="Avisar a X meses"
-                      style={inputStyle}
-                      aria-label="Avisar a X meses de margen"
-                      title="Con cuántos meses de margen pasar a 'próximo' (vacío = 2)"
-                    />
-                    <input
-                      value={derived.km}
-                      readOnly
-                      placeholder="Últ. cambio km"
-                      style={{ ...inputStyle, background: "var(--c-surface)", color: "var(--c-muted)" }}
-                      aria-label="Último cambio en kilómetros (automático)"
-                      title={derived.source === "auto" ? "Automático desde la reparación" : undefined}
-                    />
-                    <input
-                      type="date"
-                      value={m.lastDate}
-                      onChange={(e) => updateMaintenance(m.id, { lastDate: e.target.value })}
-                      style={inputStyle}
-                      aria-label="Fecha del último cambio"
-                    />
-                    <button type="button" onClick={() => markMaintenanceDone(m.id)} style={btnStyle}>
-                      Hecho
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => deleteMaintenance(m.id)}
-                      style={btnDanger}
-                      aria-label="Eliminar mantenimiento"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <p
-                    style={{
-                      color: MNT_STATUS_COLORS[status],
-                      fontSize: "0.8rem",
-                      margin: "0 0 0.2rem",
-                    }}
-                  >
-                    {maintenanceMessage(effectiveItem, active.currentKm)}
-                  </p>
-                  {derived.source === "auto" && derived.repair ? (
-                    <p style={{ color: "var(--c-muted)", fontSize: "0.75rem", margin: 0 }}>
-                      Automático · de la reparación “{derived.repair.description}” (
-                      {derived.repair.date || "sin fecha"})
-                    </p>
-                  ) : derived.source === "manual" ? (
-                    <p style={{ color: "var(--c-muted)", fontSize: "0.75rem", margin: 0 }}>
-                      Km manual (sin reparación coincidente)
-                    </p>
-                  ) : (
-                    <p style={{ color: "var(--c-muted)", fontSize: "0.75rem", margin: 0 }}>
-                      Sin dato: añade una reparación con su km, p. ej. “Cambio de aceite”
-                    </p>
-                  )}
-                </div>
-              );
-            })}
           </div>
 
           <div style={{ ...cardStyle, marginBottom: "1.25rem" }}>

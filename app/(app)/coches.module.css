@@ -1,3 +1,97 @@
 .page {
   padding: 2rem 1.5rem;
 }
+
+.mntWrap {
+  overflow-x: auto;
+}
+
+.mntTable {
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  width: max-content;
+}
+
+.mntTable th {
+  color: var(--c-text);
+  text-align: left;
+  font-weight: 500;
+  font-size: 0.85rem;
+}
+
+.mntActionsHeader,
+.mntActionsCell {
+  box-sizing: border-box;
+  width: 3rem;
+  position: sticky;
+  left: 0;
+  background: var(--c-card);
+  z-index: 1;
+}
+
+.mntNameHeader,
+.mntNameCell {
+  box-sizing: border-box;
+  width: 10rem;
+  position: sticky;
+  left: 3rem;
+  background: var(--c-card);
+  z-index: 1;
+  padding: 0.4rem;
+  text-align: left;
+}
+
+.mntIntervalKmHeader,
+.mntIntervalKmCell {
+  box-sizing: border-box;
+  width: 5.5rem;
+  position: sticky;
+  left: 13rem;
+  background: var(--c-card);
+  z-index: 1;
+}
+
+.mntIntervalMonthsHeader,
+.mntIntervalMonthsCell {
+  box-sizing: border-box;
+  width: 5.5rem;
+  position: sticky;
+  left: 18.5rem;
+  background: var(--c-card);
+  z-index: 1;
+}
+
+.mntWarnKmHeader,
+.mntWarnKmCell {
+  box-sizing: border-box;
+  width: 5.5rem;
+  position: sticky;
+  left: 24rem;
+  background: var(--c-card);
+  z-index: 1;
+}
+
+.mntWarnMonthsHeader,
+.mntWarnMonthsCell {
+  box-sizing: border-box;
+  width: 5.5rem;
+  position: sticky;
+  left: 29.5rem;
+  background: var(--c-card);
+  z-index: 1;
+}
+
+.mntRevisionHeader,
+.mntRevisionCell {
+  box-sizing: border-box;
+  width: 7rem;
+  padding: 0.4rem;
+}
+
+.mntAddRevisionHeader,
+.mntAddRevisionCell {
+  box-sizing: border-box;
+  width: 6rem;
+  padding: 0.4rem;
+}
