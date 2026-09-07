@@ -20,6 +20,45 @@
   font-size: 0.85rem;
 }
 
+.mntTable td {
+  vertical-align: middle;
+}
+
+.mntFlatInput {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.35rem 0.25rem;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  color: var(--c-text);
+  font-size: 0.85rem;
+  font-family: inherit;
+  transition: background 0.12s;
+}
+
+.mntFlatInput:hover {
+  background: rgba(148, 163, 184, 0.15);
+}
+
+.mntFlatInput:focus {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 1px;
+  background: rgba(148, 163, 184, 0.15);
+}
+
+.mntFlatInput::placeholder {
+  color: var(--c-muted);
+}
+
+.mntStatusMsg {
+  margin: 0.3rem 0 0;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .mntActionsHeader,
 .mntActionsCell {
   box-sizing: border-box;
@@ -82,11 +121,28 @@
   z-index: 1;
 }
 
-.mntRevisionHeader,
-.mntRevisionCell {
+.mntRevisionHeader {
   box-sizing: border-box;
   width: 7rem;
   padding: 0.4rem;
+}
+
+.mntRevisionCell {
+  box-sizing: border-box;
+  width: 7rem;
+  text-align: center;
+  font-size: 1rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.mntRevisionDone {
+  color: var(--c-ok);
+}
+
+.mntRevisionPending {
+  color: var(--c-danger);
+  opacity: 0.5;
 }
 
 .mntAddRevisionHeader,

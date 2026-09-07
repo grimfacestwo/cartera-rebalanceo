@@ -32,7 +32,7 @@ export type MaintenanceItem = {
   name: string;
   intervalKm: string;
   intervalMonths: string;
-  revisionKm: Record<string, string>;
+  revisionDone: Record<string, boolean>;
   warnKm?: string;
   warnMonths?: string;
 };
@@ -41,6 +41,7 @@ export type MaintenanceRevision = {
   id: string;
   vehicleId: string;
   date: string;
+  km: string;
 };
 
 export type CarDocument = {
@@ -64,35 +65,35 @@ export type CochesState = {
 };
 
 export const CORSAS_MAINTENANCE: MaintenanceItem[] = [
-  { id: "preset-aceite", name: "Aceite", intervalKm: "30000", intervalMonths: "12", revisionKm: {} },
-  { id: "preset-filtro-aceite", name: "Filtro de aceite", intervalKm: "30000", intervalMonths: "12", revisionKm: {} },
-  { id: "preset-filtro-aire", name: "Filtro de aire", intervalKm: "30000", intervalMonths: "24", revisionKm: {} },
-  { id: "preset-filtro-combustible", name: "Filtro de combustible", intervalKm: "30000", intervalMonths: "24", revisionKm: {} },
-  { id: "preset-filtro-habitaculo", name: "Filtro de habitáculo", intervalKm: "30000", intervalMonths: "24", revisionKm: {} },
-  { id: "preset-liquido-frenos", name: "Líquido de frenos", intervalKm: "", intervalMonths: "24", revisionKm: {} },
-  { id: "preset-refrigerante", name: "Líquido refrigerante", intervalKm: "", intervalMonths: "60", revisionKm: {} },
-  { id: "preset-correa-alternador", name: "Correa de alternador", intervalKm: "90000", intervalMonths: "60", revisionKm: {} },
-  { id: "preset-pastillas", name: "Pastillas de freno", intervalKm: "45000", intervalMonths: "", revisionKm: {} },
+  { id: "preset-aceite", name: "Aceite", intervalKm: "30000", intervalMonths: "12", revisionDone: {} },
+  { id: "preset-filtro-aceite", name: "Filtro de aceite", intervalKm: "30000", intervalMonths: "12", revisionDone: {} },
+  { id: "preset-filtro-aire", name: "Filtro de aire", intervalKm: "30000", intervalMonths: "24", revisionDone: {} },
+  { id: "preset-filtro-combustible", name: "Filtro de combustible", intervalKm: "30000", intervalMonths: "24", revisionDone: {} },
+  { id: "preset-filtro-habitaculo", name: "Filtro de habitáculo", intervalKm: "30000", intervalMonths: "24", revisionDone: {} },
+  { id: "preset-liquido-frenos", name: "Líquido de frenos", intervalKm: "", intervalMonths: "24", revisionDone: {} },
+  { id: "preset-refrigerante", name: "Líquido refrigerante", intervalKm: "", intervalMonths: "60", revisionDone: {} },
+  { id: "preset-correa-alternador", name: "Correa de alternador", intervalKm: "90000", intervalMonths: "60", revisionDone: {} },
+  { id: "preset-pastillas", name: "Pastillas de freno", intervalKm: "45000", intervalMonths: "", revisionDone: {} },
 ];
 
 export const CARENS_MAINTENANCE: MaintenanceItem[] = [
-  { id: "preset-aceite", name: "Aceite", intervalKm: "15000", intervalMonths: "12", revisionKm: {} },
-  { id: "preset-filtro-aceite", name: "Filtro de aceite", intervalKm: "15000", intervalMonths: "12", revisionKm: {} },
-  { id: "preset-filtro-combustible", name: "Filtro de combustible", intervalKm: "60000", intervalMonths: "48", revisionKm: {} },
-  { id: "preset-filtro-aire", name: "Filtro de aire", intervalKm: "30000", intervalMonths: "24", revisionKm: {} },
-  { id: "preset-filtro-habitaculo", name: "Filtro de habitáculo", intervalKm: "15000", intervalMonths: "12", revisionKm: {} },
-  { id: "preset-liquido-frenos", name: "Líquido de frenos", intervalKm: "", intervalMonths: "24", revisionKm: {} },
-  { id: "preset-refrigerante", name: "Líquido refrigerante", intervalKm: "", intervalMonths: "60", revisionKm: {} },
-  { id: "preset-correa-alternador", name: "Correa de alternador", intervalKm: "90000", intervalMonths: "60", revisionKm: {} },
-  { id: "preset-aceite-transmision", name: "Aceite de transmisión", intervalKm: "60000", intervalMonths: "60", revisionKm: {} },
-  { id: "preset-pastillas", name: "Pastillas de freno", intervalKm: "45000", intervalMonths: "", revisionKm: {} },
+  { id: "preset-aceite", name: "Aceite", intervalKm: "15000", intervalMonths: "12", revisionDone: {} },
+  { id: "preset-filtro-aceite", name: "Filtro de aceite", intervalKm: "15000", intervalMonths: "12", revisionDone: {} },
+  { id: "preset-filtro-combustible", name: "Filtro de combustible", intervalKm: "60000", intervalMonths: "48", revisionDone: {} },
+  { id: "preset-filtro-aire", name: "Filtro de aire", intervalKm: "30000", intervalMonths: "24", revisionDone: {} },
+  { id: "preset-filtro-habitaculo", name: "Filtro de habitáculo", intervalKm: "15000", intervalMonths: "12", revisionDone: {} },
+  { id: "preset-liquido-frenos", name: "Líquido de frenos", intervalKm: "", intervalMonths: "24", revisionDone: {} },
+  { id: "preset-refrigerante", name: "Líquido refrigerante", intervalKm: "", intervalMonths: "60", revisionDone: {} },
+  { id: "preset-correa-alternador", name: "Correa de alternador", intervalKm: "90000", intervalMonths: "60", revisionDone: {} },
+  { id: "preset-aceite-transmision", name: "Aceite de transmisión", intervalKm: "60000", intervalMonths: "60", revisionDone: {} },
+  { id: "preset-pastillas", name: "Pastillas de freno", intervalKm: "45000", intervalMonths: "", revisionDone: {} },
 ];
 
 export const GENERIC_MAINTENANCE: MaintenanceItem[] = [
-  { id: "preset-aceite", name: "Aceite", intervalKm: "15000", intervalMonths: "12", revisionKm: {} },
-  { id: "preset-filtro-aceite", name: "Filtro de aceite", intervalKm: "15000", intervalMonths: "12", revisionKm: {} },
-  { id: "preset-filtro-aire", name: "Filtro de aire", intervalKm: "30000", intervalMonths: "24", revisionKm: {} },
-  { id: "preset-liquido-frenos", name: "Líquido de frenos", intervalKm: "", intervalMonths: "24", revisionKm: {} },
+  { id: "preset-aceite", name: "Aceite", intervalKm: "15000", intervalMonths: "12", revisionDone: {} },
+  { id: "preset-filtro-aceite", name: "Filtro de aceite", intervalKm: "15000", intervalMonths: "12", revisionDone: {} },
+  { id: "preset-filtro-aire", name: "Filtro de aire", intervalKm: "30000", intervalMonths: "24", revisionDone: {} },
+  { id: "preset-liquido-frenos", name: "Líquido de frenos", intervalKm: "", intervalMonths: "24", revisionDone: {} },
 ];
 
 export function maintenanceForName(name: string): MaintenanceItem[] {
@@ -134,11 +135,11 @@ function str(v: unknown): string {
   return typeof v === "string" ? v : "";
 }
 
-function parseRevisionKm(raw: unknown): Record<string, string> {
+function parseRevisionDone(raw: unknown): Record<string, boolean> {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
-  const out: Record<string, string> = {};
+  const out: Record<string, boolean> = {};
   for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
-    if (typeof value === "string") out[key] = value;
+    if (typeof value === "boolean") out[key] = value;
   }
   return out;
 }
@@ -155,7 +156,7 @@ export function parseMaintenanceItems(raw: unknown): MaintenanceItem[] {
           name: o.name,
           intervalKm: str(o.intervalKm),
           intervalMonths: str(o.intervalMonths),
-          revisionKm: parseRevisionKm(o.revisionKm),
+          revisionDone: parseRevisionDone(o.revisionDone),
           warnKm: str(o.warnKm),
           warnMonths: str(o.warnMonths),
         });
@@ -241,7 +242,7 @@ export function parseMaintenanceRevisions(raw: unknown): MaintenanceRevision[] {
     if (item && typeof item === "object") {
       const o = item as Record<string, unknown>;
       if (typeof o.id === "string" && typeof o.vehicleId === "string") {
-        out.push({ id: o.id, vehicleId: o.vehicleId, date: str(o.date) });
+        out.push({ id: o.id, vehicleId: o.vehicleId, date: str(o.date), km: str(o.km) });
       }
     }
   }
@@ -390,8 +391,10 @@ export function lastFilledRevisionKm(
   revisions: MaintenanceRevision[]
 ): { km: string; date: string } | null {
   for (let i = revisions.length - 1; i >= 0; i--) {
-    const km = item.revisionKm[revisions[i].id];
-    if (km && km.trim() !== "") return { km, date: revisions[i].date };
+    const rev = revisions[i];
+    if (item.revisionDone[rev.id] && rev.km.trim() !== "") {
+      return { km: rev.km, date: rev.date };
+    }
   }
   return null;
 }

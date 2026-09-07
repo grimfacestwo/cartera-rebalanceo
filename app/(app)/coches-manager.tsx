@@ -450,7 +450,7 @@ export default function CochesManager() {
       name: "",
       intervalKm: "",
       intervalMonths: "",
-      revisionKm: {},
+      revisionDone: {},
     };
     setState((s) =>
       s
@@ -478,7 +478,7 @@ export default function CochesManager() {
         : s
     );
 
-  const setRevisionKm = (itemId: string, revisionId: string, km: string) =>
+  const toggleRevisionDone = (itemId: string, revisionId: string) =>
     setState((s) =>
       s
         ? {
@@ -488,7 +488,9 @@ export default function CochesManager() {
                 ? {
                     ...v,
                     maintenance: v.maintenance.map((i) =>
-                      i.id === itemId ? { ...i, revisionKm: { ...i.revisionKm, [revisionId]: km } } : i
+                      i.id === itemId
+                        ? { ...i, revisionDone: { ...i.revisionDone, [revisionId]: !i.revisionDone[revisionId] } }
+                        : i
                     ),
                   }
                 : v
@@ -499,13 +501,20 @@ export default function CochesManager() {
 
   const addMaintenanceRevision = () => {
     if (!active) return;
-    const rev: MaintenanceRevision = { id: uid(), vehicleId: active.id, date: "" };
+    const rev: MaintenanceRevision = { id: uid(), vehicleId: active.id, date: "", km: "" };
     setState((s) => (s ? { ...s, maintenanceRevisions: [...s.maintenanceRevisions, rev] } : s));
   };
 
   const deleteRevisionColumn = (id: string) =>
     setState((s) =>
       s ? { ...s, maintenanceRevisions: s.maintenanceRevisions.filter((r) => r.id !== id) } : s
+    );
+
+  const updateRevisionKm = (id: string, km: string) =>
+    setState((s) =>
+      s
+        ? { ...s, maintenanceRevisions: s.maintenanceRevisions.map((r) => (r.id === id ? { ...r, km } : r)) }
+        : s
     );
 
   const updateRevisionDate = (id: string, date: string) =>
@@ -722,7 +731,6 @@ export default function CochesManager() {
                               alignItems: "center",
                               justifyContent: "space-between",
                               gap: "0.25rem",
-                              fontWeight: 500,
                             }}
                           >
                             <span>Revisión {idx + 1}</span>
@@ -739,8 +747,15 @@ export default function CochesManager() {
                             type="date"
                             value={rev.date}
                             onChange={(e) => updateRevisionDate(rev.id, e.target.value)}
-                            style={{ ...inputStyle, marginTop: "0.25rem" }}
+                            className={c.mntFlatInput}
                             aria-label={`Fecha de revisión ${idx + 1}`}
+                          />
+                          <input
+                            value={rev.km}
+                            onChange={(e) => updateRevisionKm(rev.id, e.target.value)}
+                            placeholder="Km"
+                            className={c.mntFlatInput}
+                            aria-label={`Km de la revisión ${idx + 1}`}
                           />
                         </th>
                       ))}
@@ -778,15 +793,12 @@ export default function CochesManager() {
                               value={m.name}
                               onChange={(e) => updateMaintenance(m.id, { name: e.target.value })}
                               placeholder="Elemento (aceite, filtros…)"
-                              style={inputStyle}
+                              className={c.mntFlatInput}
                               aria-label="Nombre del mantenimiento"
                             />
                             <p
-                              style={{
-                                color: MNT_STATUS_COLORS[status],
-                                fontSize: "0.75rem",
-                                margin: "0.3rem 0 0",
-                              }}
+                              className={c.mntStatusMsg}
+                              style={{ color: MNT_STATUS_COLORS[status] }}
                               title={sourceTitle}
                             >
                               {maintenanceMessage(m, active.currentKm, derived.km, derived.date)}
@@ -797,7 +809,7 @@ export default function CochesManager() {
                               value={m.intervalKm}
                               onChange={(e) => updateMaintenance(m.id, { intervalKm: e.target.value })}
                               placeholder="Cada X km"
-                              style={inputStyle}
+                              className={c.mntFlatInput}
                               aria-label="Intervalo en kilómetros"
                             />
                           </td>
@@ -806,7 +818,7 @@ export default function CochesManager() {
                               value={m.intervalMonths}
                               onChange={(e) => updateMaintenance(m.id, { intervalMonths: e.target.value })}
                               placeholder="Cada X meses"
-                              style={inputStyle}
+                              className={c.mntFlatInput}
                               aria-label="Intervalo en meses"
                             />
                           </td>
@@ -815,7 +827,7 @@ export default function CochesManager() {
                               value={m.warnKm ?? ""}
                               onChange={(e) => updateMaintenance(m.id, { warnKm: e.target.value })}
                               placeholder="Avisar a X km"
-                              style={inputStyle}
+                              className={c.mntFlatInput}
                               aria-label="Avisar a X kilómetros de margen"
                               title="Con cuántos km de margen pasar a 'próximo' (vacío = 2000)"
                             />
@@ -825,22 +837,33 @@ export default function CochesManager() {
                               value={m.warnMonths ?? ""}
                               onChange={(e) => updateMaintenance(m.id, { warnMonths: e.target.value })}
                               placeholder="Avisar a X meses"
-                              style={inputStyle}
+                              className={c.mntFlatInput}
                               aria-label="Avisar a X meses de margen"
                               title="Con cuántos meses de margen pasar a 'próximo' (vacío = 2)"
                             />
                           </td>
-                          {vehicleRevisions.map((rev, idx) => (
-                            <td key={rev.id} className={c.mntRevisionCell}>
-                              <input
-                                value={m.revisionKm[rev.id] ?? ""}
-                                onChange={(e) => setRevisionKm(m.id, rev.id, e.target.value)}
-                                placeholder="km"
-                                style={inputStyle}
-                                aria-label={`Km de ${m.name || "elemento"} en revisión ${idx + 1}`}
-                              />
-                            </td>
-                          ))}
+                          {vehicleRevisions.map((rev, idx) => {
+                            const done = m.revisionDone[rev.id] === true;
+                            return (
+                              <td
+                                key={rev.id}
+                                className={`${c.mntRevisionCell} ${done ? c.mntRevisionDone : c.mntRevisionPending}`}
+                                onClick={() => toggleRevisionDone(m.id, rev.id)}
+                                role="button"
+                                tabIndex={0}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    toggleRevisionDone(m.id, rev.id);
+                                  }
+                                }}
+                                aria-label={`${m.name || "Elemento"} hecho en revisión ${idx + 1}`}
+                                title={done ? "Hecho en esta revisión" : "No hecho en esta revisión — clic para marcar"}
+                              >
+                                {done ? "✓" : "•"}
+                              </td>
+                            );
+                          })}
                           <td className={c.mntAddRevisionCell} />
                         </tr>
                       );
