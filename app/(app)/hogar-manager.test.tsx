@@ -35,6 +35,7 @@ function buildMockState(): PortfolioState {
     catRules: [],
     planTargets: {},
     rowOrder: [],
+    contributions: [],
   };
 }
 
