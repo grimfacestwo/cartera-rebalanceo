@@ -1,13 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
   addFixedRowToTemplate,
+  addPuntualExpense,
   computeMovedRowOrder,
+  deletePuntualExpense,
   deleteRowFromMonths,
   deleteRowFromTemplate,
+  patchPuntualExpense,
   patchRowInMonths,
   patchRowTemplate,
   seedFixedRowIntoMonths,
   toggleCellPaid,
+  togglePuntualPaid,
 } from "./rows";
 import type { SummaryCategoryGroup, SummaryRow } from "./matrix";
 import { DEFAULT_BANKS, type Expense, type FixedExpense, type MonthData } from "./state";
@@ -160,6 +164,47 @@ describe("deleteRowFromTemplate / deleteRowFromMonths", () => {
     const row = variableRow({});
     expect(deleteRowFromTemplate(tmpl, row)).toBe(tmpl);
     expect(deleteRowFromMonths(months, row)["2026-01"].expenses).toHaveLength(0);
+  });
+});
+
+describe("addPuntualExpense / togglePuntualPaid / patchPuntualExpense / deletePuntualExpense", () => {
+  it("añade un gasto puntual solo al mes indicado, sin recurring", () => {
+    const months: Record<string, MonthData> = { "2026-09": month({}) };
+    const next = addPuntualExpense(months, "2026-09", { id: "p1", name: "Movil", amount: "255.85", bank: "ing", category: "gastos" });
+    expect(next["2026-09"].expenses).toEqual([
+      { id: "p1", name: "Movil", amount: "255.85", type: "variable", bank: "ing", paid: false, category: "gastos", recurring: false },
+    ]);
+  });
+
+  it("no hace nada si el mes no existe", () => {
+    const months: Record<string, MonthData> = {};
+    expect(addPuntualExpense(months, "2026-09", { id: "p1", name: "Movil", amount: "1", bank: "ing", category: "gastos" })).toBe(months);
+  });
+
+  it("alterna pagado solo del gasto puntual indicado, no de otros del mismo mes", () => {
+    const months: Record<string, MonthData> = {
+      "2026-09": month({ expenses: [expense({ id: "p1", name: "IBI", recurring: false }), expense({ id: "p2", name: "Basura", recurring: false })] }),
+    };
+    const next = togglePuntualPaid(months, "2026-09", "p1");
+    expect(next["2026-09"].expenses.find((e) => e.id === "p1")?.paid).toBe(true);
+    expect(next["2026-09"].expenses.find((e) => e.id === "p2")?.paid).toBe(false);
+  });
+
+  it("aplica el patch solo al gasto puntual indicado", () => {
+    const months: Record<string, MonthData> = {
+      "2026-09": month({ expenses: [expense({ id: "p1", name: "Movil", amount: "255.85", recurring: false })] }),
+    };
+    const next = patchPuntualExpense(months, "2026-09", "p1", { amount: "200" });
+    expect(next["2026-09"].expenses[0].amount).toBe("200");
+  });
+
+  it("elimina solo el gasto puntual indicado de su mes", () => {
+    const months: Record<string, MonthData> = {
+      "2026-09": month({ expenses: [expense({ id: "p1", name: "IBI", recurring: false }), expense({ id: "p2", name: "Basura", recurring: false })] }),
+    };
+    const next = deletePuntualExpense(months, "2026-09", "p1");
+    expect(next["2026-09"].expenses).toHaveLength(1);
+    expect(next["2026-09"].expenses[0].id).toBe("p2");
   });
 });
 

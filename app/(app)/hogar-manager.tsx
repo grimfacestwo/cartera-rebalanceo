@@ -7,13 +7,17 @@ import { putState } from "@/lib/persist";
 import { DEFAULT_HOGAR_UI_PREFS, parseHogarUiPrefs, type HogarUiPrefs } from "@/lib/hogar-ui-prefs";
 import {
   addFixedRowToTemplate,
+  addPuntualExpense,
   computeMovedRowOrder,
+  deletePuntualExpense,
   deleteRowFromMonths,
   deleteRowFromTemplate,
+  patchPuntualExpense,
   patchRowInMonths,
   patchRowTemplate,
   seedFixedRowIntoMonths,
   toggleCellPaid as toggleCellPaidInMonths,
+  togglePuntualPaid as togglePuntualPaidInMonths,
 } from "@/lib/rows";
 import {
   BANK_IDS,
@@ -40,6 +44,7 @@ import {
   type BankId,
   type CategoryId,
   type CategoryRule,
+  type Expense,
   type FixedExpense,
   type Goal,
   type MonthData,
@@ -49,6 +54,7 @@ import {
 } from "@/lib/state";
 import { PlanDonut } from "./hogar-plan-donut";
 import { ExpenseMatrix } from "./hogar-expense-matrix";
+import { BankPicker } from "./bank-picker";
 import styles from "./hogar.module.css";
 
 const currency = new Intl.NumberFormat("es-ES", {
@@ -98,6 +104,10 @@ export default function HogarManager() {
   const [planTargets, setPlanTargets] = useState<Record<string, string>>({ ...PLAN_TARGETS_DEFAULT });
   const [rowOrder, setRowOrder] = useState<string[]>([]);
   const [contributions, setContributions] = useState<PortfolioContribution[]>([]);
+  const [newPuntualName, setNewPuntualName] = useState("");
+  const [newPuntualAmount, setNewPuntualAmount] = useState("");
+  const [newPuntualBank, setNewPuntualBank] = useState<BankId | "">("");
+  const [newPuntualCategory, setNewPuntualCategory] = useState<CategoryId>("gastos");
   const skipOnce = useRef(true);
   const pendingStateRef = useRef<PortfolioState | null>(null);
   // Última versión conocida del estado en el servidor. Viaja en cada
@@ -277,6 +287,11 @@ export default function HogarManager() {
   );
   const activeDaysRemaining = daysRemaining(activeMonth);
 
+  // Gastos puntuales (no recurrentes) del mes activo: no salen en Resumen
+  // por mes (esa tabla solo compara gastos recurrentes entre meses), pero sí
+  // cuentan en Pendiente/Disponible de su banco si están sin pagar.
+  const puntualExpenses = activeData.expenses.filter((e) => !e.recurring);
+
   const bankPendientes = (bankId: BankId) => {
     return allActiveExpenses
       .filter((e) => e.bank === bankId && !e.paid)
@@ -424,6 +439,33 @@ export default function HogarManager() {
     setFixedExpenses((prev) => addFixedRowToTemplate(prev, newRow));
     setMonths((prev) => seedFixedRowIntoMonths(prev, newRow));
   };
+
+  // Gastos puntuales (no recurrentes): a diferencia de los fijos, viven solo
+  // en el mes activo, no en una plantilla ni sembrados en otros meses.
+  const addPuntual = () => {
+    const name = newPuntualName.trim();
+    if (!name) return;
+    setMonths((prev) =>
+      addPuntualExpense(prev, activeMonth, {
+        id: newId(),
+        name,
+        amount: newPuntualAmount,
+        bank: newPuntualBank,
+        category: newPuntualCategory,
+      })
+    );
+    setNewPuntualName("");
+    setNewPuntualAmount("");
+    setNewPuntualBank("");
+    setNewPuntualCategory("gastos");
+  };
+
+  const togglePuntual = (id: string) => setMonths((prev) => togglePuntualPaidInMonths(prev, activeMonth, id));
+
+  const setPuntualField = (id: string, patch: Partial<Pick<Expense, "name" | "amount" | "bank" | "category">>) =>
+    setMonths((prev) => patchPuntualExpense(prev, activeMonth, id, patch));
+
+  const deletePuntual = (id: string) => setMonths((prev) => deletePuntualExpense(prev, activeMonth, id));
 
   // Elimina el gasto de una fila del resumen de TODOS los meses donde
   // aparece (y de la plantilla si es fijo), igual que las demás ediciones
@@ -576,6 +618,114 @@ export default function HogarManager() {
                 onAddRow={addFixedRow}
               />
               <p className={styles.note}>Los gastos puntuales no recurrentes no aparecen aquí.</p>
+            </section>
+
+            {/* Gastos puntuales (no recurrentes) */}
+            <section className={styles.card}>
+              <h2>Gastos puntuales ({monthShortLabel(activeMonth)})</h2>
+              <p className={styles.note}>
+                No aparecen en Resumen por mes (esa tabla solo compara gastos recurrentes entre
+                meses), pero si están sin pagar sí restan del Disponible de su banco.
+              </p>
+              {puntualExpenses.length === 0 && (
+                <p className={styles.note}>Sin gastos puntuales este mes.</p>
+              )}
+              {puntualExpenses.map((e) => (
+                <div key={e.id} className={styles.addExpenseBar}>
+                  <input
+                    type="text"
+                    value={e.name}
+                    onChange={(ev) => setPuntualField(e.id, { name: ev.target.value })}
+                    className={styles.expenseInput}
+                    aria-label={`Nombre de ${e.name || "gasto puntual"}`}
+                    style={{ width: "9rem" }}
+                  />
+                  <div className={styles.amountCell}>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={e.amount}
+                      onChange={(ev) => {
+                        const v = ev.target.value;
+                        if (v === "" || /^\d*\.?\d*$/.test(v)) setPuntualField(e.id, { amount: v });
+                      }}
+                      className={styles.expenseInput}
+                      aria-label={`Importe de ${e.name || "gasto puntual"}`}
+                      style={{ width: "4rem" }}
+                    />
+                    <span className={styles.amountUnit}>€</span>
+                  </div>
+                  <BankPicker
+                    value={e.bank}
+                    onChange={(b) => setPuntualField(e.id, { bank: b })}
+                    ariaLabel={`Banco de ${e.name || "gasto puntual"}`}
+                  />
+                  <select
+                    value={e.category}
+                    onChange={(ev) => setPuntualField(e.id, { category: ev.target.value as CategoryId })}
+                    className={styles.expenseSelect}
+                    aria-label={`Categoría de ${e.name || "gasto puntual"}`}
+                  >
+                    {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
+                  </select>
+                  <label style={{ display: "flex", alignItems: "center", gap: "0.3rem", fontSize: "0.85rem" }}>
+                    <input
+                      type="checkbox"
+                      checked={e.paid}
+                      onChange={() => togglePuntual(e.id)}
+                      aria-label={`${e.name || "Gasto puntual"} pagado`}
+                    />
+                    Pagado
+                  </label>
+                  <button
+                    type="button"
+                    className={styles.removeBtn}
+                    onClick={() => deletePuntual(e.id)}
+                    aria-label={`Eliminar ${e.name || "gasto puntual"}`}
+                    title="Eliminar"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+              <div className={styles.addExpenseBar}>
+                <input
+                  type="text"
+                  value={newPuntualName}
+                  onChange={(ev) => setNewPuntualName(ev.target.value)}
+                  placeholder="Nuevo gasto puntual"
+                  className={styles.expenseInput}
+                  aria-label="Nombre del nuevo gasto puntual"
+                  style={{ width: "9rem" }}
+                  onKeyDown={(ev) => { if (ev.key === "Enter") addPuntual(); }}
+                />
+                <div className={styles.amountCell}>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={newPuntualAmount}
+                    onChange={(ev) => {
+                      const v = ev.target.value;
+                      if (v === "" || /^\d*\.?\d*$/.test(v)) setNewPuntualAmount(v);
+                    }}
+                    placeholder="0"
+                    className={styles.expenseInput}
+                    aria-label="Importe del nuevo gasto puntual"
+                    style={{ width: "4rem" }}
+                  />
+                  <span className={styles.amountUnit}>€</span>
+                </div>
+                <BankPicker value={newPuntualBank} onChange={setNewPuntualBank} ariaLabel="Banco del nuevo gasto puntual" />
+                <select
+                  value={newPuntualCategory}
+                  onChange={(ev) => setNewPuntualCategory(ev.target.value as CategoryId)}
+                  className={styles.expenseSelect}
+                  aria-label="Categoría del nuevo gasto puntual"
+                >
+                  {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
+                </select>
+                <button type="button" className={styles.addBtn} onClick={addPuntual}>+ Añadir</button>
+              </div>
             </section>
 
             {/* Banks */}

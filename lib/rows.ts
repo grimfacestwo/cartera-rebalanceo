@@ -56,6 +56,73 @@ export function toggleCellPaid(
   return { ...months, [monthKey]: { ...m, expenses: m.expenses.map((e) => (matchesRow(e, row) ? { ...e, paid: !e.paid } : e)) } };
 }
 
+export type NewPuntualInput = {
+  id: string;
+  name: string;
+  amount: string;
+  bank: BankId | "";
+  category: CategoryId;
+};
+
+/**
+ * Añade un gasto puntual (no recurrente) al mes indicado. A diferencia de
+ * los gastos fijos/variables recurrentes, un puntual vive solo en ESE mes:
+ * no se siembra en otros meses ni tiene plantilla asociada.
+ */
+export function addPuntualExpense(
+  months: Record<string, MonthData>,
+  monthKey: string,
+  input: NewPuntualInput
+): Record<string, MonthData> {
+  const m = months[monthKey];
+  if (!m) return months;
+  const expense: Expense = {
+    id: input.id,
+    name: input.name,
+    amount: input.amount,
+    type: "variable",
+    bank: input.bank,
+    paid: false,
+    category: input.category,
+    recurring: false,
+  };
+  return { ...months, [monthKey]: { ...m, expenses: [...m.expenses, expense] } };
+}
+
+/** Alterna pagado/pendiente de un gasto puntual concreto (por id) en su mes. */
+export function togglePuntualPaid(
+  months: Record<string, MonthData>,
+  monthKey: string,
+  id: string
+): Record<string, MonthData> {
+  const m = months[monthKey];
+  if (!m) return months;
+  return { ...months, [monthKey]: { ...m, expenses: m.expenses.map((e) => (e.id === id ? { ...e, paid: !e.paid } : e)) } };
+}
+
+/** Aplica cambios de campos (nombre/importe/banco/categoría) a un gasto puntual concreto. */
+export function patchPuntualExpense(
+  months: Record<string, MonthData>,
+  monthKey: string,
+  id: string,
+  patch: Partial<Pick<Expense, "name" | "amount" | "bank" | "category">>
+): Record<string, MonthData> {
+  const m = months[monthKey];
+  if (!m) return months;
+  return { ...months, [monthKey]: { ...m, expenses: m.expenses.map((e) => (e.id === id ? { ...e, ...patch } : e)) } };
+}
+
+/** Elimina un gasto puntual concreto de su mes. */
+export function deletePuntualExpense(
+  months: Record<string, MonthData>,
+  monthKey: string,
+  id: string
+): Record<string, MonthData> {
+  const m = months[monthKey];
+  if (!m) return months;
+  return { ...months, [monthKey]: { ...m, expenses: m.expenses.filter((e) => e.id !== id) } };
+}
+
 export type NewRowInput = {
   id: string;
   name: string;
