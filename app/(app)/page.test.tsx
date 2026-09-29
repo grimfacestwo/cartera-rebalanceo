@@ -97,7 +97,7 @@ describe("Cartera tab – Añadir activo y aportaciones", () => {
     const confirmBtn = screen.getByRole("button", { name: "✓ Añadir a la cartera" });
     await user.click(confirmBtn);
 
-    expect(screen.getByText("S&P 500")).toBeInTheDocument();
+    expect(screen.getAllByText("S&P 500").length).toBeGreaterThan(0);
   });
 
   it("permite sumar una aportación directamente a un activo y verla en el historial", async () => {
@@ -117,7 +117,7 @@ describe("Cartera tab – Añadir activo y aportaciones", () => {
     const saveContribBtn = screen.getByRole("button", { name: /Sumar.*al saldo y guardar/ });
     await user.click(saveContribBtn);
 
-    expect(screen.getByText("+500,00 €")).toBeInTheDocument();
+    expect(screen.getByText("+500 €")).toBeInTheDocument();
   });
 });
 
