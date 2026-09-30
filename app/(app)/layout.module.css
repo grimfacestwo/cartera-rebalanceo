@@ -25,6 +25,7 @@
 
 .main {
   flex: 1;
+  min-width: 0;
   margin-left: 200px;
   transition: margin-left 0.2s ease;
 }
