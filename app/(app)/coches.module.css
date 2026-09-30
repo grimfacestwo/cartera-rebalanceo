@@ -4,6 +4,24 @@
 
 .mntWrap {
   overflow-x: auto;
+  scrollbar-color: var(--c-muted) transparent;
+}
+
+.mntWrap::-webkit-scrollbar {
+  height: 10px;
+}
+
+.mntWrap::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.mntWrap::-webkit-scrollbar-thumb {
+  background: var(--c-muted);
+  border-radius: 6px;
+}
+
+.mntWrap::-webkit-scrollbar-thumb:hover {
+  background: var(--c-text);
 }
 
 .mntTable {

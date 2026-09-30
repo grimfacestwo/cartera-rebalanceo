@@ -587,7 +587,7 @@ export default function CochesManager() {
       {active ? (
         <>
           <div style={{ ...cardStyle, marginBottom: "1.25rem" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
+            <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.75rem" }}>
               <h2 style={{ fontSize: "0.95rem", margin: 0, color: "var(--c-text)", flex: 1 }}>
                 Ficha del vehículo
               </h2>
@@ -700,7 +700,7 @@ export default function CochesManager() {
           )}
 
           <div style={{ ...cardStyle, marginBottom: "1.25rem" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
+            <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.75rem" }}>
               <h2 style={{ fontSize: "0.95rem", margin: 0, color: "var(--c-text)", flex: 1 }}>
                 Mantenimiento
               </h2>
@@ -853,7 +853,7 @@ export default function CochesManager() {
           </div>
 
           <div style={{ ...cardStyle, marginBottom: "1.25rem" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
+            <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.75rem" }}>
               <h2 style={{ fontSize: "0.95rem", margin: 0, color: "var(--c-text)", flex: 1 }}>Talleres</h2>
             </div>
             <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
@@ -908,7 +908,7 @@ export default function CochesManager() {
           </div>
 
           <div style={{ ...cardStyle, marginBottom: "1.25rem" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
+            <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.75rem" }}>
               <h2 style={{ fontSize: "0.95rem", margin: 0, color: "var(--c-text)", flex: 1 }}>
                 Reparaciones
                 <span style={{ color: "var(--c-muted)", fontSize: "0.8rem", fontWeight: 400, marginLeft: "0.5rem" }}>
@@ -1101,7 +1101,7 @@ export default function CochesManager() {
           </div>
 
           <div style={{ ...cardStyle, marginBottom: "1.25rem" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
+            <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.75rem" }}>
               <h2 style={{ fontSize: "0.95rem", margin: 0, color: "var(--c-text)", flex: 1 }}>Documentos</h2>
             </div>
             <input
@@ -1158,7 +1158,7 @@ export default function CochesManager() {
           </div>
 
           <div style={cardStyle}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
+            <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.75rem" }}>
               <h2 style={{ fontSize: "0.95rem", margin: 0, color: "var(--c-text)", flex: 1 }}>
                 Revisiones
                 <span style={{ color: "var(--c-muted)", fontSize: "0.8rem", fontWeight: 400, marginLeft: "0.5rem" }}>
