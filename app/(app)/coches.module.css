@@ -71,13 +71,13 @@
   color: var(--c-muted);
 }
 
-/* max-width explícito (9.2rem = 10rem de .mntNameCell menos su padding):
+/* max-width explícito (17.2rem = 18rem de .mntNameCell menos su padding):
    sin él, table-layout:fixed igual deja que este texto sin saltos de línea
    fuerce la columna a crecer por encima de su ancho declarado, empujando
    las columnas sticky siguientes a superponerse con esta. */
 .mntStatusMsg {
   display: block;
-  max-width: 9.2rem;
+  max-width: 17.2rem;
   margin: 0.3rem 0 0;
   font-size: 0.75rem;
   white-space: nowrap;
@@ -98,7 +98,7 @@
 .mntNameHeader,
 .mntNameCell {
   box-sizing: border-box;
-  width: 10rem;
+  width: 18rem;
   position: sticky;
   left: 3rem;
   background: var(--c-card);
@@ -112,7 +112,7 @@
   box-sizing: border-box;
   width: 5.5rem;
   position: sticky;
-  left: 13rem;
+  left: 21rem;
   background: var(--c-card);
   z-index: 1;
 }
@@ -122,7 +122,7 @@
   box-sizing: border-box;
   width: 5.5rem;
   position: sticky;
-  left: 18.5rem;
+  left: 26.5rem;
   background: var(--c-card);
   z-index: 1;
 }
