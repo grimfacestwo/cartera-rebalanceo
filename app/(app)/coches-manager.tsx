@@ -774,6 +774,8 @@ export default function CochesManager() {
                           : derived.source === "manual"
                             ? "Km de la última revisión rellenada"
                             : "Sin dato: rellena una revisión o añade una reparación con su km";
+                      const statusMessage = maintenanceMessage(m, active.currentKm, derived.km, derived.date);
+                      const statusMessageTitle = `${statusMessage}\n\n${sourceTitle}`;
                       return (
                         <tr key={m.id}>
                           <td className={c.mntActionsCell}>
@@ -797,9 +799,9 @@ export default function CochesManager() {
                             <p
                               className={c.mntStatusMsg}
                               style={{ color: MNT_STATUS_COLORS[status] }}
-                              title={sourceTitle}
+                              title={statusMessageTitle}
                             >
-                              {maintenanceMessage(m, active.currentKm, derived.km, derived.date)}
+                              {statusMessage}
                             </p>
                           </td>
                           <td className={c.mntIntervalKmCell}>
