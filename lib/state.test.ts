@@ -10,7 +10,6 @@ import {
   DEFAULT_ASSETS,
   DEFAULT_VALUES,
   effectiveAmount,
-  emergencyFundAmount,
   expenseAppliesToMonth,
   matchCategory,
   monthLabel,
@@ -19,14 +18,15 @@ import {
   parseExpenses,
   parseFixedExpenses,
   parseGoals,
+  parseBankReserved,
   parsePlanTargets,
   parseState,
   parseContributions,
+  reservedAmount,
   totalContributed,
   assetContributed,
   PLAN_TARGETS_DEFAULT,
   sortMonthKeys,
-  type Goal,
   type MonthData,
 } from "./state";
 
@@ -471,29 +471,33 @@ describe("parsePlanTargets", () => {
   });
 });
 
-function makeGoal(overrides: Partial<Goal> = {}): Goal {
-  return { id: "g1", name: "Fondo de emergencia", target: "6000", current: "2200", bank: "trade", rate: "", notes: "", ...overrides };
-}
-
-describe("emergencyFundAmount", () => {
-  it("devuelve el importe ahorrado del objetivo 'Fondo de emergencia'", () => {
-    expect(emergencyFundAmount([makeGoal()])).toBe(2200);
+describe("parseBankReserved", () => {
+  it("acepta solo valores string de bancos conocidos", () => {
+    expect(parseBankReserved({ trade: "2200", santander: "1000", ing: 999, otro: "5" })).toEqual({
+      trade: "2200",
+      santander: "1000",
+    });
   });
 
-  it("no distingue mayúsculas ni espacios en el nombre", () => {
-    expect(emergencyFundAmount([makeGoal({ name: "  FONDO DE EMERGENCIA  " })])).toBe(2200);
+  it("devuelve {} para datos inválidos", () => {
+    expect(parseBankReserved(null)).toEqual({});
+    expect(parseBankReserved("mal")).toEqual({});
+    expect(parseBankReserved([])).toEqual({});
   });
+});
 
-  it("devuelve 0 si no existe ese objetivo o no hay objetivos", () => {
-    expect(emergencyFundAmount([])).toBe(0);
-    expect(emergencyFundAmount([makeGoal({ name: "Vacaciones" })])).toBe(0);
+describe("reservedAmount", () => {
+  it("devuelve el importe reservado de un banco o 0 si no hay", () => {
+    expect(reservedAmount({ trade: "2200" }, "trade")).toBe(2200);
+    expect(reservedAmount({ trade: "2200" }, "santander")).toBe(0);
+    expect(reservedAmount({}, "trade")).toBe(0);
   });
 });
 
 describe("computeDisponible", () => {
   const monthKey = currentMonthKey();
 
-  it("Saldo total de bancos menos pendientes, sin objetivos", () => {
+  it("Saldo total de bancos menos pendientes, sin reservas", () => {
     const months: Record<string, MonthData> = {
       [monthKey]: {
         banks: { ing: "1000", santander: "500", trade: "300" },
@@ -505,10 +509,10 @@ describe("computeDisponible", () => {
       },
     };
     // (1000+500+300) − 200 pendiente (el pagado no cuenta) = 1600
-    expect(computeDisponible(months, [], monthKey)).toBe(1600);
+    expect(computeDisponible(months, {}, monthKey)).toBe(1600);
   });
 
-  it("descuenta el Fondo de emergencia solo del saldo de Trade Republic", () => {
+  it("descuenta lo reservado del saldo de cada banco por separado", () => {
     const months: Record<string, MonthData> = {
       [monthKey]: {
         banks: { ing: "1000", santander: "0", trade: "500" },
@@ -517,11 +521,11 @@ describe("computeDisponible", () => {
       },
     };
     // Trade: 500 − 2200 = −1700; total bancos = 1000 + 0 − 1700 = −700; sin pendientes
-    expect(computeDisponible(months, [makeGoal()], monthKey)).toBe(-700);
+    expect(computeDisponible(months, { trade: "2200" }, monthKey)).toBe(-700);
   });
 
   it("devuelve 0 si el mes no existe", () => {
-    expect(computeDisponible({}, [], monthKey)).toBe(0);
+    expect(computeDisponible({}, {}, monthKey)).toBe(0);
   });
 });
 

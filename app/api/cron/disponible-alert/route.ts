@@ -35,14 +35,14 @@ export async function GET(request: Request) {
   let disponible: number;
   try {
     await ensureSectionTable();
-    const { rows } = await sql<{ months: unknown; goals: unknown }>`
-      SELECT months, goals FROM portfolio_state WHERE id = 1
+    const { rows } = await sql<{ months: unknown; bankReserved: unknown }>`
+      SELECT months, bankReserved AS "bankReserved" FROM portfolio_state WHERE id = 1
     `;
     if (rows.length === 0) {
       return NextResponse.json({ ok: true, skipped: "sin estado" });
     }
     const state = parseState(rows[0]);
-    disponible = computeDisponible(state.months, state.goals, currentMonthKey());
+    disponible = computeDisponible(state.months, state.bankReserved, currentMonthKey());
   } catch {
     return NextResponse.json({ error: "No se pudo leer el estado" }, { status: 500 });
   }

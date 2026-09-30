@@ -135,6 +135,7 @@ export type PortfolioState = {
   planTargets: Record<string, string>;
   rowOrder: string[];
   contributions: PortfolioContribution[];
+  bankReserved: Partial<Record<BankId, string>>;
 };
 
 export const DEFAULT_ASSETS: AssetDef[] = [
@@ -160,6 +161,7 @@ export const DEFAULT_STATE: PortfolioState = {
   planTargets: { ...PLAN_TARGETS_DEFAULT },
   rowOrder: [],
   contributions: [],
+  bankReserved: {},
 };
 
 export const PALETTE = [
@@ -244,21 +246,30 @@ export function sortMonthKeys(keys: string[]): string[] {
   return [...keys].sort();
 }
 
-// El saldo de Trade Republic que se ve en el banco incluye el Fondo de
-// emergencia (un objetivo de ahorro, no dinero realmente disponible) — se
-// identifica por nombre porque es el único vínculo entre un Goal y "cuánto
-// del saldo bancario de un banco concreto no cuenta como libre".
-export function emergencyFundAmount(goals: Goal[]): number {
-  return Number.parseFloat(
-    goals.find((g) => g.name.trim().toLowerCase() === "fondo de emergencia")?.current ?? "",
-  ) || 0;
+export function parseBankReserved(raw: unknown): Partial<Record<BankId, string>> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const o = raw as Record<string, unknown>;
+  const out: Partial<Record<BankId, string>> = {};
+  for (const id of BANK_IDS) {
+    if (typeof o[id] === "string") out[id] = o[id] as string;
+  }
+  return out;
 }
 
-// "Disponible" del mes: saldo de bancos (Trade Republic ya descontado el
-// Fondo de emergencia) menos los gastos pendientes de ese mes. Misma fórmula
-// que "Disponible total" en Hogar — usada también por el aviso por email de
+export function reservedAmount(bankReserved: Partial<Record<BankId, string>>, id: BankId): number {
+  return Number.parseFloat(bankReserved[id] ?? "") || 0;
+}
+
+// "Disponible" del mes: saldo de bancos (cada uno menos lo que tenga
+// reservado, p.ej. un fondo de emergencia que no es dinero realmente
+// disponible) menos los gastos pendientes de ese mes. Misma fórmula que
+// "Disponible total" en Hogar — usada también por el aviso por email de
 // disponible negativo (app/api/cron/disponible-alert/route.ts).
-export function computeDisponible(months: Record<string, MonthData>, goals: Goal[], monthKey: string): number {
+export function computeDisponible(
+  months: Record<string, MonthData>,
+  bankReserved: Partial<Record<BankId, string>>,
+  monthKey: string,
+): number {
   const month = months[monthKey];
   if (!month) return 0;
   const days = daysRemaining(monthKey);
@@ -266,10 +277,9 @@ export function computeDisponible(months: Record<string, MonthData>, goals: Goal
   const totalPendientes = allExpenses
     .filter((e) => !e.paid)
     .reduce((s, e) => s + effectiveAmount(e, days), 0);
-  const efAmount = emergencyFundAmount(goals);
   const bankTotal = BANK_IDS.reduce((s, id) => {
     const raw = Number.parseFloat(month.banks[id]) || 0;
-    return s + (id === "trade" ? raw - efAmount : raw);
+    return s + (raw - reservedAmount(bankReserved, id));
   }, 0);
   return bankTotal - totalPendientes;
 }
@@ -621,5 +631,6 @@ export function parseState(raw: unknown): PortfolioState {
     planTargets: parsePlanTargets(o.planTargets),
     rowOrder: parseRowOrder(o.rowOrder),
     contributions: parseContributions(o.contributions),
+    bankReserved: parseBankReserved(o.bankReserved),
   };
 }

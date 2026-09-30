@@ -73,6 +73,9 @@ export default function Home() {
   // esta página lo resetea a vacío y se pierde el orden personalizado.
   const [rowOrder, setRowOrder] = useState<string[]>([]);
   const [contributions, setContributions] = useState<PortfolioContribution[]>([]);
+  // bankReserved no tiene UI propia aquí (se edita en /hogar) pero hay que
+  // cargarlo y reenviarlo tal cual al guardar, igual que rowOrder.
+  const [bankReserved, setBankReserved] = useState<Partial<Record<BankId, string>>>({});
   const [newFixedBank, setNewFixedBank] = useState<BankId | "">("");
   const [goalName, setGoalName] = useState("");
   const [goalTarget, setGoalTarget] = useState("");
@@ -98,6 +101,7 @@ export default function Home() {
     setPlanTargets(state.planTargets);
     setRowOrder(state.rowOrder);
     setContributions(state.contributions ?? []);
+    setBankReserved(state.bankReserved ?? {});
     skipOnce.current = true;
   };
 
@@ -128,7 +132,7 @@ export default function Home() {
   useEffect(() => {
     if (loading || loadError) return;
     if (skipOnce.current) { skipOnce.current = false; return; }
-    const state: PortfolioState = { assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder, contributions };
+    const state: PortfolioState = { assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder, contributions, bankReserved };
     pendingStateRef.current = state;
     const timer = setTimeout(async () => {
       setSaveStatus("saving");
@@ -148,7 +152,7 @@ export default function Home() {
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder, contributions, loading, loadError]);
+  }, [assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder, contributions, bankReserved, loading, loadError]);
 
   // Flush the último estado antes de cerrar/refrescar para no perder ediciones
   // que queden dentro de la ventana de debounce de 500 ms.
@@ -260,7 +264,7 @@ export default function Home() {
 
   // Export/Import
   const handleExport = () => {
-    const payload = { assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder, contributions };
+    const payload = { assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder, contributions, bankReserved };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -296,6 +300,7 @@ export default function Home() {
           setPlanTargets(state.planTargets);
           setRowOrder(state.rowOrder);
           setContributions(state.contributions ?? []);
+          setBankReserved(state.bankReserved ?? {});
         } catch {
           alert("Error al importar: archivo no válido.");
         }

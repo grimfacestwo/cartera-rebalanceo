@@ -33,13 +33,13 @@ import {
   daysInMonth,
   daysRemaining,
   effectiveAmount,
-  emergencyFundAmount,
   expenseAppliesToMonth,
   DEFAULT_FIXED_EXPENSES,
   monthLabel,
   monthShortLabel,
   parseState,
   PLAN_TARGETS_DEFAULT,
+  reservedAmount,
   sortMonthKeys,
   type BankId,
   type CategoryId,
@@ -104,6 +104,7 @@ export default function HogarManager() {
   const [planTargets, setPlanTargets] = useState<Record<string, string>>({ ...PLAN_TARGETS_DEFAULT });
   const [rowOrder, setRowOrder] = useState<string[]>([]);
   const [contributions, setContributions] = useState<PortfolioContribution[]>([]);
+  const [bankReserved, setBankReservedState] = useState<Partial<Record<BankId, string>>>({});
   const [newPuntualName, setNewPuntualName] = useState("");
   const [newPuntualAmount, setNewPuntualAmount] = useState("");
   const [newPuntualBank, setNewPuntualBank] = useState<BankId | "">("");
@@ -127,6 +128,7 @@ export default function HogarManager() {
     setPlanTargets(state.planTargets);
     setRowOrder(state.rowOrder);
     setContributions(state.contributions ?? []);
+    setBankReservedState(state.bankReserved ?? {});
     skipOnce.current = true;
   };
 
@@ -218,7 +220,7 @@ export default function HogarManager() {
   useEffect(() => {
     if (loading || loadError) return;
     if (skipOnce.current) { skipOnce.current = false; return; }
-    const state: PortfolioState = { assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder, contributions };
+    const state: PortfolioState = { assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder, contributions, bankReserved };
     pendingStateRef.current = state;
     const timer = setTimeout(async () => {
       setSaveStatus("saving");
@@ -239,7 +241,7 @@ export default function HogarManager() {
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder, contributions, loading, loadError]);
+  }, [assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder, contributions, bankReserved, loading, loadError]);
 
   // Flush el último estado antes de cerrar/refrescar para no perder ediciones
   // que queden dentro de la ventana de debounce de 500 ms.
@@ -298,13 +300,17 @@ export default function HogarManager() {
       .reduce((s, e) => s + effectiveAmount(e, activeDaysRemaining), 0);
   };
 
-  // El saldo de Trade Republic que se ve en el banco incluye el Fondo de
-  // emergencia (un objetivo de ahorro de Finanzas, no dinero realmente
-  // disponible), así que se descuenta de ese banco al calcular Disponible.
-  const efAmount = emergencyFundAmount(goals);
+  // Cada banco puede tener una cantidad "reservada" (p.ej. un fondo de
+  // emergencia) que no cuenta como dinero realmente disponible; se
+  // descuenta de su saldo al calcular Disponible.
   const bankSaldo = (bankId: BankId) => {
     const raw = Number.parseFloat(activeData.banks[bankId]) || 0;
-    return bankId === "trade" ? raw - efAmount : raw;
+    return raw - reservedAmount(bankReserved, bankId);
+  };
+  const setBankReserved = (id: BankId, v: string) => {
+    if (v === "" || /^\d*\.?\d*$/.test(v)) {
+      setBankReservedState((prev) => ({ ...prev, [id]: v }));
+    }
   };
 
   const bankTotal = BANK_IDS.reduce((s, id) => s + bankSaldo(id), 0);
@@ -742,20 +748,31 @@ export default function HogarManager() {
                       const pendItems = allActiveExpenses.filter((e) => e.bank === id && !e.paid);
                       const pendLines = pendItems.map((e) => `${e.name}: ${currency.format(effectiveAmount(e, activeDaysRemaining))}`);
                       const pendingTitle = pendLines.length ? `Pendientes en ${BANK_LABELS[id]}:\n${pendLines.join("\n")}` : `Sin pendientes en ${BANK_LABELS[id]}`;
-                      const hasEmergencyAdjustment = id === "trade" && efAmount > 0;
+                      const reserved = reservedAmount(bankReserved, id);
                       return (
                         <tr key={id}>
                           <td className={styles.cellName}>{BANK_LABELS[id]}</td>
                           <td>
                             <input type="text" inputMode="decimal" value={activeData.banks[id]} onChange={(e) => setBank(id, e.target.value)} placeholder="0" className={styles.expenseInput} aria-label={`Saldo ${BANK_LABELS[id]}`} />
-                            {hasEmergencyAdjustment && (
-                              <div
-                                className={styles.dailyEffective}
-                                title={`Saldo introducido: ${currency.format(Number.parseFloat(activeData.banks[id]) || 0)}\nFondo de emergencia: −${currency.format(efAmount)}`}
-                              >
-                                − <Money value={efAmount} /> = <Money value={saldo} />
-                              </div>
-                            )}
+                            <div className={styles.dailyEffective} style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                              <span>Reservado</span>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={bankReserved[id] ?? ""}
+                                onChange={(e) => setBankReserved(id, e.target.value)}
+                                placeholder="0"
+                                className={styles.expenseInput}
+                                style={{ width: "3.5rem" }}
+                                aria-label={`Reservado en ${BANK_LABELS[id]}`}
+                                title="Cantidad del saldo que no cuenta como disponible (p.ej. un fondo de emergencia)"
+                              />
+                              {reserved > 0 && (
+                                <span title={`Saldo introducido: ${currency.format(Number.parseFloat(activeData.banks[id]) || 0)}\nReservado: −${currency.format(reserved)}`}>
+                                  → <Money value={saldo} />
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td title={pendingTitle}><Money value={pendiente} /></td>
                           <td className={rest >= 0 ? styles.inject : styles.negative}><Money value={rest} /></td>

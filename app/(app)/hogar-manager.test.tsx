@@ -36,6 +36,7 @@ function buildMockState(): PortfolioState {
     planTargets: {},
     rowOrder: [],
     contributions: [],
+    bankReserved: {},
   };
 }
 
