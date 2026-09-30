@@ -71,7 +71,13 @@
   color: var(--c-muted);
 }
 
+/* max-width explícito (9.2rem = 10rem de .mntNameCell menos su padding):
+   sin él, table-layout:fixed igual deja que este texto sin saltos de línea
+   fuerce la columna a crecer por encima de su ancho declarado, empujando
+   las columnas sticky siguientes a superponerse con esta. */
 .mntStatusMsg {
+  display: block;
+  max-width: 9.2rem;
   margin: 0.3rem 0 0;
   font-size: 0.75rem;
   white-space: nowrap;
