@@ -34,6 +34,7 @@ export function CarteraTab({
   onDeleteContribution,
   onApplyRecommended,
   onQuickAddAsset,
+  onChangeTarget,
 }: {
   assets: AssetDef[];
   values: PortfolioValues;
@@ -60,6 +61,7 @@ export function CarteraTab({
   onDeleteContribution: (id: string, subtractFromCurrentValue?: boolean) => void;
   onApplyRecommended: () => void;
   onQuickAddAsset: (name: string, targetPct: number, initialValue: string) => void;
+  onChangeTarget: (id: string, v: string) => void;
 }) {
   // State for inline quick asset add
   const [showAddAsset, setShowAddAsset] = useState(false);
@@ -430,7 +432,28 @@ export function CarteraTab({
                           </td>
                           <td>{currency.format(r.value)}</td>
                           <td>{r.currentPct.toFixed(1)}%</td>
-                          <td>{isTotal ? "100%" : `${r.targetPct.toFixed(1)}%`}</td>
+                          <td>
+                            {isTotal ? (
+                              "100%"
+                            ) : (
+                              <>
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  value={(() => {
+                                    const a = assets.find((x) => x.id === r.id);
+                                    return a && a.targetPct !== 0 ? String(a.targetPct) : "";
+                                  })()}
+                                  onChange={(e) => onChangeTarget(r.id, e.target.value)}
+                                  placeholder="0"
+                                  className={styles.miniInput}
+                                  style={{ width: "3.5rem" }}
+                                  aria-label={`Objetivo de ${r.name} en porcentaje`}
+                                />
+                                %
+                              </>
+                            )}
+                          </td>
                           <td>
                             {isTotal ? (
                               <span className={styles.plain}>{aligned ? "—" : currency.format(r.toAlign)}</span>

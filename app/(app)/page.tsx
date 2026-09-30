@@ -485,6 +485,7 @@ export default function Home() {
             onDeleteContribution={handleDeleteContribution}
             onApplyRecommended={handleApplyRecommendedContribution}
             onQuickAddAsset={handleQuickAddAsset}
+            onChangeTarget={changeTarget}
           />
         ) : null}
 
