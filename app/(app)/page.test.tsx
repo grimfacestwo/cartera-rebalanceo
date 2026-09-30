@@ -117,7 +117,7 @@ describe("Cartera tab – Añadir activo y aportaciones", () => {
     const saveContribBtn = screen.getByRole("button", { name: /Sumar.*al saldo y guardar/ });
     await user.click(saveContribBtn);
 
-    expect(screen.getByText("+500 €")).toBeInTheDocument();
+    expect(screen.getByLabelText("Importe de la aportación")).toHaveValue("500");
   });
 });
 

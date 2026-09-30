@@ -360,6 +360,13 @@ export default function Home() {
     setContributions((prev) => [newEntry, ...prev]);
   };
 
+  const handleEditContribution = (
+    id: string,
+    patch: Partial<Pick<PortfolioContribution, "assetId" | "amount" | "date" | "note">>
+  ) => {
+    setContributions((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+  };
+
   const handleDeleteContribution = (id: string, subtractFromCurrentValue = false) => {
     const item = contributions.find((c) => c.id === id);
     if (item && subtractFromCurrentValue) {
@@ -474,6 +481,7 @@ export default function Home() {
             aligned={aligned}
             covered={covered}
             onAddContribution={handleAddContribution}
+            onEditContribution={handleEditContribution}
             onDeleteContribution={handleDeleteContribution}
             onApplyRecommended={handleApplyRecommendedContribution}
             onQuickAddAsset={handleQuickAddAsset}

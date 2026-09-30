@@ -14,13 +14,6 @@ const currency = new Intl.NumberFormat("es-ES", {
 
 const pct = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 });
 
-function formatDate(dStr: string): string {
-  if (!dStr) return "—";
-  const [y, m, d] = dStr.split("-").map(Number);
-  if (!y || !m || !d) return dStr;
-  return `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}/${y}`;
-}
-
 export function CarteraTab({
   assets,
   values,
@@ -37,6 +30,7 @@ export function CarteraTab({
   aligned,
   covered,
   onAddContribution,
+  onEditContribution,
   onDeleteContribution,
   onApplyRecommended,
   onQuickAddAsset,
@@ -62,6 +56,7 @@ export function CarteraTab({
     note?: string,
     addToCurrentValue?: boolean
   ) => void;
+  onEditContribution: (id: string, patch: Partial<Pick<PortfolioContribution, "assetId" | "amount" | "date" | "note">>) => void;
   onDeleteContribution: (id: string, subtractFromCurrentValue?: boolean) => void;
   onApplyRecommended: () => void;
   onQuickAddAsset: (name: string, targetPct: number, initialValue: string) => void;
@@ -752,24 +747,53 @@ export function CarteraTab({
               <tbody>
                 {filteredContributions.map((c) => {
                   const asset = assets.find((a) => a.id === c.assetId);
-                  const numAmt = Number.parseFloat(c.amount) || 0;
                   return (
                     <tr key={c.id}>
-                      <td style={{ whiteSpace: "nowrap" }}>{formatDate(c.date)}</td>
+                      <td style={{ whiteSpace: "nowrap" }}>
+                        <input
+                          type="date"
+                          value={c.date}
+                          onChange={(e) => onEditContribution(c.id, { date: e.target.value })}
+                          className={styles.miniInput}
+                          aria-label={`Fecha de la aportación a ${asset?.name || "activo eliminado"}`}
+                        />
+                      </td>
                       <td>
-                        <span className={styles.cellName}>
-                          <span
-                            className={styles.dot}
-                            style={{ background: asset?.color || "#94a3b8" }}
-                          />
-                          {asset?.name || "Activo eliminado"}
-                        </span>
+                        <select
+                          value={c.assetId}
+                          onChange={(e) => onEditContribution(c.id, { assetId: e.target.value })}
+                          className={styles.miniInput}
+                          aria-label="Activo de la aportación"
+                        >
+                          {!asset && <option value={c.assetId}>Activo eliminado</option>}
+                          {assets.map((a) => (
+                            <option key={a.id} value={a.id}>{a.name}</option>
+                          ))}
+                        </select>
                       </td>
-                      <td style={{ fontWeight: 600, color: "#16a34a", whiteSpace: "nowrap" }}>
-                        +{currency.format(numAmt)}
+                      <td style={{ whiteSpace: "nowrap" }}>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={c.amount}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            if (v === "" || /^\d*\.?\d*$/.test(v)) onEditContribution(c.id, { amount: v });
+                          }}
+                          className={styles.miniInput}
+                          style={{ width: "5rem", fontWeight: 600, color: "#16a34a" }}
+                          aria-label="Importe de la aportación"
+                        />
                       </td>
-                      <td style={{ color: c.note ? "inherit" : "#94a3b8" }}>
-                        {c.note || "—"}
+                      <td>
+                        <input
+                          type="text"
+                          value={c.note ?? ""}
+                          onChange={(e) => onEditContribution(c.id, { note: e.target.value })}
+                          placeholder="—"
+                          className={styles.miniInput}
+                          aria-label="Nota de la aportación"
+                        />
                       </td>
                       <td style={{ textAlign: "right" }}>
                         <button
