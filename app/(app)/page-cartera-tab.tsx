@@ -100,6 +100,20 @@ export function CarteraTab({
     }
   };
 
+  // Orden de la tabla Historial de aportaciones
+  type ContribSortKey = "date" | "assetName" | "amount" | "note";
+  const [contribSortKey, setContribSortKey] = useState<ContribSortKey | null>(null);
+  const [contribSortDir, setContribSortDir] = useState<"asc" | "desc">("desc");
+
+  const handleContribSort = (key: ContribSortKey) => {
+    if (contribSortKey === key) {
+      setContribSortDir(contribSortDir === "asc" ? "desc" : "asc");
+    } else {
+      setContribSortKey(key);
+      setContribSortDir(key === "amount" ? "desc" : "asc");
+    }
+  };
+
   // Temporary feedback toast
   const [feedback, setFeedback] = useState<string | null>(null);
 
@@ -169,6 +183,35 @@ export function CarteraTab({
     if (selectedAssetFilter === "all") return contributions;
     return contributions.filter((c) => c.assetId === selectedAssetFilter);
   }, [contributions, selectedAssetFilter]);
+
+  const displayContributions = useMemo(() => {
+    if (!contribSortKey) return filteredContributions;
+    const getValue = (c: PortfolioContribution): string | number => {
+      switch (contribSortKey) {
+        case "date":
+          return c.date;
+        case "assetName":
+          return assets.find((a) => a.id === c.assetId)?.name ?? "";
+        case "amount":
+          return Number.parseFloat(c.amount) || 0;
+        case "note":
+          return c.note ?? "";
+      }
+    };
+    return [...filteredContributions].sort((a, b) => {
+      const va = getValue(a);
+      const vb = getValue(b);
+      if (typeof va === "string" || typeof vb === "string") {
+        return contribSortDir === "asc"
+          ? String(va).localeCompare(String(vb))
+          : String(vb).localeCompare(String(va));
+      }
+      return contribSortDir === "asc" ? va - vb : vb - va;
+    });
+  }, [filteredContributions, assets, contribSortKey, contribSortDir]);
+
+  const contribSortArrow = (key: ContribSortKey) =>
+    contribSortKey === key ? (contribSortDir === "asc" ? " ▲" : " ▼") : "";
 
   const pnl = total - totalContributed;
   const pnlPct = totalContributed > 0 ? (pnl / totalContributed) * 100 : 0;
@@ -831,15 +874,23 @@ export function CarteraTab({
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>Fecha</th>
-                  <th>Activo</th>
-                  <th>Importe</th>
-                  <th>Nota</th>
+                  <th onClick={() => handleContribSort("date")} className={styles.sortableTh}>
+                    Fecha{contribSortArrow("date")}
+                  </th>
+                  <th onClick={() => handleContribSort("assetName")} className={styles.sortableTh}>
+                    Activo{contribSortArrow("assetName")}
+                  </th>
+                  <th onClick={() => handleContribSort("amount")} className={styles.sortableTh}>
+                    Importe{contribSortArrow("amount")}
+                  </th>
+                  <th onClick={() => handleContribSort("note")} className={styles.sortableTh}>
+                    Nota{contribSortArrow("note")}
+                  </th>
                   <th style={{ textAlign: "right" }}>Acción</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredContributions.map((c) => {
+                {displayContributions.map((c) => {
                   const asset = assets.find((a) => a.id === c.assetId);
                   return (
                     <tr key={c.id}>
