@@ -454,6 +454,20 @@
   border-top-right-radius: 8px;
 }
 
+.sortableTh {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.sortableTh:hover {
+  color: #0f172a;
+}
+
+[data-theme="dark"] .sortableTh:hover {
+  color: #e2e8f0;
+}
+
 .table td {
   padding: 0.55rem 0.6rem;
 }

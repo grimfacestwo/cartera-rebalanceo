@@ -86,6 +86,20 @@ export function CarteraTab({
   // Filter for history
   const [selectedAssetFilter, setSelectedAssetFilter] = useState<string>("all");
 
+  // Orden de la tabla Resultado
+  type SortKey = "name" | "value" | "currentPct" | "targetPct" | "toAlign" | "allocation";
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir(sortDir === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortDir(key === "name" ? "asc" : "desc");
+    }
+  };
+
   // Temporary feedback toast
   const [feedback, setFeedback] = useState<string | null>(null);
 
@@ -163,6 +177,41 @@ export function CarteraTab({
   // los cálculos), así que la fila Total de "Objetivo" refleja esa suma
   // real en vez de mostrar siempre "100%".
   const targetSum = assets.reduce((s, a) => s + a.targetPct, 0);
+
+  // La fila Total siempre queda fija al final; solo se reordenan los activos.
+  const displayRows = useMemo(() => {
+    if (!sortKey) return tableRows;
+    const totalRow = tableRows.find((r) => r.id === "total");
+    const getValue = (r: Row): string | number => {
+      switch (sortKey) {
+        case "name":
+          return r.name;
+        case "value":
+          return r.value;
+        case "currentPct":
+          return r.currentPct;
+        case "targetPct":
+          return assets.find((a) => a.id === r.id)?.targetPct ?? 0;
+        case "toAlign":
+          return r.toAlign;
+        case "allocation":
+          return r.allocation;
+      }
+    };
+    const sorted = [...rows].sort((a, b) => {
+      const va = getValue(a);
+      const vb = getValue(b);
+      if (typeof va === "string" || typeof vb === "string") {
+        return sortDir === "asc"
+          ? String(va).localeCompare(String(vb))
+          : String(vb).localeCompare(String(va));
+      }
+      return sortDir === "asc" ? va - vb : vb - va;
+    });
+    return totalRow ? [...sorted, totalRow] : sorted;
+  }, [tableRows, rows, assets, sortKey, sortDir]);
+
+  const sortArrow = (key: SortKey) => (sortKey === key ? (sortDir === "asc" ? " ▲" : " ▼") : "");
 
   return (
     <>
@@ -414,16 +463,28 @@ export function CarteraTab({
                 <table className={styles.table}>
                   <thead>
                     <tr>
-                      <th>Activo</th>
-                      <th>Actual</th>
-                      <th>% actual</th>
-                      <th>Objetivo</th>
-                      <th>Inyectar (alinear)</th>
-                      <th>Aportación</th>
+                      <th onClick={() => handleSort("name")} className={styles.sortableTh}>
+                        Activo{sortArrow("name")}
+                      </th>
+                      <th onClick={() => handleSort("value")} className={styles.sortableTh}>
+                        Actual{sortArrow("value")}
+                      </th>
+                      <th onClick={() => handleSort("currentPct")} className={styles.sortableTh}>
+                        % actual{sortArrow("currentPct")}
+                      </th>
+                      <th onClick={() => handleSort("targetPct")} className={styles.sortableTh}>
+                        Objetivo{sortArrow("targetPct")}
+                      </th>
+                      <th onClick={() => handleSort("toAlign")} className={styles.sortableTh}>
+                        Inyectar (alinear){sortArrow("toAlign")}
+                      </th>
+                      <th onClick={() => handleSort("allocation")} className={styles.sortableTh}>
+                        Aportación{sortArrow("allocation")}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {tableRows.map((r) => {
+                    {displayRows.map((r) => {
                       const isTotal = r.id === "total";
                       const needAlign = r.toAlign > 0.01;
                       const hasAlloc = extra > 0 && r.allocation > 0.01;
