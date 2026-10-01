@@ -75,4 +75,17 @@ describe("computePlan", () => {
       expect(Number.isFinite(r.toAlign)).toBe(true);
     }
   });
+
+  it("un activo con objetivo 0% no diluye el % actual de los demás", () => {
+    const assets = [
+      ...base,
+      { id: "sg", name: "Saint Gobain", targetPct: 0, color: "#ec4899" },
+    ];
+    const p = computePlan(assets, { msci: 88.8, oro: 30, btc: 8, sg: 6000 }, 0);
+    const msci = p.rows.find((r) => r.id === "msci")!;
+    const sg = p.rows.find((r) => r.id === "sg")!;
+    // 88.8 / (88.8 + 30 + 8) * 100 ≈ 70, no 88.8 / 6126.8 * 100 ≈ 1.45
+    expect(msci.currentPct).toBeCloseTo(70, 0);
+    expect(sg.currentPct).toBe(0);
+  });
 });

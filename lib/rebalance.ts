@@ -38,6 +38,16 @@ export function computePlan(
   const total = assets.reduce((s, a) => s + (values[a.id] || 0), 0);
   const extra = contribution;
   const targetSum = assets.reduce((s, a) => s + a.targetPct, 0);
+  // Un activo a objetivo 0% se sigue mostrando aparte (se ve su valor real,
+  // pero no forma parte del reparto). Si contase en el total, diluiría el "% actual"
+  // de los demás activos (p.ej. un activo grande sin objetivo haría que el
+  // resto mostrase porcentajes ridículamente bajos). Por eso el % actual se
+  // calcula sobre este "activeTotal" (solo activos con objetivo > 0), y no
+  // sobre el total bruto — que sigue usándose tal cual para el importe en €.
+  const activeTotal = assets.reduce(
+    (s, a) => (a.targetPct > 0 ? s + (values[a.id] || 0) : s),
+    0
+  );
 
   const rows: Row[] = assets.map((a) => {
     const value = values[a.id] || 0;
@@ -49,7 +59,7 @@ export function computePlan(
       value,
       w,
       r: w > 0 ? value / w : Infinity,
-      currentPct: total > 0 ? (value / total) * 100 : 0,
+      currentPct: w > 0 && activeTotal > 0 ? (value / activeTotal) * 100 : 0,
       targetPct: targetSum > 0 ? (a.targetPct / targetSum) * 100 : 0,
       toAlign: 0,
       allocation: 0,
