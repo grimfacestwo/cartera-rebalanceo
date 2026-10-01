@@ -425,7 +425,7 @@ export function CarteraTab({
                   <tbody>
                     {tableRows.map((r) => {
                       const isTotal = r.id === "total";
-                      const needAlign = r.toAlign > Math.max(0.01, total * 0.001);
+                      const needAlign = r.toAlign > 0.01;
                       const hasAlloc = extra > 0 && r.allocation > 0.01;
                       return (
                         <tr key={r.id} className={isTotal ? styles.totalRow : ""}>

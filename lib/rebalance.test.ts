@@ -15,9 +15,9 @@ describe("computePlan", () => {
 
   it("indica cuánto inyectar en los activos desfasados", () => {
     const p = computePlan(base, { msci: 10000, oro: 2500, btc: 500 }, 0);
-    expect(p.rows.find((r) => r.id === "oro")!.toAlign).toBeCloseTo(1176.47, 0);
-    expect(p.rows.find((r) => r.id === "btc")!.toAlign).toBeCloseTo(382.35, 0);
-    expect(p.fullNeed).toBeCloseTo(1558.82, 0);
+    expect(p.rows.find((r) => r.id === "oro")!.toAlign).toBeCloseTo(782.83, 1);
+    expect(p.rows.find((r) => r.id === "btc")!.toAlign).toBeCloseTo(287.88, 1);
+    expect(p.fullNeed).toBeCloseTo(1070.71, 1);
     expect(p.aligned).toBe(false);
   });
 
@@ -35,8 +35,8 @@ describe("computePlan", () => {
     const allocSum = p.rows.reduce((s, r) => s + r.allocation, 0);
     expect(allocSum).toBeCloseTo(1000, 1);
     expect(p.rows.find((r) => r.id === "msci")!.allocation).toBeCloseTo(0, 1);
-    expect(p.rows.find((r) => r.id === "oro")!.allocation).toBeCloseTo(725.8, 0);
-    expect(p.rows.find((r) => r.id === "btc")!.allocation).toBeCloseTo(274.2, 0);
+    expect(p.rows.find((r) => r.id === "oro")!.allocation).toBeCloseTo(731.13, 1);
+    expect(p.rows.find((r) => r.id === "btc")!.allocation).toBeCloseTo(268.87, 1);
   });
 
   it("detecta una cartera alineada", () => {

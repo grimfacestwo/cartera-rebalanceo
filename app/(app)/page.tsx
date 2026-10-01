@@ -187,7 +187,7 @@ export default function Home() {
   const hasValues = rows.some((r) => r.value > 0);
 
   const totalRow: Row = {
-    id: "total", name: "Total", color: "#64748b", value: total, w: 1, r: 0,
+    id: "total", name: "Total", color: "#64748b", value: total, w: 1,
     currentPct: 100, targetPct: 100, toAlign: fullNeed, allocation: extra,
   };
   const tableRows = hasValues ? [...rows, totalRow] : [];
