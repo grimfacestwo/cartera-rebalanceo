@@ -158,6 +158,11 @@ export function CarteraTab({
 
   const pnl = total - totalContributed;
   const pnlPct = totalContributed > 0 ? (pnl / totalContributed) * 100 : 0;
+  // Suma de los objetivos en bruto (no normalizados) tal cual los edita el
+  // usuario: no tiene por qué dar 100 (computePlan los normaliza solo para
+  // los cálculos), así que la fila Total de "Objetivo" refleja esa suma
+  // real en vez de mostrar siempre "100%".
+  const targetSum = assets.reduce((s, a) => s + a.targetPct, 0);
 
   return (
     <>
@@ -434,7 +439,7 @@ export function CarteraTab({
                           <td>{r.currentPct.toFixed(1)}%</td>
                           <td>
                             {isTotal ? (
-                              "100%"
+                              `${pct.format(targetSum)}%`
                             ) : (
                               <>
                                 <input
@@ -480,6 +485,11 @@ export function CarteraTab({
                   </tbody>
                 </table>
               </div>
+              {Math.abs(targetSum - 100) > 0.01 && (
+                <p className={styles.note}>
+                  Los objetivos suman {pct.format(targetSum)}%; se ajustan a 100% automáticamente para los cálculos.
+                </p>
+              )}
 
               {aligned && extra === 0 && (
                 <p className={styles.balanced}>Tu cartera ya está alineada con la asignación objetivo.</p>
