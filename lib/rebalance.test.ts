@@ -60,4 +60,19 @@ describe("computePlan", () => {
     expect(p.rows).toHaveLength(4);
     expect(p.rows.find((r) => r.id === "aa")!.toAlign).toBeGreaterThan(0);
   });
+
+  it("un activo con objetivo 0% no rompe el cálculo de los demás (sin Infinity/NaN)", () => {
+    const assets = [
+      ...base,
+      { id: "sg", name: "Saint Gobain", targetPct: 0, color: "#ec4899" },
+    ];
+    const p = computePlan(assets, { msci: 88.8, oro: 30, btc: 8, sg: 6000 }, 0);
+    const sg = p.rows.find((r) => r.id === "sg")!;
+    expect(sg.toAlign).toBe(0);
+    expect(sg.allocation).toBe(0);
+    expect(Number.isFinite(p.fullNeed)).toBe(true);
+    for (const r of p.rows) {
+      expect(Number.isFinite(r.toAlign)).toBe(true);
+    }
+  });
 });

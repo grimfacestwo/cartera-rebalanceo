@@ -60,7 +60,13 @@ export function computePlan(
   let fullNeed = 0;
 
   if (total > 0 && targetSum > 0) {
-    const byR = [...rows].sort((a, b) => a.r - b.r);
+    // Los activos con objetivo 0% (w === 0) no tienen un reparto al que
+    // aspirar, así que se excluyen de la búsqueda de fullTheta — si no,
+    // su r = Infinity puede "ganar" la búsqueda (el grupo que les queda a
+    // la derecha tiene sumW = 0, luego g = Infinity, y la comprobación de
+    // límites lo acepta como válido), haciendo fullTheta = Infinity y
+    // propagando Infinity/NaN a toAlign de todos los activos.
+    const byR = rows.filter((r) => r.w > 0).sort((a, b) => a.r - b.r);
     const n = byR.length;
 
     for (let k = 0; k < n; k++) {
