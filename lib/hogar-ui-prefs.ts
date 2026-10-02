@@ -1,7 +1,7 @@
 import { BANK_IDS, CATEGORIES, type BankId, type CategoryId } from "./state";
 
-const PAID_FILTERS = ["all", "paid", "pending"] as const;
-type PaidFilter = (typeof PAID_FILTERS)[number];
+const PAID_FILTERS = ["all", "paid", "pending", "na"] as const;
+export type PaidFilter = (typeof PAID_FILTERS)[number];
 
 export type HogarUiPrefs = {
   mensualidadCollapsed: boolean;

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { AssetDef } from "@/lib/rebalance";
 import { buildExpenseMatrix, type SummaryRow } from "@/lib/matrix";
 import { putState } from "@/lib/persist";
-import { DEFAULT_HOGAR_UI_PREFS, parseHogarUiPrefs, type HogarUiPrefs } from "@/lib/hogar-ui-prefs";
+import { DEFAULT_HOGAR_UI_PREFS, parseHogarUiPrefs, type HogarUiPrefs, type PaidFilter } from "@/lib/hogar-ui-prefs";
 import {
   addFixedRowToTemplate,
   addPuntualExpense,
@@ -165,7 +165,7 @@ export default function HogarManager() {
   // siempre el objeto completo o pisaría el otro campo.
   const [uiPrefs, setUiPrefs] = useState<HogarUiPrefs>(DEFAULT_HOGAR_UI_PREFS);
   const [matrixBankFilter, setMatrixBankFilter] = useState<BankId | "all">("all");
-  const [matrixPaidFilter, setMatrixPaidFilter] = useState<"all" | "paid" | "pending">("all");
+  const [matrixPaidFilter, setMatrixPaidFilter] = useState<PaidFilter>("all");
   const [collapsedCategories, setCollapsedCategories] = useState<Set<CategoryId>>(new Set());
   useEffect(() => {
     let cancelled = false;
@@ -210,7 +210,7 @@ export default function HogarManager() {
     updateUiPrefs({ defaultBankFilter: v });
     setMatrixBankFilter(v);
   };
-  const setDefaultPaidFilter = (v: "all" | "paid" | "pending") => {
+  const setDefaultPaidFilter = (v: PaidFilter) => {
     updateUiPrefs({ defaultPaidFilter: v });
     setMatrixPaidFilter(v);
   };
@@ -589,13 +589,14 @@ export default function HogarManager() {
                 </select>
                 <select
                   value={matrixPaidFilter}
-                  onChange={(ev) => setMatrixPaidFilter(ev.target.value as "all" | "paid" | "pending")}
+                  onChange={(ev) => setMatrixPaidFilter(ev.target.value as PaidFilter)}
                   className={styles.expenseSelect}
                   aria-label="Filtrar por estado de pago del mes activo"
                 >
                   <option value="all">Pagados y pendientes</option>
                   <option value="paid">Solo pagados ({monthShortLabel(activeMonth)})</option>
                   <option value="pending">Solo pendientes ({monthShortLabel(activeMonth)})</option>
+                  <option value="na">Solo no aplicados ({monthShortLabel(activeMonth)})</option>
                 </select>
                 <button type="button" className={styles.expenseSelect} onClick={() => setOptionsOpen(true)}>⚙ Opciones</button>
               </div>
@@ -884,13 +885,14 @@ export default function HogarManager() {
                 <span className={styles.settingName}>Estado</span>
                 <select
                   value={uiPrefs.defaultPaidFilter}
-                  onChange={(ev) => setDefaultPaidFilter(ev.target.value as "all" | "paid" | "pending")}
+                  onChange={(ev) => setDefaultPaidFilter(ev.target.value as PaidFilter)}
                   className={styles.expenseSelect}
                   aria-label="Estado por defecto"
                 >
                   <option value="all">Pagados y pendientes</option>
                   <option value="paid">Solo pagados</option>
                   <option value="pending">Solo pendientes</option>
+                  <option value="na">Solo no aplicados</option>
                 </select>
               </div>
               <div className={styles.modalFooter}>

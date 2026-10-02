@@ -47,6 +47,10 @@ describe("parseHogarUiPrefs", () => {
       ...DEFAULT_HOGAR_UI_PREFS,
       defaultPaidFilter: "paid",
     });
+    expect(parseHogarUiPrefs({ defaultPaidFilter: "na" })).toEqual({
+      ...DEFAULT_HOGAR_UI_PREFS,
+      defaultPaidFilter: "na",
+    });
     expect(parseHogarUiPrefs({ defaultPaidFilter: "vencido" })).toEqual(DEFAULT_HOGAR_UI_PREFS);
   });
 
