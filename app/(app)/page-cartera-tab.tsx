@@ -17,6 +17,8 @@ const pct = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 });
 export function CarteraTab({
   assets,
   values,
+  shares,
+  onChangeShares,
   contribution,
   contributions,
   setValue,
@@ -38,6 +40,8 @@ export function CarteraTab({
 }: {
   assets: AssetDef[];
   values: PortfolioValues;
+  shares: PortfolioValues;
+  onChangeShares: (id: string, v: string) => void;
   contribution: string;
   contributions: PortfolioContribution[];
   setValue: (id: string, v: string) => void;
@@ -376,6 +380,15 @@ export function CarteraTab({
                     onChange={(e) => setValue(a.id, e.target.value)}
                     aria-label={`Valor actual de ${a.name}`}
                   />
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={shares[a.id] ?? ""}
+                    onChange={(e) => onChangeShares(a.id, e.target.value)}
+                    placeholder="Nº acciones"
+                    aria-label={`Número de acciones de ${a.name}`}
+                    style={{ flex: "0 0 5.5rem" }}
+                  />
                   <button
                     type="button"
                     className={styles.quickContribBtn}
@@ -393,6 +406,12 @@ export function CarteraTab({
                     + Aportar €
                   </button>
                 </div>
+                {(() => {
+                  const n = Number.parseFloat(shares[a.id] ?? "");
+                  const v = Number.parseFloat(values[a.id] ?? "");
+                  if (!(n > 0) || !Number.isFinite(v)) return null;
+                  return <p className={styles.shareHint}>≈ {currency.format(v / n)} / acción</p>;
+                })()}
               </label>
 
               {/* Subformulario inline para sumar dinero directamente al activo */}

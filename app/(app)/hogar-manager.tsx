@@ -91,6 +91,10 @@ function newId(): string {
 export default function HogarManager() {
   const [assets, setAssets] = useState<AssetDef[]>(DEFAULT_ASSETS);
   const [values, setValues] = useState<PortfolioValues>(DEFAULT_VALUES);
+  // shares (nº de acciones por activo) no tiene UI propia aquí (se edita en
+  // Finanzas/Cartera) pero hay que cargarlo y reenviarlo tal cual al
+  // guardar, igual que rowOrder/bankReserved.
+  const [shares, setShares] = useState<PortfolioValues>({});
   const [contribution, setContribution] = useState("");
   const [months, setMonths] = useState<Record<string, MonthData>>({});
   const [activeMonth, setActiveMonth] = useState(currentMonthKey);
@@ -120,6 +124,7 @@ export default function HogarManager() {
   const applyServerState = (state: PortfolioState) => {
     setAssets(state.assets);
     setValues(state.values);
+    setShares(state.shares ?? {});
     setContribution(state.contribution);
     setMonths(state.months);
     setGoals(state.goals);
@@ -235,7 +240,7 @@ export default function HogarManager() {
   useEffect(() => {
     if (loading || loadError) return;
     if (skipOnce.current) { skipOnce.current = false; return; }
-    const state: PortfolioState = { assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder, contributions, bankReserved };
+    const state: PortfolioState = { assets, values, shares, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder, contributions, bankReserved };
     pendingStateRef.current = state;
     const timer = setTimeout(async () => {
       setSaveStatus("saving");
@@ -256,7 +261,7 @@ export default function HogarManager() {
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder, contributions, bankReserved, loading, loadError]);
+  }, [assets, values, shares, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder, contributions, bankReserved, loading, loadError]);
 
   // Flush el último estado antes de cerrar/refrescar para no perder ediciones
   // que queden dentro de la ventana de debounce de 500 ms.

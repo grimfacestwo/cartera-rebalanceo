@@ -47,6 +47,7 @@ function newId(): string {
 export default function Home() {
   const [assets, setAssets] = useState<AssetDef[]>(DEFAULT_ASSETS);
   const [values, setValues] = useState<PortfolioValues>(DEFAULT_VALUES);
+  const [shares, setShares] = useState<PortfolioValues>({});
   const [contribution, setContribution] = useState("");
   // months se sigue cargando/guardando aquí (sin UI propia) porque Exportar/Importar
   // necesitan el PortfolioState completo; la edición vive en /hogar.
@@ -93,6 +94,7 @@ export default function Home() {
   const applyServerState = (state: PortfolioState) => {
     setAssets(state.assets);
     setValues(state.values);
+    setShares(state.shares ?? {});
     setContribution(state.contribution);
     setMonths(state.months);
     setGoals(state.goals);
@@ -132,7 +134,7 @@ export default function Home() {
   useEffect(() => {
     if (loading || loadError) return;
     if (skipOnce.current) { skipOnce.current = false; return; }
-    const state: PortfolioState = { assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder, contributions, bankReserved };
+    const state: PortfolioState = { assets, values, shares, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder, contributions, bankReserved };
     pendingStateRef.current = state;
     const timer = setTimeout(async () => {
       setSaveStatus("saving");
@@ -152,7 +154,7 @@ export default function Home() {
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder, contributions, bankReserved, loading, loadError]);
+  }, [assets, values, shares, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder, contributions, bankReserved, loading, loadError]);
 
   // Flush the último estado antes de cerrar/refrescar para no perder ediciones
   // que queden dentro de la ventana de debounce de 500 ms.
@@ -194,6 +196,10 @@ export default function Home() {
 
   const setValue = (id: string, v: string) => {
     if (v === "" || /^\d*\.?\d*$/.test(v)) setValues({ ...values, [id]: v });
+  };
+
+  const setShareCount = (id: string, v: string) => {
+    if (v === "" || /^\d*\.?\d*$/.test(v)) setShares({ ...shares, [id]: v });
   };
 
   const changeTarget = (id: string, v: string) => {
@@ -264,7 +270,7 @@ export default function Home() {
 
   // Export/Import
   const handleExport = () => {
-    const payload = { assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder, contributions, bankReserved };
+    const payload = { assets, values, shares, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder, contributions, bankReserved };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -292,6 +298,7 @@ export default function Home() {
           // guardar a continuación.
           setAssets(state.assets);
           setValues(state.values);
+          setShares(state.shares ?? {});
           setContribution(state.contribution);
           setMonths(state.months);
           setGoals(state.goals);
@@ -468,6 +475,8 @@ export default function Home() {
           <CarteraTab
             assets={assets}
             values={values}
+            shares={shares}
+            onChangeShares={setShareCount}
             contribution={contribution}
             contributions={contributions}
             setValue={setValue}

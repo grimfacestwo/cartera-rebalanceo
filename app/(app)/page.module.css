@@ -1039,6 +1039,10 @@
   color: #fbbf24;
 }
 
+[data-theme="dark"] .shareHint {
+  color: #94a3b8;
+}
+
 [data-theme="dark"] .plain {
   color: #64748b;
 }
@@ -1675,6 +1679,12 @@
 .assetInputRow input {
   flex: 1;
   min-width: 0;
+}
+
+.shareHint {
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+  color: #64748b;
 }
 
 .quickContribBtn {

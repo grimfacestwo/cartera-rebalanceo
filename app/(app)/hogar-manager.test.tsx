@@ -17,6 +17,7 @@ function buildMockState(): PortfolioState {
   return {
     assets: [],
     values: {},
+    shares: {},
     contribution: "",
     months: {
       [currentMonthKey()]: {

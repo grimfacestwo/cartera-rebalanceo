@@ -16,17 +16,19 @@ async function fetchBackupPayload() {
     planTargets: unknown;
     rowOrder: unknown;
     contributions: unknown;
+    shares: unknown;
   }>`SELECT
       assets, values, contribution, months, goals,
       fixedExpenses AS "fixedExpenses",
       catRules AS "catRules",
       planTargets AS "planTargets",
       rowOrder AS "rowOrder",
-      contributions
+      contributions,
+      shares
     FROM portfolio_state WHERE id = 1`;
   const state = rows.length === 0 ? DEFAULT_STATE : parseState(rows[0]);
-  const { assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder, contributions } = state;
-  return { assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder, contributions };
+  const { assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder, contributions, shares } = state;
+  return { assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder, contributions, shares };
 }
 
 // Cron semanal (ver vercel.json) que manda por email el mismo JSON que el

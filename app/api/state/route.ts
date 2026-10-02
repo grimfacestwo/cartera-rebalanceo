@@ -38,6 +38,7 @@ async function ensureTable() {
   await sql`ALTER TABLE portfolio_state ADD COLUMN IF NOT EXISTS rowOrder jsonb NOT NULL DEFAULT '[]'::jsonb`;
   await sql`ALTER TABLE portfolio_state ADD COLUMN IF NOT EXISTS contributions jsonb NOT NULL DEFAULT '[]'::jsonb`;
   await sql`ALTER TABLE portfolio_state ADD COLUMN IF NOT EXISTS bankReserved jsonb NOT NULL DEFAULT '{}'::jsonb`;
+  await sql`ALTER TABLE portfolio_state ADD COLUMN IF NOT EXISTS shares jsonb NOT NULL DEFAULT '{}'::jsonb`;
   // Contador de versión para control de concurrencia optimista (ver PUT).
   // Se usa un entero en vez de comparar updated_at porque el timestamptz de
   // Postgres tiene precisión de microsegundos y se trunca a milisegundos al
@@ -67,6 +68,7 @@ export async function GET() {
       rowOrder: unknown;
       contributions: unknown;
       bankReserved: unknown;
+      shares: unknown;
       version: number;
     }>`SELECT
         assets, values, contribution, banks, expenses, months, goals,
@@ -76,6 +78,7 @@ export async function GET() {
         rowOrder AS "rowOrder",
         contributions,
         bankReserved AS "bankReserved",
+        shares,
         version
       FROM portfolio_state WHERE id = 1`;
     if (rows.length === 0) {
@@ -121,7 +124,7 @@ export async function PUT(request: Request) {
     // silencio con "el último que guarda gana"). Sin expectedVersion (primer
     // guardado tras crear la fila) siempre se aplica.
     const { rows } = await sql<{ version: number }>`
-      INSERT INTO portfolio_state (id, assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder, contributions, bankReserved, updated_at, version)
+      INSERT INTO portfolio_state (id, assets, values, contribution, months, goals, fixedExpenses, catRules, planTargets, rowOrder, contributions, bankReserved, shares, updated_at, version)
       VALUES (
         1,
         ${JSON.stringify(state.assets)}::jsonb,
@@ -135,6 +138,7 @@ export async function PUT(request: Request) {
         ${JSON.stringify(state.rowOrder)}::jsonb,
         ${JSON.stringify(state.contributions)}::jsonb,
         ${JSON.stringify(state.bankReserved)}::jsonb,
+        ${JSON.stringify(state.shares)}::jsonb,
         now(),
         1
       )
@@ -150,6 +154,7 @@ export async function PUT(request: Request) {
         rowOrder = EXCLUDED.rowOrder,
         contributions = EXCLUDED.contributions,
         bankReserved = EXCLUDED.bankReserved,
+        shares = EXCLUDED.shares,
         updated_at = now(),
         version = portfolio_state.version + 1
       WHERE ${expectedVersion}::int IS NULL OR portfolio_state.version = ${expectedVersion}::int

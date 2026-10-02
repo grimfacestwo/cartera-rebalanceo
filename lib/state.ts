@@ -127,6 +127,8 @@ export type PortfolioContribution = {
 export type PortfolioState = {
   assets: AssetDef[];
   values: PortfolioValues;
+  /** Número de acciones por activo, puramente informativo (no entra en computePlan). */
+  shares: PortfolioValues;
   contribution: string;
   months: Record<string, MonthData>;
   goals: Goal[];
@@ -153,6 +155,7 @@ export const DEFAULT_VALUES: PortfolioValues = {
 export const DEFAULT_STATE: PortfolioState = {
   assets: DEFAULT_ASSETS,
   values: DEFAULT_VALUES,
+  shares: {},
   contribution: "",
   months: {},
   goals: [],
@@ -587,6 +590,12 @@ export function parseState(raw: unknown): PortfolioState {
     values[a.id] = parsedValues[a.id] ?? DEFAULT_VALUES[a.id] ?? "";
   }
 
+  const parsedShares = parseValues(o.shares);
+  const shares: PortfolioValues = {};
+  for (const a of assets) {
+    shares[a.id] = parsedShares[a.id] ?? "";
+  }
+
   let months = parseMonths(o.months);
 
   if (Object.keys(months).length === 0) {
@@ -623,6 +632,7 @@ export function parseState(raw: unknown): PortfolioState {
   return {
     assets,
     values,
+    shares,
     contribution: typeof o.contribution === "string" ? o.contribution : "",
     months,
     goals: parseGoals(o.goals),

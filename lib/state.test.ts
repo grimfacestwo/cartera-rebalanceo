@@ -59,6 +59,23 @@ describe("parseState", () => {
     }
   });
 
+  it("parsea shares por id de activo y descarta ids desconocidos", () => {
+    const state = parseState({
+      assets: [{ id: "a", name: "Activo", targetPct: 50, color: "#fff" }],
+      values: { a: "123" },
+      shares: { a: "67", desconocido: "99" },
+      contribution: "",
+    });
+    expect(state.shares).toEqual({ a: "67" });
+  });
+
+  it("sin shares en el estado guardado, cada activo queda en cadena vacía (no hay valor por defecto)", () => {
+    const state = parseState({ assets: DEFAULT_ASSETS, values: {}, contribution: "" });
+    for (const a of DEFAULT_ASSETS) {
+      expect(state.shares[a.id]).toBe("");
+    }
+  });
+
   it("ignora datos inválidos", () => {
     const state = parseState(null);
     expect(state.assets).toEqual(DEFAULT_ASSETS);
