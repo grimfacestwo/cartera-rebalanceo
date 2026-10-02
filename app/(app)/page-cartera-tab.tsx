@@ -515,7 +515,11 @@ export function CarteraTab({
                       <th onClick={() => handleSort("currentPct")} className={styles.sortableTh}>
                         % actual{sortArrow("currentPct")}
                       </th>
-                      <th onClick={() => handleSort("targetPct")} className={styles.sortableTh}>
+                      <th
+                        onClick={() => handleSort("targetPct")}
+                        className={styles.sortableTh}
+                        style={{ minWidth: "5.5rem" }}
+                      >
                         Objetivo{sortArrow("targetPct")}
                       </th>
                       <th onClick={() => handleSort("toAlign")} className={styles.sortableTh}>
@@ -541,11 +545,11 @@ export function CarteraTab({
                           </td>
                           <td>{currency.format(r.value)}</td>
                           <td>{r.currentPct.toFixed(1)}%</td>
-                          <td>
+                          <td style={{ whiteSpace: "nowrap" }}>
                             {isTotal ? (
                               `${pct.format(targetSum)}%`
                             ) : (
-                              <>
+                              <span style={{ display: "inline-flex", alignItems: "center", gap: "0.2rem" }}>
                                 <input
                                   type="text"
                                   inputMode="decimal"
@@ -560,7 +564,7 @@ export function CarteraTab({
                                   aria-label={`Objetivo de ${r.name} en porcentaje`}
                                 />
                                 %
-                              </>
+                              </span>
                             )}
                           </td>
                           <td>
