@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildExpenseMatrix } from "./matrix";
-import { DEFAULT_BANKS, type Expense, type MonthData } from "./state";
+import { buildExpenseMatrix, findOrphanFixedExpenses } from "./matrix";
+import { DEFAULT_BANKS, type Expense, type FixedExpense, type MonthData } from "./state";
 
 function expense(overrides: Partial<Expense>): Expense {
   return {
@@ -143,5 +143,37 @@ describe("buildExpenseMatrix", () => {
     const row = groups.flatMap((g) => g.rows).find((r) => r.key === "seguro");
     expect(row!.cells["2026-01"].status).toBe("paid");
     expect(row!.cells["2026-02"].status).toBe("na");
+  });
+});
+
+describe("findOrphanFixedExpenses", () => {
+  function tmpl(overrides: Partial<FixedExpense>): FixedExpense {
+    return { id: "t1", name: "Plantilla", amount: "10", bank: "ing", category: "gastos", ...overrides };
+  }
+
+  it("detecta un gasto fijo que existe en algún mes pero ya no está en la plantilla", () => {
+    const months: Record<string, MonthData> = {
+      "2026-01": month({ fixed: [expense({ id: "netflix", name: "Netflix", amount: "9", category: "disfrute" })] }),
+      "2026-02": month({ fixed: [] }),
+    };
+    const orphans = findOrphanFixedExpenses(months, [tmpl({ id: "otro" })]);
+    expect(orphans).toHaveLength(1);
+    expect(orphans[0]).toMatchObject({ id: "netflix", name: "Netflix", amount: "9", category: "disfrute", lastSeenMonth: "2026-01" });
+  });
+
+  it("no reporta nada si el id sigue en la plantilla actual", () => {
+    const months: Record<string, MonthData> = {
+      "2026-01": month({ fixed: [expense({ id: "t1" })] }),
+    };
+    expect(findOrphanFixedExpenses(months, [tmpl({})])).toHaveLength(0);
+  });
+
+  it("se queda con el avistamiento más reciente del huérfano", () => {
+    const months: Record<string, MonthData> = {
+      "2026-01": month({ fixed: [expense({ id: "spotify", name: "Spotify", amount: "5" })] }),
+      "2026-02": month({ fixed: [expense({ id: "spotify", name: "Spotify", amount: "6" })] }),
+    };
+    const orphans = findOrphanFixedExpenses(months, []);
+    expect(orphans[0]).toMatchObject({ amount: "6", lastSeenMonth: "2026-02" });
   });
 });

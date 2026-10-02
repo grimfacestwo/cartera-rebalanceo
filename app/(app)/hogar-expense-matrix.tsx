@@ -39,6 +39,9 @@ const MONTH_COL_REM = 4.5;
 
 export function ExpenseMatrix({
   groups,
+  sortKey,
+  sortDir,
+  onSort,
   monthKeys,
   activeMonth,
   activeDaysRemaining,
@@ -62,6 +65,9 @@ export function ExpenseMatrix({
   onAddRow,
 }: {
   groups: SummaryCategoryGroup[];
+  sortKey: "name" | "amount" | null;
+  sortDir: "asc" | "desc";
+  onSort: (key: "name" | "amount") => void;
   monthKeys: string[];
   activeMonth: string;
   activeDaysRemaining: number;
@@ -124,7 +130,16 @@ export function ExpenseMatrix({
         <thead>
           <tr>
             <th className={styles.summaryActionsHeader} />
-            <th className={styles.summaryConceptHeader}>Concepto</th>
+            <th
+              className={styles.summaryConceptHeader}
+              role="button"
+              tabIndex={0}
+              style={{ cursor: "pointer", userSelect: "none" }}
+              onClick={() => onSort("name")}
+              onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); onSort("name"); } }}
+            >
+              Concepto{sortKey === "name" ? (sortDir === "asc" ? " ▲" : " ▼") : ""}
+            </th>
             <th
               className={monthsHeaderCls}
               role="button"
@@ -136,7 +151,16 @@ export function ExpenseMatrix({
               <span className={styles.chevron}>{mensualidadCollapsed ? "▸" : "▾"}</span>
               {!mensualidadCollapsed && "Mensualidad"}
             </th>
-            <th className={amountHeaderCls}>Importe</th>
+            <th
+              className={amountHeaderCls}
+              role="button"
+              tabIndex={0}
+              style={{ cursor: "pointer", userSelect: "none" }}
+              onClick={() => onSort("amount")}
+              onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); onSort("amount"); } }}
+            >
+              Importe{sortKey === "amount" ? (sortDir === "asc" ? " ▲" : " ▼") : ""}
+            </th>
             <th className={bankHeaderCls}>Banco</th>
             {monthKeys.map((key) => {
               const isBoundary = hasPastMonths && key === boundaryMonthKey;
@@ -207,8 +231,22 @@ export function ExpenseMatrix({
                 return (
                 <tr key={rowId}>
                   <td className={styles.summaryActionsCell}>
-                    <button type="button" className={styles.moveBtn} onClick={() => onMoveRow(row, "up")} disabled={idx === 0} aria-label={`Subir ${row.name}`} title="Subir">▲</button>
-                    <button type="button" className={styles.moveBtn} onClick={() => onMoveRow(row, "down")} disabled={idx === group.rows.length - 1} aria-label={`Bajar ${row.name}`} title="Bajar">▼</button>
+                    <button
+                      type="button"
+                      className={styles.moveBtn}
+                      onClick={() => onMoveRow(row, "up")}
+                      disabled={idx === 0 || sortKey !== null}
+                      aria-label={`Subir ${row.name}`}
+                      title={sortKey !== null ? "Quita el orden de columna para reordenar a mano" : "Subir"}
+                    >▲</button>
+                    <button
+                      type="button"
+                      className={styles.moveBtn}
+                      onClick={() => onMoveRow(row, "down")}
+                      disabled={idx === group.rows.length - 1 || sortKey !== null}
+                      aria-label={`Bajar ${row.name}`}
+                      title={sortKey !== null ? "Quita el orden de columna para reordenar a mano" : "Bajar"}
+                    >▼</button>
                     <button type="button" className={styles.removeBtn} onClick={() => onDeleteRow(row)} aria-label={`Eliminar ${row.name}`} title="Eliminar">×</button>
                   </td>
                   <td className={styles.summaryConceptCell}>

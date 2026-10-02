@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { AssetDef } from "@/lib/rebalance";
-import { buildExpenseMatrix, type SummaryRow } from "@/lib/matrix";
+import { buildExpenseMatrix, findOrphanFixedExpenses, type OrphanFixedExpense, type SummaryRow } from "@/lib/matrix";
 import { putState } from "@/lib/persist";
 import { DEFAULT_HOGAR_UI_PREFS, parseHogarUiPrefs, type HogarUiPrefs, type PaidFilter } from "@/lib/hogar-ui-prefs";
 import {
@@ -167,6 +167,21 @@ export default function HogarManager() {
   const [matrixBankFilter, setMatrixBankFilter] = useState<BankId | "all">("all");
   const [matrixPaidFilter, setMatrixPaidFilter] = useState<PaidFilter>("all");
   const [collapsedCategories, setCollapsedCategories] = useState<Set<CategoryId>>(new Set());
+
+  // Orden de columna en Resumen por mes (dentro de cada categoría; el orden
+  // manual de filas, arrastrado con ▲▼, se ignora mientras haya una columna
+  // activa — ver ExpenseMatrix).
+  type SummarySortKey = "name" | "amount";
+  const [summarySortKey, setSummarySortKey] = useState<SummarySortKey | null>(null);
+  const [summarySortDir, setSummarySortDir] = useState<"asc" | "desc">("asc");
+  const handleSummarySort = (key: SummarySortKey) => {
+    if (summarySortKey === key) {
+      setSummarySortDir(summarySortDir === "asc" ? "desc" : "asc");
+    } else {
+      setSummarySortKey(key);
+      setSummarySortDir("asc");
+    }
+  };
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -405,6 +420,35 @@ export default function HogarManager() {
     }));
   }, [matrixGroups, matrixBankFilter, matrixPaidFilter, activeMonth]);
 
+  const sortedMatrixGroups = useMemo(() => {
+    if (!summarySortKey) return filteredMatrixGroups;
+    return filteredMatrixGroups.map((group) => ({
+      ...group,
+      rows: [...group.rows].sort((a, b) => {
+        if (summarySortKey === "name") {
+          return summarySortDir === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+        }
+        const va = Number.parseFloat(a.amount) || 0;
+        const vb = Number.parseFloat(b.amount) || 0;
+        return summarySortDir === "asc" ? va - vb : vb - va;
+      }),
+    }));
+  }, [filteredMatrixGroups, summarySortKey, summarySortDir]);
+
+  // Gastos fijos que existen en algún mes guardado pero ya no están en la
+  // plantilla actual — ver findOrphanFixedExpenses. Avisa de un desajuste que,
+  // si no, solo se nota cuando un mes futuro deja de mostrar el gasto.
+  const orphanFixedExpenses = useMemo(
+    () => findOrphanFixedExpenses(months, fixedExpenses),
+    [months, fixedExpenses],
+  );
+
+  const restoreOrphanToTemplate = (orphan: OrphanFixedExpense) => {
+    const input = { id: orphan.id, name: orphan.name, amount: orphan.amount, bank: orphan.bank, category: orphan.category, months: orphan.months };
+    setFixedExpenses((prev) => addFixedRowToTemplate(prev, input));
+    setMonths((prev) => seedFixedRowIntoMonths(prev, input));
+  };
+
   // Cambiar el banco/nombre/importe/mensualidad de una fila del resumen
   // actualiza el gasto en TODOS los meses donde aparece (por id si es fijo,
   // por nombre si es variable recurrente), y además la plantilla si es un
@@ -577,6 +621,31 @@ export default function HogarManager() {
                 Resumen por mes
                 {activeMonth === currentMonthKey() && ` (${activeDaysRemaining} días restantes)`}
               </h2>
+              {orphanFixedExpenses.length > 0 && (
+                <div className={styles.note}>
+                  <p>
+                    ⚠ {orphanFixedExpenses.length === 1 ? "Este concepto" : "Estos conceptos"} ya no{" "}
+                    {orphanFixedExpenses.length === 1 ? "está" : "están"} en tu plantilla de gastos fijos —
+                    puede que {orphanFixedExpenses.length === 1 ? "deje" : "dejen"} de aparecer en meses futuros:
+                  </p>
+                  <ul style={{ margin: "0.3rem 0 0", paddingLeft: "1.2rem" }}>
+                    {orphanFixedExpenses.map((o) => (
+                      <li key={o.id} style={{ marginBottom: "0.3rem" }}>
+                        {o.name} ({currency.format(Number.parseFloat(o.amount) || 0)}, visto por última vez en{" "}
+                        {monthShortLabel(o.lastSeenMonth)}){" "}
+                        <button
+                          type="button"
+                          className={styles.addBtn}
+                          style={{ padding: "0.15rem 0.5rem", fontSize: "0.8rem" }}
+                          onClick={() => restoreOrphanToTemplate(o)}
+                        >
+                          Restaurar a la plantilla
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               <div className={styles.filterBar}>
                 <select
                   value={matrixBankFilter}
@@ -601,7 +670,10 @@ export default function HogarManager() {
                 <button type="button" className={styles.expenseSelect} onClick={() => setOptionsOpen(true)}>⚙ Opciones</button>
               </div>
               <ExpenseMatrix
-                groups={filteredMatrixGroups}
+                groups={sortedMatrixGroups}
+                sortKey={summarySortKey}
+                sortDir={summarySortDir}
+                onSort={handleSummarySort}
                 monthKeys={visibleMonthKeys}
                 activeMonth={activeMonth}
                 activeDaysRemaining={activeDaysRemaining}

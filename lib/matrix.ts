@@ -1,4 +1,4 @@
-import { CATEGORIES, expenseAppliesToMonth, type BankId, type CategoryId, type Expense, type MonthData } from "./state";
+import { CATEGORIES, expenseAppliesToMonth, sortMonthKeys, type BankId, type CategoryId, type Expense, type FixedExpense, type MonthData } from "./state";
 
 export type SummaryCellStatus = "paid" | "pending" | "na";
 
@@ -144,4 +144,46 @@ export function buildExpenseMatrix(
     targetPct: planTargets[category] ?? "",
     rows: allRows.filter((r) => r.category === category),
   }));
+}
+
+export type OrphanFixedExpense = {
+  id: string;
+  name: string;
+  amount: string;
+  bank: BankId | "";
+  category: CategoryId;
+  months: string;
+  lastSeenMonth: string;
+};
+
+/**
+ * Gastos fijos que existen en algún mes guardado pero cuyo id ya no está en
+ * la plantilla actual (`fixedExpenses`) — p.ej. porque un guardado defectuoso
+ * se la llevó por delante (pasó de verdad una vez, ver commit que introduce
+ * esta función). Como `parseState` solo AÑADE a los meses lo que está en la
+ * plantilla, un huérfano deja de aparecer en los meses nuevos sin que nada lo
+ * avise; esto detecta el hueco para poder ofrecer restaurarlo.
+ */
+export function findOrphanFixedExpenses(
+  months: Record<string, MonthData>,
+  fixedExpenses: FixedExpense[],
+): OrphanFixedExpense[] {
+  const tmplIds = new Set(fixedExpenses.map((f) => f.id));
+  const byId = new Map<string, OrphanFixedExpense>();
+  for (const key of sortMonthKeys(Object.keys(months))) {
+    const m = months[key];
+    for (const e of m.fixed) {
+      if (tmplIds.has(e.id)) continue;
+      byId.set(e.id, {
+        id: e.id,
+        name: e.name,
+        amount: e.amount,
+        bank: e.bank,
+        category: e.category,
+        months: e.months ?? "",
+        lastSeenMonth: key,
+      });
+    }
+  }
+  return Array.from(byId.values());
 }
