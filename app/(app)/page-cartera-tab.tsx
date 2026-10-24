@@ -179,10 +179,6 @@ export function CarteraTab({
   };
 
   // Calculations for contribution history
-  const totalContributed = useMemo(() => {
-    return contributions.reduce((s, c) => s + (Number.parseFloat(c.amount) || 0), 0);
-  }, [contributions]);
-
   const filteredContributions = useMemo(() => {
     if (selectedAssetFilter === "all") return contributions;
     return contributions.filter((c) => c.assetId === selectedAssetFilter);
@@ -191,6 +187,18 @@ export function CarteraTab({
   const filteredTotalContributed = useMemo(() => {
     return filteredContributions.reduce((s, c) => s + (Number.parseFloat(c.amount) || 0), 0);
   }, [filteredContributions]);
+
+  // Cuando hay un activo filtrado, las tarjetas de resumen (Total aportado,
+  // Valor actual cartera, Plusvalía, N.º de aportaciones) pasan a reflejar
+  // solo ese activo en vez de la cartera entera.
+  const filteredCurrentValue = useMemo(() => {
+    if (selectedAssetFilter === "all") return total;
+    return Number.parseFloat(values[selectedAssetFilter] ?? "") || 0;
+  }, [selectedAssetFilter, total, values]);
+
+  const filteredPnl = filteredCurrentValue - filteredTotalContributed;
+  const filteredPnlPct = filteredTotalContributed > 0 ? (filteredPnl / filteredTotalContributed) * 100 : 0;
+  const filteredAssetName = assets.find((a) => a.id === selectedAssetFilter)?.name;
 
   const displayContributions = useMemo(() => {
     if (!contribSortKey) return filteredContributions;
@@ -221,8 +229,6 @@ export function CarteraTab({
   const contribSortArrow = (key: ContribSortKey) =>
     contribSortKey === key ? (contribSortDir === "asc" ? " ▲" : " ▼") : "";
 
-  const pnl = total - totalContributed;
-  const pnlPct = totalContributed > 0 ? (pnl / totalContributed) * 100 : 0;
   // Suma de los objetivos en bruto (no normalizados) tal cual los edita el
   // usuario: no tiene por qué dar 100 (computePlan los normaliza solo para
   // los cálculos), así que la fila Total de "Objetivo" refleja esa suma
@@ -744,36 +750,38 @@ export function CarteraTab({
           </button>
         </div>
 
-        {/* Resumen métricas */}
+        {/* Resumen métricas: reflejan solo el activo filtrado cuando hay uno activo */}
         <div className={styles.historyMetrics}>
           <div className={styles.historyMetricCard}>
-            <span className={styles.metricLabel}>Total aportado</span>
-            <span className={styles.metricValue}>{currency.format(totalContributed)}</span>
+            <span className={styles.metricLabel}>Total aportado{filteredAssetName ? ` (${filteredAssetName})` : ""}</span>
+            <span className={styles.metricValue}>{currency.format(filteredTotalContributed)}</span>
           </div>
           <div className={styles.historyMetricCard}>
-            <span className={styles.metricLabel}>Valor actual cartera</span>
-            <span className={styles.metricValue}>{currency.format(total)}</span>
+            <span className={styles.metricLabel}>
+              {filteredAssetName ? `Valor actual (${filteredAssetName})` : "Valor actual cartera"}
+            </span>
+            <span className={styles.metricValue}>{currency.format(filteredCurrentValue)}</span>
           </div>
           <div className={styles.historyMetricCard}>
-            <span className={styles.metricLabel}>Plusvalía / Retorno</span>
+            <span className={styles.metricLabel}>Plusvalía / Retorno{filteredAssetName ? ` (${filteredAssetName})` : ""}</span>
             <div className={styles.metricRow}>
               <span className={styles.metricValue}>
-                {pnl >= 0 ? `+${currency.format(pnl)}` : currency.format(pnl)}
+                {filteredPnl >= 0 ? `+${currency.format(filteredPnl)}` : currency.format(filteredPnl)}
               </span>
-              {totalContributed > 0 && (
+              {filteredTotalContributed > 0 && (
                 <span
                   className={`${styles.metricBadge} ${
-                    pnl >= 0 ? styles.metricPositive : styles.metricNegative
+                    filteredPnl >= 0 ? styles.metricPositive : styles.metricNegative
                   }`}
                 >
-                  {pnl >= 0 ? `+${pnlPct.toFixed(1)}%` : `${pnlPct.toFixed(1)}%`}
+                  {filteredPnl >= 0 ? `+${filteredPnlPct.toFixed(1)}%` : `${filteredPnlPct.toFixed(1)}%`}
                 </span>
               )}
             </div>
           </div>
           <div className={styles.historyMetricCard}>
-            <span className={styles.metricLabel}>N.º de aportaciones</span>
-            <span className={styles.metricValue}>{contributions.length}</span>
+            <span className={styles.metricLabel}>N.º de aportaciones{filteredAssetName ? ` (${filteredAssetName})` : ""}</span>
+            <span className={styles.metricValue}>{filteredContributions.length}</span>
           </div>
         </div>
 
@@ -887,14 +895,6 @@ export function CarteraTab({
               );
             })}
           </div>
-        )}
-
-        {selectedAssetFilter !== "all" && filteredContributions.length > 0 && (
-          <p className={styles.note}>
-            Total de {assets.find((a) => a.id === selectedAssetFilter)?.name ?? "este activo"}:{" "}
-            {currency.format(filteredTotalContributed)}{" "}
-            ({filteredContributions.length} {filteredContributions.length === 1 ? "aportación" : "aportaciones"})
-          </p>
         )}
 
         {/* Tabla de aportaciones */}
