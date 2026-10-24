@@ -188,6 +188,10 @@ export function CarteraTab({
     return contributions.filter((c) => c.assetId === selectedAssetFilter);
   }, [contributions, selectedAssetFilter]);
 
+  const filteredTotalContributed = useMemo(() => {
+    return filteredContributions.reduce((s, c) => s + (Number.parseFloat(c.amount) || 0), 0);
+  }, [filteredContributions]);
+
   const displayContributions = useMemo(() => {
     if (!contribSortKey) return filteredContributions;
     const getValue = (c: PortfolioContribution): string | number => {
@@ -883,6 +887,14 @@ export function CarteraTab({
               );
             })}
           </div>
+        )}
+
+        {selectedAssetFilter !== "all" && filteredContributions.length > 0 && (
+          <p className={styles.note}>
+            Total de {assets.find((a) => a.id === selectedAssetFilter)?.name ?? "este activo"}:{" "}
+            {currency.format(filteredTotalContributed)}{" "}
+            ({filteredContributions.length} {filteredContributions.length === 1 ? "aportación" : "aportaciones"})
+          </p>
         )}
 
         {/* Tabla de aportaciones */}
