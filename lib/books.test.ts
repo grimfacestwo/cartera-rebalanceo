@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { groupReadBooksByYear, moveFutureBook, parseBookCovers, parseBooks, parseLecturaState, type Book } from "./books";
+import { computeReadingStats, groupReadBooksByYear, moveFutureBook, parseBookCovers, parseBooks, parseLecturaState, type Book } from "./books";
 
 function book(overrides: Partial<Book>): Book {
   return { id: "b1", title: "Libro", author: "", status: "future", yearFinished: "", ...overrides };
@@ -98,5 +98,48 @@ describe("moveFutureBook", () => {
     const books = [book({ id: "a", status: "future" }), book({ id: "b", status: "reading" })];
     expect(moveFutureBook(books, "b", "up")).toBe(books);
     expect(moveFutureBook(books, "no-existe", "up")).toBe(books);
+  });
+});
+
+describe("computeReadingStats", () => {
+  const today = new Date("2026-06-15T00:00:00");
+
+  it("cuenta leídos totales, de este año, y la media por año activo", () => {
+    const books = [
+      book({ id: "1", status: "read", yearFinished: "2026" }),
+      book({ id: "2", status: "read", yearFinished: "2026" }),
+      book({ id: "3", status: "read", yearFinished: "2024" }),
+      book({ id: "4", status: "reading" }),
+      book({ id: "5", status: "future" }),
+      book({ id: "6", status: "future" }),
+    ];
+    const stats = computeReadingStats(books, today);
+    expect(stats).toEqual({
+      totalRead: 3,
+      readThisYear: 2,
+      yearsActive: 2,
+      avgPerYear: 1.5,
+      currentlyReading: 1,
+      upcoming: 2,
+    });
+  });
+
+  it("no cuenta los 'Sin año' como año activo, pero sí suman al total", () => {
+    const books = [book({ id: "1", status: "read", yearFinished: "" })];
+    const stats = computeReadingStats(books, today);
+    expect(stats.totalRead).toBe(1);
+    expect(stats.yearsActive).toBe(0);
+    expect(stats.avgPerYear).toBe(0);
+  });
+
+  it("con cero libros devuelve todo a cero sin dividir por cero", () => {
+    expect(computeReadingStats([], today)).toEqual({
+      totalRead: 0,
+      readThisYear: 0,
+      yearsActive: 0,
+      avgPerYear: 0,
+      currentlyReading: 0,
+      upcoming: 0,
+    });
   });
 });

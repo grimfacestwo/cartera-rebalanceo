@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import c from "./lectura.module.css";
 import {
+  computeReadingStats,
   groupReadBooksByYear,
   moveFutureBook,
   parseBookCovers,
@@ -121,6 +122,15 @@ function CoverThumb({ src, title, width, height }: { src: string | undefined; ti
       }}
     >
       Sin portada
+    </div>
+  );
+}
+
+function StatTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ minWidth: "6.5rem" }}>
+      <p style={{ fontSize: "1.3rem", fontWeight: 700, color: "var(--c-text)", margin: 0 }}>{value}</p>
+      <p style={{ fontSize: "0.76rem", color: "var(--c-muted)", margin: "0.15rem 0 0" }}>{label}</p>
     </div>
   );
 }
@@ -338,6 +348,8 @@ export default function LecturaManager() {
   const reading = books.filter((b) => b.status === "reading");
   const future = books.filter((b) => b.status === "future");
   const yearGroups = groupReadBooksByYear(books);
+  const stats = computeReadingStats(books);
+  const hasAnyBook = books.length > 0;
 
   return (
     <div className={c.page}>
@@ -352,6 +364,20 @@ export default function LecturaManager() {
           </span>
         )}
       </div>
+
+      {/* Resumen de lectura */}
+      {hasAnyBook && (
+        <section style={cardStyle}>
+          <h2 style={{ fontSize: "0.95rem", margin: "0 0 0.75rem", color: "var(--c-text)" }}>Resumen de lectura</h2>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "1.25rem" }}>
+            <StatTile label="Leídos en total" value={String(stats.totalRead)} />
+            <StatTile label="Leídos este año" value={String(stats.readThisYear)} />
+            <StatTile label="Media por año" value={stats.avgPerYear > 0 ? stats.avgPerYear.toFixed(1) : "—"} />
+            <StatTile label="Leyendo ahora" value={String(stats.currentlyReading)} />
+            <StatTile label="En espera" value={String(stats.upcoming)} />
+          </div>
+        </section>
+      )}
 
       {/* Leyendo ahora */}
       <section style={cardStyle}>

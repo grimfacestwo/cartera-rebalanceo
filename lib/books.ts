@@ -73,6 +73,31 @@ export function groupReadBooksByYear(books: Book[]): ReadYearGroup[] {
   return years.map((year) => ({ year, books: byYear.get(year)! }));
 }
 
+export type ReadingStats = {
+  totalRead: number;
+  readThisYear: number;
+  /** Años distintos con al menos un libro leído (los "Sin año" no cuentan). */
+  yearsActive: number;
+  avgPerYear: number;
+  currentlyReading: number;
+  upcoming: number;
+};
+
+export function computeReadingStats(books: Book[], today: Date = new Date()): ReadingStats {
+  const read = books.filter((b) => b.status === "read");
+  const currentYear = String(today.getFullYear());
+  const years = new Set(read.map((b) => b.yearFinished.trim()).filter(Boolean));
+  const yearsActive = years.size;
+  return {
+    totalRead: read.length,
+    readThisYear: read.filter((b) => b.yearFinished.trim() === currentYear).length,
+    yearsActive,
+    avgPerYear: yearsActive > 0 ? read.length / yearsActive : 0,
+    currentlyReading: books.filter((b) => b.status === "reading").length,
+    upcoming: books.filter((b) => b.status === "future").length,
+  };
+}
+
 /**
  * Mueve un libro de "próximas lecturas" un puesto arriba/abajo respecto a
  * los demás libros futuros, preservando su posición relativa con el resto
