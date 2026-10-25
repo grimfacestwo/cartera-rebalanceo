@@ -60,6 +60,23 @@ describe("buildExpenseMatrix", () => {
     expect(rows[0].cells["2026-02"].status).toBe("pending");
   });
 
+  it("fusiona (no pisa) dos gastos variables del mismo mes que normalizan al mismo nombre", () => {
+    const months: Record<string, MonthData> = {
+      "2026-01": month({
+        expenses: [
+          expense({ id: "a1", name: "Gimnasio", recurring: true, paid: true, amount: "30" }),
+          expense({ id: "a2", name: "gimnasio ", recurring: true, paid: false, amount: "45" }),
+        ],
+      }),
+    };
+    const groups = buildExpenseMatrix(months, ["2026-01"], {});
+    const rows = groups.flatMap((g) => g.rows).filter((r) => r.key === "gimnasio");
+    expect(rows).toHaveLength(1);
+    // El pago ya hecho (30€, paid) no debe desaparecer al fusionarse con el
+    // segundo (45€, pending): se suman los importes y se conserva "paid".
+    expect(rows[0].cells["2026-01"]).toEqual({ status: "paid", amount: 75 });
+  });
+
   it("excluye los gastos variables puntuales (no recurrentes) de la matriz", () => {
     const months: Record<string, MonthData> = {
       "2026-01": month({ expenses: [expense({ id: "a1", name: "Regalo", recurring: false })] }),

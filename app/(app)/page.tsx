@@ -4,14 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { computePlan, type AssetDef, type Row } from "@/lib/rebalance";
 import { putState } from "@/lib/persist";
 import {
-  BANK_IDS,
   CATEGORIES,
   DEFAULT_ASSETS,
   DEFAULT_VALUES,
   PALETTE,
+  computeDisponible,
   currentMonthKey,
-  daysRemaining,
-  effectiveAmount,
   DEFAULT_FIXED_EXPENSES,
   parseState,
   PLAN_TARGETS_DEFAULT,
@@ -261,12 +259,7 @@ export default function Home() {
   // Disponible del mes actual (gestionado en /hogar) para el resumen de Objetivos.
   const curMonthKey = currentMonthKey();
   const curMonthData = months[curMonthKey];
-  const remaining = curMonthData
-    ? BANK_IDS.reduce((s, id) => s + (Number.parseFloat(curMonthData.banks[id]) || 0), 0) -
-      [...curMonthData.fixed, ...curMonthData.expenses]
-        .filter((e) => !e.paid)
-        .reduce((s, e) => s + effectiveAmount(e, daysRemaining(curMonthKey)), 0)
-    : 0;
+  const remaining = curMonthData ? computeDisponible(months, bankReserved, curMonthKey) : 0;
 
   // Export/Import
   const handleExport = () => {

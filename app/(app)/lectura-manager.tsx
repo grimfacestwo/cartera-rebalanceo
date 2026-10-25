@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import c from "./lectura.module.css";
+import { putSection } from "@/lib/section-persist";
 import {
   computeReadingStats,
   groupReadBooksByYear,
@@ -13,7 +14,8 @@ import {
   type BookStatus,
 } from "@/lib/books";
 
-type SaveStatus = "idle" | "saving" | "saved" | "error";
+type SaveStatus = "idle" | "saving" | "saved" | "error" | "conflict";
+type LecturaVersions = { lectura: number | null; lecturaCovers: number | null };
 
 function uid(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -56,39 +58,37 @@ const cardStyle: CSSProperties = {
   marginBottom: "1rem",
 };
 
+// Control de concurrencia optimista (mismo patrón que Coches/portfolio_state
+// — ver lib/section-persist.ts): en conflicto se pide una recarga completa
+// en vez de perder la edición más reciente en silencio.
 async function saveLectura(
   books: Book[],
   covers: Record<string, string>,
+  versions: LecturaVersions,
   setStatus: (s: SaveStatus) => void
-) {
+): Promise<{ versions: LecturaVersions; conflicted: boolean }> {
   setStatus("saving");
-  let mainOk = false;
-  for (let i = 0; i < 2 && !mainOk; i++) {
-    try {
-      const res = await fetch("/api/section/lectura", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ books }),
-      });
-      mainOk = res.ok;
-    } catch {
-      mainOk = false;
+  const nextVersions = { ...versions };
+  let conflicted = false;
+  let ok = true;
+
+  for (let i = 0; i < 2; i++) {
+    const r = await putSection("lectura", { books }, versions.lectura, parseLecturaState);
+    if (r.kind === "ok") { nextVersions.lectura = r.version; break; }
+    if (r.kind === "conflict") { conflicted = true; ok = false; break; }
+    ok = false;
+  }
+  if (!conflicted) {
+    for (let i = 0; i < 2; i++) {
+      const r = await putSection("lectura-covers", covers, versions.lecturaCovers, parseBookCovers);
+      if (r.kind === "ok") { nextVersions.lecturaCovers = r.version; ok = true; break; }
+      if (r.kind === "conflict") { conflicted = true; ok = false; break; }
+      ok = false;
     }
   }
-  let coversOk = false;
-  for (let i = 0; i < 2 && !coversOk; i++) {
-    try {
-      const res = await fetch("/api/section/lectura-covers", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(covers),
-      });
-      coversOk = res.ok;
-    } catch {
-      coversOk = false;
-    }
-  }
-  setStatus(mainOk && coversOk ? "saved" : "error");
+
+  setStatus(conflicted ? "conflict" : ok ? "saved" : "error");
+  return { versions: nextVersions, conflicted };
 }
 
 function CoverThumb({ src, title, width, height }: { src: string | undefined; title: string; width: number; height: number }) {
@@ -200,6 +200,7 @@ export default function LecturaManager() {
   const [markYear, setMarkYear] = useState("");
   const skipOnce = useRef(true);
   const pendingRef = useRef<{ books: Book[]; covers: Record<string, string> } | null>(null);
+  const versionsRef = useRef<LecturaVersions>({ lectura: null, lecturaCovers: null });
 
   // --- Load ---
   useEffect(() => {
@@ -211,11 +212,14 @@ export default function LecturaManager() {
           fetch("/api/section/lectura-covers"),
         ]);
         if (!booksRes.ok) throw new Error("no data");
-        const booksData = (await booksRes.json()) as { data?: unknown };
-        const coversData = coversRes.ok ? ((await coversRes.json()) as { data?: unknown }) : { data: {} };
+        const booksData = (await booksRes.json()) as { data?: unknown; version?: number | null };
+        const coversData = coversRes.ok
+          ? ((await coversRes.json()) as { data?: unknown; version?: number | null })
+          : { data: {}, version: null };
         if (!cancelled) {
           setBooks(parseLecturaState(booksData.data).books);
           setCovers(parseBookCovers(coversData.data));
+          versionsRef.current = { lectura: booksData.version ?? null, lecturaCovers: coversData.version ?? null };
           setLoadError(false);
         }
       } catch {
@@ -231,7 +235,15 @@ export default function LecturaManager() {
     if (skipOnce.current) { skipOnce.current = false; return; }
     pendingRef.current = { books, covers };
     const timer = setTimeout(() => {
-      void saveLectura(books, covers, setSaveStatus);
+      (async () => {
+        const result = await saveLectura(books, covers, versionsRef.current, setSaveStatus);
+        versionsRef.current = result.versions;
+        if (result.conflicted) {
+          skipOnce.current = true;
+          setBooks(null);
+          setReloadKey((k) => k + 1);
+        }
+      })();
     }, 500);
     return () => clearTimeout(timer);
   }, [books, covers, loadError]);
@@ -245,13 +257,13 @@ export default function LecturaManager() {
         fetch("/api/section/lectura", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ books: p.books }),
+          body: JSON.stringify({ books: p.books, expectedVersion: versionsRef.current.lectura }),
           keepalive: true,
         });
         fetch("/api/section/lectura-covers", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(p.covers),
+          body: JSON.stringify({ ...p.covers, expectedVersion: versionsRef.current.lecturaCovers }),
           keepalive: true,
         });
       } catch {
@@ -360,7 +372,13 @@ export default function LecturaManager() {
             role="status"
             style={{ color: saveStatus === "error" ? "var(--c-danger)" : "var(--c-ok)", fontSize: "0.8rem" }}
           >
-            {saveStatus === "saving" ? "Guardando…" : saveStatus === "saved" ? "Guardado" : "Error al guardar"}
+            {saveStatus === "saving"
+              ? "Guardando…"
+              : saveStatus === "saved"
+                ? "Guardado"
+                : saveStatus === "conflict"
+                  ? "Actualizado desde otra pestaña — recargando"
+                  : "Error al guardar"}
           </span>
         )}
       </div>

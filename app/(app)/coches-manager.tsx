@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import c from "./coches.module.css";
+import { putSection } from "@/lib/section-persist";
 import {
   type CarDocument,
   type CochesState,
@@ -26,9 +27,28 @@ import {
   vehicleCostPerKm,
 } from "@/lib/coches";
 
-type SaveStatus = "idle" | "saving" | "saved" | "error";
+type SaveStatus = "idle" | "saving" | "saved" | "error" | "conflict";
 
-async function saveCoches(state: CochesState, setStatus: (s: SaveStatus) => void) {
+type DocsPayload = { docs: CarDocument[] };
+function parseDocsPayload(raw: unknown): DocsPayload {
+  const docs = raw && typeof raw === "object" && Array.isArray((raw as { docs?: unknown }).docs)
+    ? ((raw as { docs: unknown[] }).docs as CarDocument[])
+    : [];
+  return { docs };
+}
+
+type CochesVersions = { coches: number | null; cochesDocs: number | null };
+
+// Control de concurrencia optimista (mismo patrón que portfolio_state — ver
+// lib/section-persist.ts): sin esto, dos pestañas guardando Coches casi a
+// la vez se pisaban en silencio, "el último que guarda gana". En conflicto
+// se pide una recarga completa (igual que portfolio_state adopta el estado
+// del servidor) en vez de intentar fusionar a mano documentos parciales.
+async function saveCoches(
+  state: CochesState,
+  versions: CochesVersions,
+  setStatus: (s: SaveStatus) => void,
+): Promise<{ versions: CochesVersions; conflicted: boolean }> {
   const stripped = {
     ...state,
     documents: state.documents.map((d) => ({
@@ -41,36 +61,30 @@ async function saveCoches(state: CochesState, setStatus: (s: SaveStatus) => void
       date: d.date,
     })),
   } as CochesState;
-  const docsPayload = { docs: state.documents };
+  const docsPayload: DocsPayload = { docs: state.documents };
 
   setStatus("saving");
-  let mainOk = false;
-  for (let i = 0; i < 2 && !mainOk; i++) {
-    try {
-      const res = await fetch("/api/section/coches", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(stripped),
-      });
-      mainOk = res.ok;
-    } catch {
-      mainOk = false;
+  const nextVersions = { ...versions };
+  let conflicted = false;
+  let ok = true;
+
+  for (let i = 0; i < 2; i++) {
+    const r = await putSection("coches", stripped, versions.coches, parseCochesState);
+    if (r.kind === "ok") { nextVersions.coches = r.version; break; }
+    if (r.kind === "conflict") { conflicted = true; ok = false; break; }
+    ok = false;
+  }
+  if (!conflicted) {
+    for (let i = 0; i < 2; i++) {
+      const r = await putSection("coches-docs", docsPayload, versions.cochesDocs, parseDocsPayload);
+      if (r.kind === "ok") { nextVersions.cochesDocs = r.version; ok = true; break; }
+      if (r.kind === "conflict") { conflicted = true; ok = false; break; }
+      ok = false;
     }
   }
-  let docsOk = false;
-  for (let i = 0; i < 2 && !docsOk; i++) {
-    try {
-      const res = await fetch("/api/section/coches-docs", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(docsPayload),
-      });
-      docsOk = res.ok;
-    } catch {
-      docsOk = false;
-    }
-  }
-  setStatus(mainOk && docsOk ? "saved" : "error");
+
+  setStatus(conflicted ? "conflict" : ok ? "saved" : "error");
+  return { versions: nextVersions, conflicted };
 }
 
 const STATUS_COLORS: Record<RevisionStatus, string> = {
@@ -172,6 +186,9 @@ export default function CochesManager() {
   const [filterYear, setFilterYear] = useState("");
   const skipOnce = useRef(true);
   const pendingCochesRef = useRef<CochesState | null>(null);
+  // Última versión conocida de cada sub-sección, para detectar si alguien
+  // guardó de por medio (ver saveCoches).
+  const versionsRef = useRef<CochesVersions>({ coches: null, cochesDocs: null });
 
   useEffect(() => {
     let cancelled = false;
@@ -179,13 +196,15 @@ export default function CochesManager() {
       try {
         const res = await fetch("/api/section/coches");
         if (!res.ok) throw new Error("no data");
-        const data = (await res.json()) as { data?: unknown };
+        const data = (await res.json()) as { data?: unknown; version?: number | null };
         const parsed = parseCochesState(data.data);
+        versionsRef.current.coches = data.version ?? null;
         try {
           const docsRes = await fetch("/api/section/coches-docs");
           if (docsRes.ok) {
-            const docsData = (await docsRes.json()) as { data?: { docs?: unknown } };
+            const docsData = (await docsRes.json()) as { data?: { docs?: unknown }; version?: number | null };
             const docs = Array.isArray(docsData.data?.docs) ? (docsData.data?.docs as CarDocument[]) : [];
+            versionsRef.current.cochesDocs = docsData.version ?? null;
             const byKey = new Map(docs.map((d) => [`${d.vehicleId}:${d.id}`, d]));
             parsed.documents = parsed.documents.map((doc) => {
               const full = byKey.get(`${doc.vehicleId}:${doc.id}`);
@@ -217,7 +236,17 @@ export default function CochesManager() {
     }
     pendingCochesRef.current = state;
     const timer = setTimeout(() => {
-      void saveCoches(state, setSaveStatus);
+      (async () => {
+        const result = await saveCoches(state, versionsRef.current, setSaveStatus);
+        versionsRef.current = result.versions;
+        if (result.conflicted) {
+          // Alguien más guardó de por medio: se adopta su versión en vez de
+          // sobrescribirla (igual que portfolio_state) recargando entero.
+          skipOnce.current = true;
+          setState(null);
+          setReloadKey((k) => k + 1);
+        }
+      })();
     }, 500);
     return () => clearTimeout(timer);
   }, [state, loadError]);
@@ -242,7 +271,17 @@ export default function CochesManager() {
         fetch("/api/section/coches", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(stripped),
+          body: JSON.stringify({ ...stripped, expectedVersion: versionsRef.current.coches }),
+          keepalive: true,
+        });
+        // Sin este segundo PUT, un documento recién subido (addDocument) solo
+        // guarda sus metadatos al cerrar la pestaña dentro de los 500ms del
+        // autoguardado normal — el base64 del archivo en sí nunca llega a
+        // coches-docs y el enlace de "Descargar" queda roto para siempre.
+        fetch("/api/section/coches-docs", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ docs: s.documents, expectedVersion: versionsRef.current.cochesDocs }),
           keepalive: true,
         });
       } catch {
@@ -555,7 +594,13 @@ export default function CochesManager() {
               fontSize: "0.8rem",
             }}
           >
-            {saveStatus === "saving" ? "Guardando…" : saveStatus === "saved" ? "Guardado" : "Error al guardar"}
+            {saveStatus === "saving"
+              ? "Guardando…"
+              : saveStatus === "saved"
+                ? "Guardado"
+                : saveStatus === "conflict"
+                  ? "Actualizado desde otra pestaña — recargando"
+                  : "Error al guardar"}
           </span>
         )}
       </div>

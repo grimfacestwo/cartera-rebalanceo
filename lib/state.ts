@@ -614,8 +614,13 @@ export function parseState(raw: unknown): PortfolioState {
     }
   }
 
+  // Sin dato guardado (o.fixedExpenses === undefined, primera carga nunca
+  // guardada) usa la plantilla por defecto. Si el usuario SÍ guardó un
+  // array vacío a propósito (borró toda su plantilla), fixedExpenses ya es
+  // [] aquí — no hay que confundirlo con "nunca configurado" y resucitar los
+  // gastos por defecto en cada mes.
   const fixedExpenses = o.fixedExpenses !== undefined ? parseFixedExpenses(o.fixedExpenses) : DEFAULT_FIXED_EXPENSES;
-  const tmpl = fixedExpenses.length > 0 ? fixedExpenses : DEFAULT_FIXED_EXPENSES;
+  const tmpl = fixedExpenses;
 
   for (const key of Object.keys(months)) {
     const m = months[key];

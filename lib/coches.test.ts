@@ -434,6 +434,10 @@ describe("effectiveLastKm", () => {
     expect(res.km).toBe("105000");
     expect(res.source).toBe("auto");
     expect(res.repair?.id).toBe("r1");
+    // La fecha real de la reparación debe propagarse (si no, maintenanceMonthsRemaining
+    // nunca puede calcular nada para mantenimientos sin intervalo en km — ver
+    // app/api/cron/coches-alert).
+    expect(res.date).toBe("2026-05-20");
   });
 
   it("cae al manual si no hay reparación coincidente", () => {

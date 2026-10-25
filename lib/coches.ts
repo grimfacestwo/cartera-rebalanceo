@@ -409,7 +409,7 @@ export function effectiveLastKm(
     if (Number.isFinite(manualKm) && manualKm > autoKm) {
       return { km: manual!.km, date: manual!.date, source: "manual", repair: null };
     }
-    return { km: auto.km, date: "", source: "auto", repair: auto };
+    return { km: auto.km, date: auto.date, source: "auto", repair: auto };
   }
   if (manual) {
     return { km: manual.km, date: manual.date, source: "manual", repair: null };

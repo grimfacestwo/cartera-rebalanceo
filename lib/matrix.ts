@@ -37,6 +37,21 @@ function cellFor(e: Expense | undefined, monthKey: string): SummaryCell {
   return { status: e.paid ? "paid" : "pending", amount };
 }
 
+const STATUS_RANK: Record<SummaryCellStatus, number> = { na: 0, pending: 1, paid: 2 };
+
+// Dos gastos variables recurrentes de un mismo mes que normalizan al mismo
+// nombre (p.ej. "Gimnasio" y "gimnasio ") colisionan en la misma fila — sin
+// fusionar, el segundo pisaba sin más la celda del primero y un pago ya
+// hecho desaparecía en silencio del resumen. Se suman los importes y se
+// conserva el status "más avanzado" (paid > pending > na).
+function mergeCell(existing: SummaryCell | undefined, next: SummaryCell): SummaryCell {
+  if (!existing) return next;
+  return {
+    status: STATUS_RANK[next.status] > STATUS_RANK[existing.status] ? next.status : existing.status,
+    amount: existing.amount + next.amount,
+  };
+}
+
 /**
  * Construye la matriz gasto×mes para la vista resumen de Hogar.
  *
@@ -96,7 +111,7 @@ export function buildExpenseMatrix(
         row.months = e.months ?? "";
         row.daily = e.daily === true;
       }
-      row.cells[key] = cellFor(e, key);
+      row.cells[key] = mergeCell(row.cells[key], cellFor(e, key));
     }
   }
 

@@ -173,6 +173,7 @@ export async function PUT(request: Request) {
           rowOrder AS "rowOrder",
           contributions,
           bankReserved AS "bankReserved",
+          shares,
           version
         FROM portfolio_state WHERE id = 1
       `;

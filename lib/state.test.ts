@@ -393,6 +393,15 @@ describe("parseState + gastos fijos", () => {
     expect(m.fixed[0].amount).toBe("50");
   });
 
+  it("si el usuario vació la plantilla a propósito, no resucita los gastos por defecto", () => {
+    const state = parseState({
+      fixedExpenses: [],
+      months: { "2026-08": { banks: { ing: "0", santander: "0", trade: "0" }, expenses: [], fixed: [] } },
+    });
+    expect(state.fixedExpenses).toEqual([]);
+    expect(state.months["2026-08"].fixed).toEqual([]);
+  });
+
   it("no duplica fijos ya presentes en el mes", () => {
     const state = parseState({
       fixedExpenses: [{ id: "luz", name: "Luz", amount: "50", bank: "", category: "vivienda" }],
