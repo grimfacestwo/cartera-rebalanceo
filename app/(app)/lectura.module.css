@@ -1,3 +1,8 @@
 .page {
   padding: 2rem 1.5rem;
 }
+
+[data-theme="dark"] .page {
+  background: #0f172a;
+  min-height: 100dvh;
+}
