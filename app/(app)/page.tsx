@@ -224,7 +224,7 @@ export default function Home() {
 
   const handleReset = () => {
     if (!window.confirm("¿Restablecer todos los valores guardados?")) return;
-    setAssets(DEFAULT_ASSETS); setValues({ ...DEFAULT_VALUES }); setContribution(""); setContributions([]);
+    setAssets(DEFAULT_ASSETS); setValues({ ...DEFAULT_VALUES }); setShares({}); setContribution(""); setContributions([]);
   };
 
   const planSum = CATEGORIES.reduce((s, c) => s + (Number.parseFloat(planTargets[c]) || 0), 0);

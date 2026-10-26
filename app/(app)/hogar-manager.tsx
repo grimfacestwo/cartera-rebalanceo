@@ -568,11 +568,18 @@ export default function HogarManager() {
   }, []);
 
   useEffect(() => {
-    if (!notifEnabled || notifSentRef.current) return;
+    if (!notifEnabled) return;
     if (typeof Notification === "undefined") return;
     if (remaining < 0) {
-      new Notification("Hogar", { body: `Disponible negativo: ${currency.format(remaining)}` });
-      notifSentRef.current = true;
+      if (!notifSentRef.current) {
+        new Notification("Hogar", { body: `Disponible negativo: ${currency.format(remaining)}` });
+        notifSentRef.current = true;
+      }
+    } else {
+      // Se rearma al volver a positivo, igual que el "alerted" del cron de
+      // email (app/api/cron/disponible-alert) — si no, un segundo episodio
+      // negativo dentro de la misma sesión de pestaña no avisaba.
+      notifSentRef.current = false;
     }
   }, [notifEnabled, remaining]);
 

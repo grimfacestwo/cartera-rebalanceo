@@ -574,6 +574,7 @@ export default function CochesManager() {
       repairs: state.repairs.filter((r) => r.vehicleId !== id),
       revisions: state.revisions.filter((r) => r.vehicleId !== id),
       maintenanceRevisions: state.maintenanceRevisions.filter((r) => r.vehicleId !== id),
+      documents: state.documents.filter((d) => d.vehicleId !== id),
     });
     setActiveId((cur) => {
       if (cur !== id) return cur;
