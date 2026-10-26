@@ -1,4 +1,4 @@
-export type BookStatus = "reading" | "future" | "read";
+export type BookStatus = "reading" | "future" | "read" | "abandoned";
 
 export type Book = {
   id: string;
@@ -7,13 +7,24 @@ export type Book = {
   status: BookStatus;
   /** Año en que se terminó, solo relevante si status === "read". */
   yearFinished: string;
+  pagesTotal: string;
+  pagesRead: string;
+  /** 0 = sin valorar, 1-5 estrellas. */
+  rating: number;
+  notes: string;
+  /** URL de portada pegada a mano (independiente de la imagen ya descargada
+   * en "lectura-covers"), para poder mostrarla de nuevo al reabrir el libro. */
+  coverUrl: string;
 };
 
 export type LecturaState = {
   books: Book[];
+  /** Meta anual de libros terminados, como texto para el mismo patrón de
+   * inputs numéricos del resto de la app ("" = sin meta fijada). */
+  yearlyGoal: string;
 };
 
-const BOOK_STATUSES: BookStatus[] = ["reading", "future", "read"];
+const BOOK_STATUSES: BookStatus[] = ["reading", "future", "read", "abandoned"];
 
 export function parseBooks(raw: unknown): Book[] {
   if (!Array.isArray(raw)) return [];
@@ -22,12 +33,18 @@ export function parseBooks(raw: unknown): Book[] {
     if (item && typeof item === "object") {
       const o = item as Record<string, unknown>;
       if (typeof o.id === "string" && typeof o.title === "string") {
+        const rating = typeof o.rating === "number" && Number.isFinite(o.rating) ? o.rating : 0;
         out.push({
           id: o.id,
           title: o.title,
           author: typeof o.author === "string" ? o.author : "",
           status: BOOK_STATUSES.includes(o.status as BookStatus) ? (o.status as BookStatus) : "future",
           yearFinished: typeof o.yearFinished === "string" ? o.yearFinished : "",
+          pagesTotal: typeof o.pagesTotal === "string" ? o.pagesTotal : "",
+          pagesRead: typeof o.pagesRead === "string" ? o.pagesRead : "",
+          rating: Math.min(5, Math.max(0, Math.round(rating))),
+          notes: typeof o.notes === "string" ? o.notes : "",
+          coverUrl: typeof o.coverUrl === "string" ? o.coverUrl : "",
         });
       }
     }
@@ -36,9 +53,12 @@ export function parseBooks(raw: unknown): Book[] {
 }
 
 export function parseLecturaState(raw: unknown): LecturaState {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { books: [] };
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { books: [], yearlyGoal: "" };
   const o = raw as Record<string, unknown>;
-  return { books: parseBooks(o.books) };
+  return {
+    books: parseBooks(o.books),
+    yearlyGoal: typeof o.yearlyGoal === "string" ? o.yearlyGoal : "",
+  };
 }
 
 /** Portadas: guardadas aparte (sección "lectura-covers"), igual que coches
@@ -53,48 +73,37 @@ export function parseBookCovers(raw: unknown): Record<string, string> {
   return out;
 }
 
-export type ReadYearGroup = { year: string; books: Book[] };
-
-/** Agrupa los libros leídos por año (más reciente primero); los que no
- * tienen año anotado caen en un grupo "Sin año" al final. */
-export function groupReadBooksByYear(books: Book[]): ReadYearGroup[] {
-  const byYear = new Map<string, Book[]>();
-  for (const b of books) {
-    if (b.status !== "read") continue;
-    const key = b.yearFinished.trim() || "Sin año";
-    if (!byYear.has(key)) byYear.set(key, []);
-    byYear.get(key)!.push(b);
-  }
-  const years = Array.from(byYear.keys()).sort((a, b) => {
-    if (a === "Sin año") return 1;
-    if (b === "Sin año") return -1;
-    return b.localeCompare(a);
-  });
-  return years.map((year) => ({ year, books: byYear.get(year)! }));
+export function bookProgress(book: Book): number {
+  const total = Number.parseFloat(book.pagesTotal);
+  const read = Number.parseFloat(book.pagesRead);
+  if (!Number.isFinite(total) || total <= 0 || !Number.isFinite(read)) return 0;
+  return Math.min(100, Math.max(0, (read / total) * 100));
 }
 
 export type ReadingStats = {
   totalRead: number;
   readThisYear: number;
-  /** Años distintos con al menos un libro leído (los "Sin año" no cuentan). */
-  yearsActive: number;
-  avgPerYear: number;
   currentlyReading: number;
   upcoming: number;
+  abandoned: number;
+  /** Suma de páginas leídas (pagesRead) de todos los libros, leídos o en curso. */
+  totalPages: number;
+  /** Media de valoración entre los libros que tienen alguna (rating > 0). */
+  avgRating: number;
 };
 
 export function computeReadingStats(books: Book[], today: Date = new Date()): ReadingStats {
   const read = books.filter((b) => b.status === "read");
   const currentYear = String(today.getFullYear());
-  const years = new Set(read.map((b) => b.yearFinished.trim()).filter(Boolean));
-  const yearsActive = years.size;
+  const rated = books.filter((b) => b.rating > 0);
   return {
     totalRead: read.length,
     readThisYear: read.filter((b) => b.yearFinished.trim() === currentYear).length,
-    yearsActive,
-    avgPerYear: yearsActive > 0 ? read.length / yearsActive : 0,
     currentlyReading: books.filter((b) => b.status === "reading").length,
     upcoming: books.filter((b) => b.status === "future").length,
+    abandoned: books.filter((b) => b.status === "abandoned").length,
+    totalPages: books.reduce((s, b) => s + (Number.parseFloat(b.pagesRead) || 0), 0),
+    avgRating: rated.length > 0 ? rated.reduce((s, b) => s + b.rating, 0) / rated.length : 0,
   };
 }
 

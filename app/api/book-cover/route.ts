@@ -25,25 +25,53 @@ async function fetchWithTimeout(url: string, ms: number): Promise<Response> {
   }
 }
 
+/** Descarga una imagen y la devuelve como data: URI, o null si no se pudo. */
+async function downloadAsDataUri(url: string): Promise<string | null> {
+  const res = await fetchWithTimeout(url, FETCH_TIMEOUT_MS);
+  if (!res.ok) return null;
+  const buf = await res.arrayBuffer();
+  if (buf.byteLength === 0 || buf.byteLength > MAX_COVER_BYTES) return null;
+  const contentType = res.headers.get("content-type") ?? "image/jpeg";
+  const base64 = Buffer.from(buf).toString("base64");
+  return `data:${contentType};base64,${base64}`;
+}
+
 /**
- * Busca la portada de un libro por título/autor en Open Library y la
- * devuelve ya descargada como data: URI. Las llamadas a Open Library pasan
- * por aquí (servidor) en vez de hacerse desde el navegador para no tener que
- * tocar la Content-Security-Policy (connect-src/img-src siguen limitados a
- * 'self' — ver next.config.ts).
+ * Busca/descarga la portada de un libro y la devuelve ya convertida en
+ * data: URI. Las llamadas (tanto a Open Library como a una URL que el
+ * usuario pegue a mano) pasan por aquí (servidor) en vez de hacerse desde el
+ * navegador, para no tener que tocar la Content-Security-Policy
+ * (connect-src/img-src siguen limitados a 'self' — ver next.config.ts).
  */
 export async function GET(request: Request) {
   if (!(await isAuthed())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
   const { searchParams } = new URL(request.url);
+  const url = searchParams.get("url")?.trim() ?? "";
   const title = searchParams.get("title")?.trim() ?? "";
   const author = searchParams.get("author")?.trim() ?? "";
-  if (!title) {
-    return NextResponse.json({ error: "Falta el título" }, { status: 400 });
-  }
 
   try {
+    // URL pegada a mano: se descarga directamente, sin pasar por Open
+    // Library. Solo se admite http(s) (no file:, data:, etc.).
+    if (url) {
+      let parsed: URL;
+      try {
+        parsed = new URL(url);
+      } catch {
+        return NextResponse.json({ cover: null });
+      }
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        return NextResponse.json({ cover: null });
+      }
+      return NextResponse.json({ cover: await downloadAsDataUri(url) });
+    }
+
+    if (!title) {
+      return NextResponse.json({ error: "Falta el título o la URL" }, { status: 400 });
+    }
+
     const query = new URLSearchParams({ title, limit: "1", fields: "cover_i" });
     if (author) query.set("author", author);
     const searchRes = await fetchWithTimeout(`https://openlibrary.org/search.json?${query}`, FETCH_TIMEOUT_MS);
@@ -53,16 +81,8 @@ export async function GET(request: Request) {
     const coverId = searchData.docs?.[0]?.cover_i;
     if (!coverId) return NextResponse.json({ cover: null });
 
-    const imgRes = await fetchWithTimeout(`https://covers.openlibrary.org/b/id/${coverId}-M.jpg`, FETCH_TIMEOUT_MS);
-    if (!imgRes.ok) return NextResponse.json({ cover: null });
-
-    const buf = await imgRes.arrayBuffer();
-    if (buf.byteLength === 0 || buf.byteLength > MAX_COVER_BYTES) {
-      return NextResponse.json({ cover: null });
-    }
-    const contentType = imgRes.headers.get("content-type") ?? "image/jpeg";
-    const base64 = Buffer.from(buf).toString("base64");
-    return NextResponse.json({ cover: `data:${contentType};base64,${base64}` });
+    const cover = await downloadAsDataUri(`https://covers.openlibrary.org/b/id/${coverId}-M.jpg`);
+    return NextResponse.json({ cover });
   } catch {
     return NextResponse.json({ cover: null });
   }

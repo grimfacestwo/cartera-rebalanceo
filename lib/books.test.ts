@@ -1,8 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { computeReadingStats, groupReadBooksByYear, moveFutureBook, parseBookCovers, parseBooks, parseLecturaState, type Book } from "./books";
+import { bookProgress, computeReadingStats, moveFutureBook, parseBookCovers, parseBooks, parseLecturaState, type Book } from "./books";
 
 function book(overrides: Partial<Book>): Book {
-  return { id: "b1", title: "Libro", author: "", status: "future", yearFinished: "", ...overrides };
+  return {
+    id: "b1",
+    title: "Libro",
+    author: "",
+    status: "future",
+    yearFinished: "",
+    pagesTotal: "",
+    pagesRead: "",
+    rating: 0,
+    notes: "",
+    coverUrl: "",
+    ...overrides,
+  };
 }
 
 describe("parseBooks", () => {
@@ -12,7 +24,18 @@ describe("parseBooks", () => {
 
   it("rellena campos opcionales con sus valores por defecto", () => {
     expect(parseBooks([{ id: "1", title: "Dune" }])).toEqual([
-      { id: "1", title: "Dune", author: "", status: "future", yearFinished: "" },
+      {
+        id: "1",
+        title: "Dune",
+        author: "",
+        status: "future",
+        yearFinished: "",
+        pagesTotal: "",
+        pagesRead: "",
+        rating: 0,
+        notes: "",
+        coverUrl: "",
+      },
     ]);
   });
 
@@ -20,25 +43,34 @@ describe("parseBooks", () => {
     expect(parseBooks([{ id: "1", title: "Dune", status: "leyendo-mal" }])[0].status).toBe("future");
   });
 
-  it("acepta los tres status válidos", () => {
+  it("acepta los cuatro status válidos, incluido 'abandoned'", () => {
     const raw = [
       { id: "1", title: "A", status: "reading" },
       { id: "2", title: "B", status: "future" },
       { id: "3", title: "C", status: "read" },
+      { id: "4", title: "D", status: "abandoned" },
     ];
-    expect(parseBooks(raw).map((b) => b.status)).toEqual(["reading", "future", "read"]);
+    expect(parseBooks(raw).map((b) => b.status)).toEqual(["reading", "future", "read", "abandoned"]);
+  });
+
+  it("recorta la valoración a 0-5 y redondea", () => {
+    expect(parseBooks([{ id: "1", title: "A", rating: 7.6 }])[0].rating).toBe(5);
+    expect(parseBooks([{ id: "1", title: "A", rating: -3 }])[0].rating).toBe(0);
+    expect(parseBooks([{ id: "1", title: "A", rating: 3.4 }])[0].rating).toBe(3);
   });
 });
 
 describe("parseLecturaState", () => {
-  it("devuelve books vacío si raw no es un objeto válido", () => {
-    expect(parseLecturaState(null)).toEqual({ books: [] });
-    expect(parseLecturaState("mal")).toEqual({ books: [] });
-    expect(parseLecturaState([])).toEqual({ books: [] });
+  it("devuelve valores por defecto si raw no es un objeto válido", () => {
+    expect(parseLecturaState(null)).toEqual({ books: [], yearlyGoal: "" });
+    expect(parseLecturaState("mal")).toEqual({ books: [], yearlyGoal: "" });
+    expect(parseLecturaState([])).toEqual({ books: [], yearlyGoal: "" });
   });
 
-  it("parsea el array books anidado", () => {
-    expect(parseLecturaState({ books: [{ id: "1", title: "Dune" }] }).books).toHaveLength(1);
+  it("parsea el array books anidado y yearlyGoal", () => {
+    const state = parseLecturaState({ books: [{ id: "1", title: "Dune" }], yearlyGoal: "12" });
+    expect(state.books).toHaveLength(1);
+    expect(state.yearlyGoal).toBe("12");
   });
 });
 
@@ -53,27 +85,18 @@ describe("parseBookCovers", () => {
   });
 });
 
-describe("groupReadBooksByYear", () => {
-  it("agrupa solo los libros con status 'read', por año, más reciente primero", () => {
-    const books = [
-      book({ id: "1", status: "read", yearFinished: "2024" }),
-      book({ id: "2", status: "read", yearFinished: "2026" }),
-      book({ id: "3", status: "read", yearFinished: "2024" }),
-      book({ id: "4", status: "reading" }),
-      book({ id: "5", status: "future" }),
-    ];
-    const groups = groupReadBooksByYear(books);
-    expect(groups.map((g) => g.year)).toEqual(["2026", "2024"]);
-    expect(groups.find((g) => g.year === "2024")!.books.map((b) => b.id)).toEqual(["1", "3"]);
+describe("bookProgress", () => {
+  it("calcula el porcentaje de páginas leídas", () => {
+    expect(bookProgress(book({ pagesTotal: "200", pagesRead: "50" }))).toBe(25);
   });
 
-  it("deja los libros sin año anotado en un grupo 'Sin año' al final", () => {
-    const books = [
-      book({ id: "1", status: "read", yearFinished: "2026" }),
-      book({ id: "2", status: "read", yearFinished: "" }),
-    ];
-    const groups = groupReadBooksByYear(books);
-    expect(groups.map((g) => g.year)).toEqual(["2026", "Sin año"]);
+  it("devuelve 0 si faltan páginas totales o son inválidas", () => {
+    expect(bookProgress(book({ pagesTotal: "", pagesRead: "50" }))).toBe(0);
+    expect(bookProgress(book({ pagesTotal: "0", pagesRead: "50" }))).toBe(0);
+  });
+
+  it("no supera el 100% aunque pagesRead sea mayor que pagesTotal", () => {
+    expect(bookProgress(book({ pagesTotal: "100", pagesRead: "150" }))).toBe(100);
   });
 });
 
@@ -104,42 +127,37 @@ describe("moveFutureBook", () => {
 describe("computeReadingStats", () => {
   const today = new Date("2026-06-15T00:00:00");
 
-  it("cuenta leídos totales, de este año, y la media por año activo", () => {
+  it("cuenta leídos totales, de este año, páginas y valoración media", () => {
     const books = [
-      book({ id: "1", status: "read", yearFinished: "2026" }),
-      book({ id: "2", status: "read", yearFinished: "2026" }),
-      book({ id: "3", status: "read", yearFinished: "2024" }),
-      book({ id: "4", status: "reading" }),
+      book({ id: "1", status: "read", yearFinished: "2026", pagesRead: "300", rating: 4 }),
+      book({ id: "2", status: "read", yearFinished: "2026", pagesRead: "200", rating: 2 }),
+      book({ id: "3", status: "read", yearFinished: "2024", pagesRead: "100" }),
+      book({ id: "4", status: "reading", pagesRead: "50" }),
       book({ id: "5", status: "future" }),
       book({ id: "6", status: "future" }),
+      book({ id: "7", status: "abandoned" }),
     ];
     const stats = computeReadingStats(books, today);
     expect(stats).toEqual({
       totalRead: 3,
       readThisYear: 2,
-      yearsActive: 2,
-      avgPerYear: 1.5,
       currentlyReading: 1,
       upcoming: 2,
+      abandoned: 1,
+      totalPages: 650,
+      avgRating: 3,
     });
-  });
-
-  it("no cuenta los 'Sin año' como año activo, pero sí suman al total", () => {
-    const books = [book({ id: "1", status: "read", yearFinished: "" })];
-    const stats = computeReadingStats(books, today);
-    expect(stats.totalRead).toBe(1);
-    expect(stats.yearsActive).toBe(0);
-    expect(stats.avgPerYear).toBe(0);
   });
 
   it("con cero libros devuelve todo a cero sin dividir por cero", () => {
     expect(computeReadingStats([], today)).toEqual({
       totalRead: 0,
       readThisYear: 0,
-      yearsActive: 0,
-      avgPerYear: 0,
       currentlyReading: 0,
       upcoming: 0,
+      abandoned: 0,
+      totalPages: 0,
+      avgRating: 0,
     });
   });
 });

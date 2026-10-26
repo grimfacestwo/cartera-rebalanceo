@@ -5,8 +5,8 @@ import type { CSSProperties } from "react";
 import c from "./lectura.module.css";
 import { putSection } from "@/lib/section-persist";
 import {
+  bookProgress,
   computeReadingStats,
-  groupReadBooksByYear,
   moveFutureBook,
   parseBookCovers,
   parseLecturaState,
@@ -16,6 +16,7 @@ import {
 
 type SaveStatus = "idle" | "saving" | "saved" | "error" | "conflict";
 type LecturaVersions = { lectura: number | null; lecturaCovers: number | null };
+type FilterValue = "all" | BookStatus;
 
 function uid(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -23,6 +24,20 @@ function uid(): string {
   }
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
+
+const STATUS_ORDER: BookStatus[] = ["reading", "future", "read", "abandoned"];
+const STATUS_LABEL: Record<BookStatus, string> = {
+  reading: "Leyendo",
+  future: "Pendiente",
+  read: "Terminado",
+  abandoned: "Abandonado",
+};
+const STATUS_COLOR: Record<BookStatus, string> = {
+  reading: "var(--c-accent)",
+  future: "var(--c-warn)",
+  read: "var(--c-ok)",
+  abandoned: "var(--c-danger)",
+};
 
 const inputStyle: CSSProperties = {
   padding: "0.5rem",
@@ -63,6 +78,7 @@ const cardStyle: CSSProperties = {
 // en vez de perder la edición más reciente en silencio.
 async function saveLectura(
   books: Book[],
+  yearlyGoal: string,
   covers: Record<string, string>,
   versions: LecturaVersions,
   setStatus: (s: SaveStatus) => void
@@ -73,7 +89,7 @@ async function saveLectura(
   let ok = true;
 
   for (let i = 0; i < 2; i++) {
-    const r = await putSection("lectura", { books }, versions.lectura, parseLecturaState);
+    const r = await putSection("lectura", { books, yearlyGoal }, versions.lectura, parseLecturaState);
     if (r.kind === "ok") { nextVersions.lectura = r.version; break; }
     if (r.kind === "conflict") { conflicted = true; ok = false; break; }
     ok = false;
@@ -126,80 +142,152 @@ function CoverThumb({ src, title, width, height }: { src: string | undefined; ti
   );
 }
 
+function ProgressBar({ pct, color }: { pct: number; color: string }) {
+  return (
+    <div style={{ height: 6, borderRadius: 3, background: "var(--c-surface)", overflow: "hidden", marginTop: "0.3rem" }}>
+      <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 3, transition: "width 0.2s" }} />
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: BookStatus }) {
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        padding: "0.15rem 0.5rem",
+        borderRadius: 999,
+        fontSize: "0.72rem",
+        fontWeight: 600,
+        color: "#ffffff",
+        background: STATUS_COLOR[status],
+      }}
+    >
+      {STATUS_LABEL[status]}
+    </span>
+  );
+}
+
+function Stars({ rating, onRate }: { rating: number; onRate?: (n: number) => void }) {
+  return (
+    <div style={{ fontSize: "1.1rem", letterSpacing: "0.1rem", color: "var(--c-warn)" }}>
+      {[1, 2, 3, 4, 5].map((n) => (
+        <span
+          key={n}
+          onClick={onRate ? () => onRate(n === rating ? 0 : n) : undefined}
+          style={{ cursor: onRate ? "pointer" : "default" }}
+        >
+          {n <= rating ? "★" : "☆"}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function StatTile({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ minWidth: "6.5rem" }}>
+    <div style={{ minWidth: "6rem" }}>
       <p style={{ fontSize: "1.3rem", fontWeight: 700, color: "var(--c-text)", margin: 0 }}>{value}</p>
       <p style={{ fontSize: "0.76rem", color: "var(--c-muted)", margin: "0.15rem 0 0" }}>{label}</p>
     </div>
   );
 }
 
-function AddBookForm({
-  placeholder,
-  showYear,
-  onAdd,
-}: {
-  placeholder: string;
-  showYear?: boolean;
-  onAdd: (title: string, author: string, year: string) => void;
-}) {
+function AddBookForm({ onAdd }: { onAdd: (title: string, author: string, pagesTotal: string) => void }) {
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
-  const [year, setYear] = useState(() => String(new Date().getFullYear()));
+  const [pages, setPages] = useState("");
 
   const submit = () => {
     const t = title.trim();
     if (!t) return;
-    onAdd(t, author.trim(), year.trim());
+    onAdd(t, author.trim(), pages.trim());
     setTitle("");
     setAuthor("");
+    setPages("");
   };
+  const onEnter = (e: React.KeyboardEvent) => { if (e.key === "Enter") submit(); };
 
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginTop: "0.75rem" }}>
-      <input
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        placeholder={placeholder}
-        style={{ ...inputStyle, flex: "2 1 10rem" }}
-        aria-label="Título del libro"
-        onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
-      />
-      <input
-        value={author}
-        onChange={(e) => setAuthor(e.target.value)}
-        placeholder="Autor (opcional)"
-        style={{ ...inputStyle, flex: "1 1 8rem" }}
-        aria-label="Autor del libro"
-        onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
-      />
-      {showYear && (
-        <input
-          value={year}
-          onChange={(e) => { if (/^\d{0,4}$/.test(e.target.value)) setYear(e.target.value); }}
-          placeholder="Año"
-          style={{ ...inputStyle, width: "5rem" }}
-          aria-label="Año de lectura"
-        />
+    <section style={cardStyle}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "flex-end" }}>
+        <label style={{ flex: "3 1 14rem" }}>
+          <span style={{ display: "block", fontSize: "0.72rem", color: "var(--c-muted)", marginBottom: "0.25rem" }}>Título del libro</span>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Escribe el título…"
+            style={{ ...inputStyle, width: "100%" }}
+            onKeyDown={onEnter}
+          />
+        </label>
+        <label style={{ flex: "2 1 10rem" }}>
+          <span style={{ display: "block", fontSize: "0.72rem", color: "var(--c-muted)", marginBottom: "0.25rem" }}>Autor</span>
+          <input
+            value={author}
+            onChange={(e) => setAuthor(e.target.value)}
+            placeholder="Autor"
+            style={{ ...inputStyle, width: "100%" }}
+            onKeyDown={onEnter}
+          />
+        </label>
+        <label style={{ width: "6rem" }}>
+          <span style={{ display: "block", fontSize: "0.72rem", color: "var(--c-muted)", marginBottom: "0.25rem" }}>Págs</span>
+          <input
+            value={pages}
+            onChange={(e) => { if (/^\d{0,5}$/.test(e.target.value)) setPages(e.target.value); }}
+            placeholder="0"
+            style={{ ...inputStyle, width: "100%" }}
+            onKeyDown={onEnter}
+          />
+        </label>
+        <button type="button" onClick={submit} style={{ ...btnAccent, padding: "0.55rem 1.1rem" }}>+ Añadir</button>
+      </div>
+    </section>
+  );
+}
+
+function YearlyGoal({ goal, done, onChange }: { goal: string; done: number; onChange: (v: string) => void }) {
+  const n = Number.parseInt(goal, 10) || 0;
+  const pct = n > 0 ? Math.min(100, Math.round((done / n) * 100)) : 0;
+  const bump = (delta: number) => onChange(String(Math.max(0, n + delta)));
+
+  return (
+    <section style={cardStyle}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.6rem" }}>
+        <h2 style={{ fontSize: "0.95rem", margin: 0, color: "var(--c-text)" }}>🎯 Meta anual de libros</h2>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+          <button type="button" onClick={() => bump(-1)} style={{ ...btnStyle, padding: "0.2rem 0.6rem" }} aria-label="Bajar meta">−</button>
+          <span style={{ fontWeight: 700, color: "var(--c-accent)", minWidth: "1.3rem", textAlign: "center" }}>{n}</span>
+          <button type="button" onClick={() => bump(1)} style={{ ...btnStyle, padding: "0.2rem 0.6rem" }} aria-label="Subir meta">+</button>
+        </div>
+      </div>
+      {n > 0 ? (
+        <>
+          <ProgressBar pct={pct} color="var(--c-accent)" />
+          <p style={{ fontSize: "0.76rem", color: "var(--c-muted)", margin: "0.35rem 0 0", textAlign: "right" }}>
+            {done} / {n} libros ({pct}%)
+          </p>
+        </>
+      ) : (
+        <p style={{ fontSize: "0.8rem", color: "var(--c-muted)", margin: 0 }}>Fija una meta con el +.</p>
       )}
-      <button type="button" onClick={submit} style={btnAccent}>+ Añadir</button>
-    </div>
+    </section>
   );
 }
 
 export default function LecturaManager() {
   const [books, setBooks] = useState<Book[] | null>(null);
+  const [yearlyGoal, setYearlyGoal] = useState("");
   const [covers, setCovers] = useState<Record<string, string>>({});
   const [loadError, setLoadError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [fetchingCovers, setFetchingCovers] = useState<Set<string>>(new Set());
-  const [collapsedYears, setCollapsedYears] = useState<Set<string>>(new Set());
-  const [markingReadId, setMarkingReadId] = useState<string | null>(null);
-  const [markYear, setMarkYear] = useState("");
+  const [filter, setFilter] = useState<FilterValue>("all");
+  const [editingId, setEditingId] = useState<string | null>(null);
   const skipOnce = useRef(true);
-  const pendingRef = useRef<{ books: Book[]; covers: Record<string, string> } | null>(null);
+  const pendingRef = useRef<{ books: Book[]; yearlyGoal: string; covers: Record<string, string> } | null>(null);
   const versionsRef = useRef<LecturaVersions>({ lectura: null, lecturaCovers: null });
 
   // --- Load ---
@@ -217,7 +305,9 @@ export default function LecturaManager() {
           ? ((await coversRes.json()) as { data?: unknown; version?: number | null })
           : { data: {}, version: null };
         if (!cancelled) {
-          setBooks(parseLecturaState(booksData.data).books);
+          const parsed = parseLecturaState(booksData.data);
+          setBooks(parsed.books);
+          setYearlyGoal(parsed.yearlyGoal);
           setCovers(parseBookCovers(coversData.data));
           versionsRef.current = { lectura: booksData.version ?? null, lecturaCovers: coversData.version ?? null };
           setLoadError(false);
@@ -233,10 +323,10 @@ export default function LecturaManager() {
   useEffect(() => {
     if (!books || loadError) return;
     if (skipOnce.current) { skipOnce.current = false; return; }
-    pendingRef.current = { books, covers };
+    pendingRef.current = { books, yearlyGoal, covers };
     const timer = setTimeout(() => {
       (async () => {
-        const result = await saveLectura(books, covers, versionsRef.current, setSaveStatus);
+        const result = await saveLectura(books, yearlyGoal, covers, versionsRef.current, setSaveStatus);
         versionsRef.current = result.versions;
         if (result.conflicted) {
           skipOnce.current = true;
@@ -246,7 +336,7 @@ export default function LecturaManager() {
       })();
     }, 500);
     return () => clearTimeout(timer);
-  }, [books, covers, loadError]);
+  }, [books, yearlyGoal, covers, loadError]);
 
   // --- Flush on unload, igual que Coches ---
   useEffect(() => {
@@ -257,7 +347,7 @@ export default function LecturaManager() {
         fetch("/api/section/lectura", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ books: p.books, expectedVersion: versionsRef.current.lectura }),
+          body: JSON.stringify({ books: p.books, yearlyGoal: p.yearlyGoal, expectedVersion: versionsRef.current.lectura }),
           keepalive: true,
         });
         fetch("/api/section/lectura-covers", {
@@ -285,10 +375,13 @@ export default function LecturaManager() {
     setReloadKey((k) => k + 1);
   };
 
-  const fetchCover = async (id: string, title: string, author: string) => {
+  const fetchCover = async (id: string, params: { title?: string; author?: string; url?: string }) => {
     setFetchingCovers((s) => new Set(s).add(id));
     try {
-      const q = new URLSearchParams({ title, author });
+      const q = new URLSearchParams();
+      if (params.url) q.set("url", params.url);
+      if (params.title) q.set("title", params.title);
+      if (params.author) q.set("author", params.author);
       const res = await fetch(`/api/book-cover?${q}`);
       if (res.ok) {
         const data = (await res.json()) as { cover: string | null };
@@ -301,11 +394,18 @@ export default function LecturaManager() {
     }
   };
 
-  const addBook = (status: BookStatus) => (title: string, author: string, year: string) => {
+  const addBook = (title: string, author: string, pagesTotal: string) => {
     const id = uid();
-    const book: Book = { id, title, author, status, yearFinished: status === "read" ? year : "" };
+    const book: Book = {
+      id, title, author, pagesTotal,
+      status: "future", yearFinished: "", pagesRead: "", rating: 0, notes: "", coverUrl: "",
+    };
     setBooks((prev) => [...(prev ?? []), book]);
-    void fetchCover(id, title, author);
+    void fetchCover(id, { title, author });
+  };
+
+  const updateBook = (id: string, patch: Partial<Book>) => {
+    setBooks((prev) => (prev ?? []).map((b) => (b.id === id ? { ...b, ...patch } : b)));
   };
 
   const deleteBook = (id: string) => {
@@ -316,28 +416,11 @@ export default function LecturaManager() {
       delete next[id];
       return next;
     });
-  };
-
-  const setStatus = (id: string, status: BookStatus, yearFinished = "") => {
-    setBooks((prev) => (prev ?? []).map((b) => (b.id === id ? { ...b, status, yearFinished } : b)));
-  };
-
-  const confirmMarkRead = (id: string) => {
-    setStatus(id, "read", markYear.trim() || String(new Date().getFullYear()));
-    setMarkingReadId(null);
+    if (editingId === id) setEditingId(null);
   };
 
   const moveFuture = (id: string, direction: "up" | "down") => {
     setBooks((prev) => (prev ? moveFutureBook(prev, id, direction) : prev));
-  };
-
-  const toggleYear = (year: string) => {
-    setCollapsedYears((prev) => {
-      const next = new Set(prev);
-      if (next.has(year)) next.delete(year);
-      else next.add(year);
-      return next;
-    });
   };
 
   if (loadError) {
@@ -357,16 +440,27 @@ export default function LecturaManager() {
     );
   }
 
-  const reading = books.filter((b) => b.status === "reading");
-  const future = books.filter((b) => b.status === "future");
-  const yearGroups = groupReadBooksByYear(books);
   const stats = computeReadingStats(books);
-  const hasAnyBook = books.length > 0;
+  const editingBook = books.find((b) => b.id === editingId) ?? null;
+  const future = books.filter((b) => b.status === "future");
+  const dateLabel = new Intl.DateTimeFormat("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date());
+
+  const counts: Record<FilterValue, number> = {
+    all: books.length,
+    reading: stats.currentlyReading,
+    future: stats.upcoming,
+    read: stats.totalRead,
+    abandoned: stats.abandoned,
+  };
+  const FILTER_LABEL: Record<FilterValue, string> = {
+    all: "Todos", reading: "Leyendo", future: "Pendientes", read: "Terminados", abandoned: "Abandonados",
+  };
 
   return (
     <div className={c.page}>
-      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1rem" }}>
-        <h1 style={{ fontSize: "1.2rem", margin: 0, color: "var(--c-text)" }}>Lectura</h1>
+      <div style={{ display: "flex", alignItems: "baseline", gap: "0.6rem", marginBottom: "0.25rem", flexWrap: "wrap" }}>
+        <h1 style={{ fontSize: "1.3rem", margin: 0, color: "var(--c-text)" }}>Lectura</h1>
+        <span style={{ fontSize: "0.85rem", color: "var(--c-muted)" }}>Seguimiento de libros</span>
         {saveStatus !== "idle" && (
           <span
             role="status"
@@ -382,153 +476,277 @@ export default function LecturaManager() {
           </span>
         )}
       </div>
+      <p style={{ fontSize: "0.8rem", color: "var(--c-muted)", margin: "0 0 1rem", textTransform: "capitalize" }}>{dateLabel}</p>
 
-      {/* Resumen de lectura */}
-      {hasAnyBook && (
+      <AddBookForm onAdd={addBook} />
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+        <YearlyGoal goal={yearlyGoal} done={stats.readThisYear} onChange={setYearlyGoal} />
         <section style={cardStyle}>
-          <h2 style={{ fontSize: "0.95rem", margin: "0 0 0.75rem", color: "var(--c-text)" }}>Resumen de lectura</h2>
+          <h2 style={{ fontSize: "0.95rem", margin: "0 0 0.75rem", color: "var(--c-text)" }}>📊 Estadísticas</h2>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "1.25rem" }}>
-            <StatTile label="Leídos en total" value={String(stats.totalRead)} />
-            <StatTile label="Leídos este año" value={String(stats.readThisYear)} />
-            <StatTile label="Media por año" value={stats.avgPerYear > 0 ? stats.avgPerYear.toFixed(1) : "—"} />
-            <StatTile label="Leyendo ahora" value={String(stats.currentlyReading)} />
-            <StatTile label="En espera" value={String(stats.upcoming)} />
+            <StatTile label="Leídos" value={String(stats.totalRead)} />
+            <StatTile label="Leyendo" value={String(stats.currentlyReading)} />
+            <StatTile label="Páginas" value={stats.totalPages.toLocaleString("es-ES")} />
+            <StatTile label="Valoración" value={stats.avgRating > 0 ? stats.avgRating.toFixed(1) : "—"} />
           </div>
         </section>
+      </div>
+
+      {/* Filtros */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", margin: "0.25rem 0 1rem" }}>
+        {(["all", "reading", "read", "future", "abandoned"] as FilterValue[]).map((f) => (
+          <button
+            key={f}
+            type="button"
+            onClick={() => setFilter(f)}
+            style={{
+              ...btnStyle,
+              background: filter === f ? "var(--c-accent)" : "var(--c-btn)",
+              color: filter === f ? "#ffffff" : "var(--c-btn-text)",
+              fontWeight: 600,
+            }}
+          >
+            {FILTER_LABEL[f]} ({counts[f]})
+          </button>
+        ))}
+      </div>
+
+      {books.length === 0 && (
+        <p style={{ color: "var(--c-muted)", fontSize: "0.85rem" }}>Añade tu primer libro arriba para empezar.</p>
       )}
 
-      {/* Leyendo ahora */}
-      <section style={cardStyle}>
-        <h2 style={{ fontSize: "0.95rem", margin: "0 0 0.75rem", color: "var(--c-text)" }}>Leyendo ahora</h2>
-        {reading.length === 0 ? (
-          <p style={{ color: "var(--c-muted)", fontSize: "0.85rem" }}>Nada en marcha ahora mismo.</p>
-        ) : (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.9rem" }}>
-            {reading.map((b) => (
-              <div key={b.id} style={{ width: "8.5rem" }}>
-                <CoverThumb src={covers[b.id]} title={b.title} width={136} height={200} />
-                <p style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--c-text)", margin: "0.4rem 0 0" }}>{b.title}</p>
-                {b.author && <p style={{ fontSize: "0.76rem", color: "var(--c-muted)", margin: "0.1rem 0 0" }}>{b.author}</p>}
-                {markingReadId === b.id ? (
-                  <div style={{ display: "flex", gap: "0.3rem", marginTop: "0.4rem" }}>
-                    <input
-                      value={markYear}
-                      onChange={(e) => { if (/^\d{0,4}$/.test(e.target.value)) setMarkYear(e.target.value); }}
-                      style={{ ...inputStyle, width: "4rem", padding: "0.3rem" }}
-                      aria-label={`Año en que terminaste ${b.title}`}
-                      autoFocus
-                    />
-                    <button type="button" onClick={() => confirmMarkRead(b.id)} style={{ ...btnAccent, padding: "0.3rem 0.5rem" }}>✓</button>
-                  </div>
-                ) : (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem", marginTop: "0.4rem" }}>
-                    <button
-                      type="button"
-                      onClick={() => { setMarkingReadId(b.id); setMarkYear(String(new Date().getFullYear())); }}
-                      style={{ ...btnStyle, padding: "0.3rem 0.5rem", fontSize: "0.75rem" }}
-                    >
-                      ✓ Leído
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setStatus(b.id, "future")}
-                      style={{ ...btnStyle, padding: "0.3rem 0.5rem", fontSize: "0.75rem" }}
-                      title="Mover a próximas lecturas"
-                    >
-                      ⏸
-                    </button>
-                    {!covers[b.id] && (
-                      <button
-                        type="button"
-                        onClick={() => void fetchCover(b.id, b.title, b.author)}
-                        disabled={fetchingCovers.has(b.id)}
-                        style={{ ...btnStyle, padding: "0.3rem 0.5rem", fontSize: "0.75rem" }}
-                        title="Buscar portada"
+      {STATUS_ORDER.filter((status) => filter === "all" || filter === status).map((status) => {
+        const group = books.filter((b) => b.status === status);
+        if (group.length === 0) return null;
+        return (
+          <section key={status} style={{ marginBottom: "1.25rem" }}>
+            <h2 style={{ fontSize: "0.9rem", margin: "0 0 0.6rem", color: STATUS_COLOR[status] }}>
+              {STATUS_LABEL[status]} <span style={{ color: "var(--c-muted)", fontWeight: 400 }}>· {group.length} libro{group.length === 1 ? "" : "s"}</span>
+            </h2>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.9rem" }}>
+              {group.map((b) => {
+                const pct = Math.round(bookProgress(b));
+                const pagesTotal = Number.parseFloat(b.pagesTotal) || 0;
+                const pagesRead = Number.parseFloat(b.pagesRead) || 0;
+                const queuePos = status === "future" ? future.findIndex((f) => f.id === b.id) : -1;
+                return (
+                  <div key={b.id} style={{ width: "11rem", position: "relative" }}>
+                    {queuePos >= 0 && (
+                      <span
+                        style={{
+                          position: "absolute", top: -6, left: -6, width: 22, height: 22, borderRadius: "50%",
+                          background: "var(--c-warn)", color: "#fff", fontSize: "0.72rem", fontWeight: 700,
+                          display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1,
+                        }}
                       >
-                        {fetchingCovers.has(b.id) ? "…" : "↻"}
-                      </button>
+                        {queuePos + 1}
+                      </span>
                     )}
-                    <button type="button" onClick={() => deleteBook(b.id)} style={{ ...btnDanger, padding: "0.3rem 0.5rem", fontSize: "0.75rem" }}>×</button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-        <AddBookForm placeholder="Ej. Dune" onAdd={addBook("reading")} />
-      </section>
-
-      {/* Próximas lecturas */}
-      <section style={cardStyle}>
-        <h2 style={{ fontSize: "0.95rem", margin: "0 0 0.75rem", color: "var(--c-text)" }}>Próximas lecturas</h2>
-        {future.length === 0 ? (
-          <p style={{ color: "var(--c-muted)", fontSize: "0.85rem" }}>No tienes nada en la lista de espera.</p>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            {future.map((b, idx) => (
-              <div key={b.id} style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-                <CoverThumb src={covers[b.id]} title={b.title} width={34} height={50} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--c-text)", margin: 0 }}>{b.title}</p>
-                  {b.author && <p style={{ fontSize: "0.76rem", color: "var(--c-muted)", margin: 0 }}>{b.author}</p>}
-                </div>
-                <button type="button" onClick={() => moveFuture(b.id, "up")} disabled={idx === 0} style={{ ...btnStyle, padding: "0.25rem 0.5rem" }} aria-label={`Subir ${b.title}`}>▲</button>
-                <button type="button" onClick={() => moveFuture(b.id, "down")} disabled={idx === future.length - 1} style={{ ...btnStyle, padding: "0.25rem 0.5rem" }} aria-label={`Bajar ${b.title}`}>▼</button>
-                <button type="button" onClick={() => setStatus(b.id, "reading")} style={{ ...btnStyle, padding: "0.25rem 0.6rem", fontSize: "0.78rem" }}>▶ Empezar</button>
-                <button type="button" onClick={() => deleteBook(b.id)} style={{ ...btnDanger, padding: "0.25rem 0.5rem" }}>×</button>
-              </div>
-            ))}
-          </div>
-        )}
-        <AddBookForm placeholder="Ej. Project Hail Mary" onAdd={addBook("future")} />
-      </section>
-
-      {/* Leídos, agrupados por año */}
-      <section style={cardStyle}>
-        <h2 style={{ fontSize: "0.95rem", margin: "0 0 0.75rem", color: "var(--c-text)" }}>Leídos</h2>
-        {yearGroups.length === 0 ? (
-          <p style={{ color: "var(--c-muted)", fontSize: "0.85rem" }}>Aún no has marcado ningún libro como leído.</p>
-        ) : (
-          yearGroups.map((group) => {
-            const collapsed = collapsedYears.has(group.year);
-            return (
-              <div key={group.year} style={{ marginBottom: "0.75rem" }}>
-                <button
-                  type="button"
-                  onClick={() => toggleYear(group.year)}
-                  style={{
-                    ...btnStyle,
-                    width: "100%",
-                    justifyContent: "flex-start",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.4rem",
-                    background: "var(--c-surface)",
-                    fontWeight: 600,
-                  }}
-                  aria-expanded={!collapsed}
-                >
-                  <span>{collapsed ? "▶" : "▼"}</span>
-                  {group.year} ({group.books.length})
-                </button>
-                {!collapsed && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.8rem", marginTop: "0.6rem" }}>
-                    {group.books.map((b) => (
-                      <div key={b.id} style={{ width: "6.5rem" }}>
-                        <CoverThumb src={covers[b.id]} title={b.title} width={104} height={152} />
-                        <p style={{ fontSize: "0.76rem", fontWeight: 600, color: "var(--c-text)", margin: "0.3rem 0 0" }}>{b.title}</p>
-                        {b.author && <p style={{ fontSize: "0.7rem", color: "var(--c-muted)", margin: 0 }}>{b.author}</p>}
-                        <button type="button" onClick={() => deleteBook(b.id)} style={{ ...btnDanger, padding: "0.2rem 0.4rem", fontSize: "0.7rem", marginTop: "0.2rem" }}>Eliminar</button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingId(b.id)}
+                      style={{ all: "unset", cursor: "pointer", display: "block", width: "100%" }}
+                    >
+                      <CoverThumb src={covers[b.id]} title={b.title} width={176} height={240} />
+                      <p style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--c-text)", margin: "0.4rem 0 0" }}>{b.title}</p>
+                      {b.author && <p style={{ fontSize: "0.76rem", color: "var(--c-muted)", margin: "0.1rem 0 0" }}>{b.author}</p>}
+                      <div style={{ marginTop: "0.3rem" }}><StatusBadge status={b.status} /></div>
+                      <ProgressBar pct={status === "read" ? 100 : pct} color={STATUS_COLOR[status]} />
+                      <p style={{ fontSize: "0.72rem", color: "var(--c-muted)", margin: "0.25rem 0 0" }}>
+                        {pagesRead} / {pagesTotal || "?"} págs · {status === "read" ? 100 : pct}%
+                      </p>
+                      {status === "read" && b.rating > 0 && <Stars rating={b.rating} />}
+                    </button>
+                    {status === "future" && (
+                      <div style={{ display: "flex", gap: "0.3rem", marginTop: "0.3rem" }}>
+                        <button type="button" onClick={() => moveFuture(b.id, "up")} disabled={queuePos === 0} style={{ ...btnStyle, padding: "0.15rem 0.45rem", fontSize: "0.75rem" }} aria-label={`Subir ${b.title}`}>▲</button>
+                        <button type="button" onClick={() => moveFuture(b.id, "down")} disabled={queuePos === future.length - 1} style={{ ...btnStyle, padding: "0.15rem 0.45rem", fontSize: "0.75rem" }} aria-label={`Bajar ${b.title}`}>▼</button>
                       </div>
-                    ))}
+                    )}
                   </div>
-                )}
-              </div>
-            );
-          })
-        )}
-        <AddBookForm placeholder="Ej. 1984" showYear onAdd={addBook("read")} />
-      </section>
+                );
+              })}
+            </div>
+          </section>
+        );
+      })}
+
+      {editingBook && (
+        <EditPanel
+          book={editingBook}
+          cover={covers[editingBook.id]}
+          fetchingCover={fetchingCovers.has(editingBook.id)}
+          onClose={() => setEditingId(null)}
+          onChange={(patch) => updateBook(editingBook.id, patch)}
+          onSearchCover={() => void fetchCover(editingBook.id, { title: editingBook.title, author: editingBook.author })}
+          onFetchCoverUrl={(url) => void fetchCover(editingBook.id, { url })}
+          onDelete={() => deleteBook(editingBook.id)}
+        />
+      )}
     </div>
+  );
+}
+
+function EditPanel({
+  book,
+  cover,
+  fetchingCover,
+  onClose,
+  onChange,
+  onSearchCover,
+  onFetchCoverUrl,
+  onDelete,
+}: {
+  book: Book;
+  cover: string | undefined;
+  fetchingCover: boolean;
+  onClose: () => void;
+  onChange: (patch: Partial<Book>) => void;
+  onSearchCover: () => void;
+  onFetchCoverUrl: (url: string) => void;
+  onDelete: () => void;
+}) {
+  const pct = Math.round(bookProgress(book));
+  const pagesTotal = Number.parseFloat(book.pagesTotal) || 0;
+  const pagesRead = Number.parseFloat(book.pagesRead) || 0;
+
+  return (
+    <>
+      <div
+        onClick={onClose}
+        style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 40 }}
+      />
+      <div
+        style={{
+          position: "fixed", top: 0, right: 0, bottom: 0, width: "min(22rem, 100vw)",
+          background: "var(--c-card)", borderLeft: "1px solid var(--c-border)", zIndex: 41,
+          overflowY: "auto", padding: "1.25rem",
+        }}
+      >
+        <div style={{ display: "flex", gap: "0.75rem", alignItems: "flex-start" }}>
+          <CoverThumb src={cover} title={book.title} width={56} height={80} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontWeight: 700, color: "var(--c-text)", margin: 0 }}>{book.title}</p>
+            {book.author && <p style={{ fontSize: "0.8rem", color: "var(--c-muted)", margin: "0.1rem 0 0" }}>{book.author}</p>}
+          </div>
+          <button type="button" onClick={onClose} aria-label="Cerrar" style={{ ...btnStyle, padding: "0.2rem 0.5rem" }}>×</button>
+        </div>
+
+        <div style={{ margin: "0.6rem 0" }}><StatusBadge status={book.status} /></div>
+        <ProgressBar pct={book.status === "read" ? 100 : pct} color={STATUS_COLOR[book.status]} />
+        <p style={{ fontSize: "0.76rem", color: "var(--c-muted)", margin: "0.3rem 0 1rem" }}>
+          {pagesRead} / {pagesTotal || "?"} págs · {book.status === "read" ? 100 : pct}%
+        </p>
+
+        <Field label="Portada (URL)">
+          <div style={{ display: "flex", gap: "0.4rem" }}>
+            <input
+              value={book.coverUrl}
+              onChange={(e) => onChange({ coverUrl: e.target.value })}
+              placeholder="https://…"
+              style={{ ...inputStyle, flex: 1 }}
+            />
+            <button
+              type="button"
+              onClick={() => book.coverUrl.trim() && onFetchCoverUrl(book.coverUrl.trim())}
+              disabled={fetchingCover || !book.coverUrl.trim()}
+              style={{ ...btnAccent, padding: "0.4rem 0.6rem" }}
+              title="Descargar esa URL"
+            >
+              ✓
+            </button>
+            <button
+              type="button"
+              onClick={onSearchCover}
+              disabled={fetchingCover}
+              style={{ ...btnStyle, padding: "0.4rem 0.6rem" }}
+              title="Buscar portada automáticamente"
+            >
+              {fetchingCover ? "…" : "🔍"}
+            </button>
+          </div>
+        </Field>
+
+        <div style={{ display: "flex", gap: "0.6rem" }}>
+          <Field label="Páginas leídas" style={{ flex: 1 }}>
+            <input
+              value={book.pagesRead}
+              onChange={(e) => { if (/^\d{0,5}$/.test(e.target.value)) onChange({ pagesRead: e.target.value }); }}
+              style={{ ...inputStyle, width: "100%" }}
+            />
+          </Field>
+          <Field label="Páginas totales" style={{ flex: 1 }}>
+            <input
+              value={book.pagesTotal}
+              onChange={(e) => { if (/^\d{0,5}$/.test(e.target.value)) onChange({ pagesTotal: e.target.value }); }}
+              style={{ ...inputStyle, width: "100%" }}
+            />
+          </Field>
+        </div>
+
+        <Field label="Año de finalización">
+          <input
+            value={book.yearFinished}
+            onChange={(e) => { if (/^\d{0,4}$/.test(e.target.value)) onChange({ yearFinished: e.target.value }); }}
+            placeholder={String(new Date().getFullYear())}
+            style={{ ...inputStyle, width: "100%" }}
+          />
+        </Field>
+
+        <Field label="Valoración">
+          <Stars rating={book.rating} onRate={(n) => onChange({ rating: n })} />
+        </Field>
+
+        <Field label="Estado">
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
+            {STATUS_ORDER.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => onChange({ status: s, yearFinished: s === "read" && !book.yearFinished ? String(new Date().getFullYear()) : book.yearFinished })}
+                style={{
+                  ...btnStyle,
+                  background: book.status === s ? STATUS_COLOR[s] : "var(--c-btn)",
+                  color: book.status === s ? "#ffffff" : "var(--c-btn-text)",
+                  fontWeight: 600,
+                }}
+              >
+                {STATUS_LABEL[s]}
+              </button>
+            ))}
+          </div>
+        </Field>
+
+        <Field label="Notas">
+          <textarea
+            value={book.notes}
+            onChange={(e) => onChange({ notes: e.target.value })}
+            placeholder="Tus anotaciones sobre el libro…"
+            rows={4}
+            style={{ ...inputStyle, width: "100%", resize: "vertical", fontFamily: "inherit" }}
+          />
+        </Field>
+
+        <button
+          type="button"
+          onClick={onDelete}
+          style={{ ...btnDanger, width: "100%", padding: "0.6rem", background: "rgba(239, 68, 68, 0.1)", marginTop: "0.5rem" }}
+        >
+          🗑 Eliminar
+        </button>
+      </div>
+    </>
+  );
+}
+
+function Field({ label, children, style }: { label: string; children: React.ReactNode; style?: CSSProperties }) {
+  return (
+    <label style={{ display: "block", margin: "0.9rem 0", ...style }}>
+      <span style={{ display: "block", fontSize: "0.72rem", fontWeight: 600, color: "var(--c-muted)", marginBottom: "0.3rem", textTransform: "uppercase" }}>
+        {label}
+      </span>
+      {children}
+    </label>
   );
 }
