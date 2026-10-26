@@ -14,6 +14,21 @@ const currency = new Intl.NumberFormat("es-ES", {
 
 const pct = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 });
 
+// Aportaciones automáticas del banco: la nota lleva el año al final (p.ej.
+// "Round up 2026", "Saveback 2026"), así que se detectan por prefijo en vez
+// de comparar el texto completo.
+type NoteType = "all" | "roundup" | "saveback";
+function detectNoteType(note: string | undefined): Exclude<NoteType, "all"> | null {
+  const n = (note ?? "").trim().toLowerCase();
+  if (n.startsWith("round up") || n.startsWith("roundup")) return "roundup";
+  if (n.startsWith("saveback") || n.startsWith("save back")) return "saveback";
+  return null;
+}
+const NOTE_TYPE_LABEL: Record<Exclude<NoteType, "all">, string> = {
+  roundup: "Round up",
+  saveback: "Saveback",
+};
+
 export function CarteraTab({
   assets,
   values,
@@ -89,6 +104,7 @@ export function CarteraTab({
 
   // Filter for history
   const [selectedAssetFilter, setSelectedAssetFilter] = useState<string>("all");
+  const [selectedNoteType, setSelectedNoteType] = useState<NoteType>("all");
 
   // Orden de la tabla Resultado
   type SortKey = "name" | "value" | "currentPct" | "targetPct" | "toAlign" | "allocation";
@@ -180,9 +196,21 @@ export function CarteraTab({
 
   // Calculations for contribution history
   const filteredContributions = useMemo(() => {
-    if (selectedAssetFilter === "all") return contributions;
-    return contributions.filter((c) => c.assetId === selectedAssetFilter);
-  }, [contributions, selectedAssetFilter]);
+    return contributions.filter((c) => {
+      if (selectedAssetFilter !== "all" && c.assetId !== selectedAssetFilter) return false;
+      if (selectedNoteType !== "all" && detectNoteType(c.note) !== selectedNoteType) return false;
+      return true;
+    });
+  }, [contributions, selectedAssetFilter, selectedNoteType]);
+
+  const noteTypeCounts = useMemo(() => {
+    const counts: Record<Exclude<NoteType, "all">, number> = { roundup: 0, saveback: 0 };
+    for (const c of contributions) {
+      const t = detectNoteType(c.note);
+      if (t) counts[t] += 1;
+    }
+    return counts;
+  }, [contributions]);
 
   const filteredTotalContributed = useMemo(() => {
     return filteredContributions.reduce((s, c) => s + (Number.parseFloat(c.amount) || 0), 0);
@@ -897,12 +925,37 @@ export function CarteraTab({
           </div>
         )}
 
+        {/* Filtro por tipo de nota (aportaciones automáticas del banco) */}
+        {(noteTypeCounts.roundup > 0 || noteTypeCounts.saveback > 0) && (
+          <div className={styles.filterBar}>
+            <button
+              type="button"
+              className={`${styles.filterPill} ${selectedNoteType === "all" ? styles.filterPillActive : ""}`}
+              onClick={() => setSelectedNoteType("all")}
+            >
+              Todos los tipos
+            </button>
+            {(Object.keys(NOTE_TYPE_LABEL) as Array<Exclude<NoteType, "all">>).map((t) =>
+              noteTypeCounts[t] > 0 ? (
+                <button
+                  key={t}
+                  type="button"
+                  className={`${styles.filterPill} ${selectedNoteType === t ? styles.filterPillActive : ""}`}
+                  onClick={() => setSelectedNoteType(t)}
+                >
+                  {NOTE_TYPE_LABEL[t]} ({noteTypeCounts[t]})
+                </button>
+              ) : null
+            )}
+          </div>
+        )}
+
         {/* Tabla de aportaciones */}
         {filteredContributions.length === 0 ? (
           <p className={styles.empty}>
             {contributions.length === 0
               ? "Aún no has registrado aportaciones. Haz clic en '+ Aportar €' junto a cualquiera de tus activos o en '+ Registrar aportación manual' para empezar."
-              : "No hay aportaciones para el activo seleccionado."}
+              : "No hay aportaciones que coincidan con los filtros seleccionados."}
           </p>
         ) : (
           <div className={styles.tableWrap}>
